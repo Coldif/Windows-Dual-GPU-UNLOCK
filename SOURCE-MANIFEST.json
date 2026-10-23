@@ -50,13 +50,13 @@
     },
     {
       "path": "README.ko.md",
-      "bytes": 11490,
-      "sha256": "d2b49c94188bc7bfde460433e7fced27c6f266222e88fa7d2e5316bd3ab46bb1"
+      "bytes": 11942,
+      "sha256": "e1b6b5fa2c488e91a9cdc49ff188dbe4a3b628113a803168aa294f3e09d3c753"
     },
     {
       "path": "README.md",
-      "bytes": 10941,
-      "sha256": "1854ddb2f1f19a1b6c54f4f0066310becbd41503e5bbd3a946ae6ba14d08ee82"
+      "bytes": 11050,
+      "sha256": "e5399b9628b82308c043cf8ea8af793b3b027d8ba41ef6a08977d4305e9b1c96"
     },
     {
       "path": "RELEASE-NOTES.md",
@@ -4035,8 +4035,8 @@
     },
     {
       "path": "research/headless/README.ko.md",
-      "bytes": 11178,
-      "sha256": "6f2ed091193cfcca9da3acb0353a3b7cc00a07beed4ef3d452a53a3005be4131"
+      "bytes": 13526,
+      "sha256": "b9e814d518f9e0ed5876546e0101885c5da448f6a21fa7e6917e86d6b04c5e69"
     },
     {
       "path": "research/headless/analyze_capture.py",

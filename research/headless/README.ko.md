@@ -2,7 +2,7 @@
 
 브랜치: `research/single-gpu-headless` / 기준: `e26bccf`.
 목표는 **3090으로 부팅 화면 조작 → 출력 해제 → 화면 없이 언락 → Windows에서 출력
-복귀**라는 가설을 검증하는 것이다. 현재 상태는 **초기 조사와 오프라인 분석 도구**다.
+복귀**라는 가설을 검증하는 것이다. 현재 상태는 **R1 단일 활성 RTX 출력 관찰 완료**다.
 단일 GPU 언락 EFI는 구현하거나 설치하지 않았다. 검증된 main의 GPU·입력·정리 검사를
 지워 통과시키지 않으며 기존 설치 파일·BootOrder·릴리스도 변경하지 않는다.
 
@@ -11,7 +11,7 @@
 | 항목 | 현재 근거 | 판단 |
 |---|---|---|
 | 가상 콘솔과 물리 출력은 구분된다 | EDK2 ConSplitter는 물리 콘솔이 없어도 가상 handle을 유지하도록 설계됨 | 화면이 없다는 이유만으로 EFI 실행이 불가능하다고 단정할 수 없음 |
-| 현재 ASUS에서 같은 동작인가 | 기존 캡처는 AMD 출력이 남아 있었음 | 미확인 |
+| 현재 ASUS에서 마지막 출력 제거 후에도 콘솔이 유지되는가 | DIAG02는 RTX 물리 GOP 하나와 정상 console/input protocol을 확인했지만 출력을 제거하지 않음 | 마지막 출력 제거 후 동작은 미확인 |
 | Windows는 부팅 중 GOP를 이용한다 | Microsoft UEFI 요구사항에 GOP 사용 명시 | 마지막 GOP 제거 뒤 Boot Manager 동작은 별도 실기 검증 필요 |
 | headless Windows 개념 자체 | Microsoft WDDM headless 지침 | 이 데스크톱에서 실행 중 GOP 제거 후 부팅된다는 증거는 아님 |
 | NVIDIA 드라이버가 화면을 복구하며 unlock 상태도 유지하는가 | 해당 조건의 실제 결과 없음 | 화면 복귀와 Tensor 성능을 따로 확인해야 함 |
@@ -36,7 +36,7 @@ GPU 독점 소유·복구 가능성·영속 로그라는 안전 조건을 구분
 
 | 단계 | 동작 | 다음 단계로 갈 근거 |
 |---|---|---|
-| R0 현재 단계 | 소스·공식 자료 조사, 기존 캡처를 오프라인 분석 | 의존성 목록, 실패 조건, 캡처 분석 검증 |
+| R0 조사 완료 | 소스·공식 자료 조사, 기존 캡처를 오프라인 분석 | 의존성 목록, 실패 조건, 캡처 분석 검증 |
 | R1 관찰만 | 단일 활성 RTX GOP 환경에서 읽기 전용 그래프 수집 | AMD/다른 물리 GOP 없음, 정확한 RTX PCI 신원·ancestry·driver profile, console/input·디스크 로그 확인 |
 | R2 콘솔 소비자만 해제 | 별도 수동 연구 EFI로 TextOut/GraphicsConsole만 해제. NVIDIA GOP는 보존 | unlock·DMA·FLR 없음, 파일 로그 지속, 새 실제 키 입력, Windows 인계 결과 |
 | R3 마지막 GOP 해제 | 검토된 EDID/NVIDIA 해제와 제한된 decode 복원만 시험. unlock 없음 | 물리 GOP 0개 실제 확인, 입력·디스크 로그·보호 graph 유지, Windows/NVIDIA 화면 복귀 |
@@ -48,8 +48,9 @@ R2 이후는 이번 브랜치 생성 요청만으로 실제 실행하지 않는�
 자동 부팅 항목을 대체하지 않고 F8에서 고르는 독립 수동 항목으로 설계한다.
 
 현재 CPU에 iGPU가 있으므로 iGPU GOP가 없는 캡처가 나오더라도 **iGPU 없는 CPU 전체를
-지원한다는 증거는 아니다**. BIOS에서 iGPU를 끄거나 화면 케이블을 바꾸는 조작도 아직
-요청하지 않았다. 실제 시험 전 복구 화면·F8 Windows 진입을 사용할 방법을 확정한다.
+지원한다는 증거는 아니다**. 사용자는 모든 모니터를 RTX에 연결해 R1 관찰을 수행했다.
+BIOS에서 iGPU를 비활성화했는지는 확인하지 않았다. 후속 해제 시험 전 복구 화면·F8
+Windows 진입을 사용할 방법을 확정한다.
 
 ## 지금 실행할 수 있는 도구
 
@@ -92,7 +93,7 @@ python -m unittest discover -s research/headless -p test_analyze_capture.py -v
 `research/headless/build/OBSERVE.EFI`다. 이 명령은 파일을 ESP에 설치하거나 부팅 항목을
 추가하지 않는다. 실제 시험용 별도 수동 항목과 화면/BIOS 복구 절차를 준비하기 전에는
 현재 자동 부팅 항목을 OBSERVE로 바꾸지 않는다. 단일 활성 RTX 조건의 실제 캡처는
-아직 수집하지 않았다.
+2026-10-24 DIAG02에서 수집했다. 아래 실기 기록을 참고한다.
 
 현재 설치된 Auto EFI는 AMD 출력을 요구하므로, iGPU를 끈 뒤 기존 Auto 항목을 선택하면
 준비 검사에서 중단될 수 있다. 실제 R1 시험 전에는 **F8 → Windows Boot Manager로
@@ -109,7 +110,8 @@ BIOS/iGPU 설정을 지금 바꾸라는 안내가 아니다.
   같은 private partition 설정으로 기존 읽기 전용 DIAGNOSTIC과 동일한 파일을 재현했다.
   이 해시는 단일 GPU 성공 증거나 다른 파티션에 맞는 범용 EFI 해시가 아니다.
 - 기존 diagnostic host 검사 35개 통과. GPU/드라이버 변경 서비스가 없는 mock이다.
-- 단일 GPU 실기 캡처·드라이버 해제·GOP 없는 Windows 인계·언락은 아직 미실행이다.
+- 단일 활성 RTX 실기 캡처는 아래 R1 기록으로 추가했다. 드라이버 해제·GOP 없는
+  Windows 인계·단일 GPU 언락은 아직 미실행이다.
 
 ## 기존 실제 캡처에서 얻은 결과
 
@@ -127,7 +129,7 @@ BIOS/iGPU 설정을 지금 바꾸라는 안내가 아니다.
 - [Microsoft WDDM headless 지침](https://learn.microsoft.com/en-us/windows-hardware/drivers/display/wddm-v1-2-best-practices).
   OS headless 동작과 이 실험의 부팅 인계를 구분한다.
 
-연구 완료 조건은 R5의 실기 근거까지다. 지금은 R0를 진행했으며 단일 GPU 지원·EFI
+연구 완료 조건은 R5의 실기 근거까지다. 지금은 R1 출력 토폴로지를 관찰했으며 단일 GPU 지원·EFI
 배포·기본 부팅 승격을 완료했다고 표현하지 않는다.
 
 ## 관찰용 항목 등록 상태
@@ -143,7 +145,39 @@ BIOS/iGPU 설정을 지금 바꾸라는 안내가 아니다.
 파티션 구성의 빌드에는 별도 검토가 필요하다. 공개 설치 범용 도구가 아니다.
 등록 상태와 BCD/firmware 백업은 로컬에만 보존하며 `registration.local.json`은 ignored다.
 
-첫 부팅은 현재 화면/BIOS 설정을 유지한 채 F8에서 이 항목을 선택해 새로운 선택 경로와
-로그 수집을 확인한다. U 입력은 없다. Windows에 돌아오면 새 DIAG 로그를 분석한다.
-이 기준 동작을 확인한 뒤, 별도 복구 경로를 확보한 단일 활성 RTX 환경 관찰로 진행한다.
-현재 두 화면 장치 상태의 성공을 단일 GPU 성공으로 표현하지 않는다.
+관찰용 EFI의 두 차례 실제 부팅에서 정상 완료 로그를 수집했다. U 입력은 없으며
+언락·드라이버 해제를 수행하지 않는다. 아래 결과는 출력 토폴로지 관찰 결과이며,
+단일 GPU 언락 성공으로 표현하지 않는다.
+
+## R1 실기 관찰 결과 — 2026-10-24
+
+같은 연구 PC에서 수집한 로컬 원본을 오프라인 분석기로 다시 읽었다. 원본 로그의
+주소·장치 경로·파티션 설정은 공개하지 않고 재현 식별용 파일 해시만 기록한다.
+
+| 항목 | 기준 부팅 DIAG01 | RTX 출력 부팅 DIAG02 |
+|---|---|---|
+| 파일 수정 시각 (KST) | 02:04:48 | 02:18:06 |
+| 원본 크기 | 426,367 bytes | 424,086 bytes |
+| handle 수 | 585 | 585 |
+| 물리 GOP | AMD + RTX, 2개 | RTX만, 1개 |
+| 가상 콘솔 GOP | 0개 | 0개 |
+| 시스템 TextOut / Input protocol | 있음 / 있음 | 있음 / 있음 |
+| capture-complete / diagnostic-result | 1 / status 0 | 1 / status 0 |
+
+- DIAG01 SHA256: `faf9955cf0ae79791b164c3d58be8cc6f92fd952fc68a259246a77e42784c88e`.
+- DIAG02 SHA256: `32c5567d4cf47ed7df2cc645301fc732a0fc75eeb680a87408e7a200f88b2a2f`.
+- DIAG02는 `OBSERVE.EFI` 실행 경로를 포함한다. Windows의 LastBootUpTime은
+  같은 날 02:18:10 KST였고 사용자가 Windows 복귀를 보고했다.
+- 사용자는 모든 모니터를 3090에 연결했다고 보고했다. 캡처는 AMD 물리 GOP가 없음을
+  확인하지만 CPU의 iGPU 제거·비활성화 또는 iGPU 없는 CPU 지원을 입증하지 않는다.
+- protocol 존재는 실제 키 입력 반응 검증과 다르다. 드라이버 코드 profile·독점
+  소유권·PROM·안전한 해제 가능성은 이 분석기의 검증 범위 밖이다.
+
+**판정:** R1의 읽기 전용 단일 RTX 출력 관찰과 해당 상태의 Windows 진입을 확인했다.
+언락·화면 해제·물리 GOP 0개 상태의 Windows 인계·FP16/BF16 향상은 시험하지 않았다.
+R1의 driver profile 및 입력 반응 등 해제 전 조건은 별도로 확인해야 한다.
+
+**다음 작업:** R2 전용 수동 시험 EFI를 준비한다. 정확한 RTX 신원·driver profile과
+보존해야 할 입력/디스크/PCI 연결을 먼저 검증하고, TextOut/GraphicsConsole 소비자만
+해제하며 NVIDIA GOP는 유지한다. 전후 그래프와 파일 로그, 새 키 입력, Windows 인계를
+확인해야 한다. 이 문서 갱신은 R2 EFI 설치나 기본 부팅 변경을 포함하지 않는다.

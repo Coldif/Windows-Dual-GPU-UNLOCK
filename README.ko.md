@@ -1,5 +1,11 @@
 # Windows GPU UNLOCK
 
+> **연구 브랜치 `research/single-gpu-headless`:** RTX 물리 GOP 하나만 활성화된
+> 상태에서 관찰용 EFI를 거쳐 Windows에 진입한 R1 결과를 확인했습니다.
+> 언락·화면 해제는 수행하지 않았으며 R2 시험은 준비 전입니다.
+> [실기 근거와 다음 단계](research/headless/README.ko.md#r1-실기-관찰-결과--2026-10-24).
+> 기존 기본 부팅 우선순위와 main 릴리스는 유지합니다.
+
 [English](README.md) | **한국어**
 
 ## 처음 시작하기: USB 또는 내부 파티션 선택
