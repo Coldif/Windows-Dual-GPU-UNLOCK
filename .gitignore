@@ -22,3 +22,7 @@ __pycache__/
 compatibility-report*.json
 *.key
 *.pem
+internal-boot/boot/platform-config.h
+internal-boot/boot/generated.h
+internal-boot/local-config.json
+internal-boot/install/state.json

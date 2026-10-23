@@ -1,5 +1,13 @@
 # 외부 코드 고지
 
+## 2026-10-23 내부 부팅 확장
+
+`internal-boot/`는 기존 GPL-2.0-only 포트의 별도 실험 확장입니다. 새 콘솔/드라이버
+인계, 제한된 PCI 복원·비교, 자동 Arm, 설치/복구 코드와 대응 검사를 추가했습니다.
+기존 root `unlock/`·릴리스의 대응 소스는 보존했습니다. 같은 EDK2 헤더는 root `deps/`를
+사용하며 라이선스 고지를 유지합니다. 바이너리 NVIDIA 펌웨어·PROM·BIOS 이미지는
+포함하지 않았습니다. 파티션에 종속되는 EFI는 공개 소스로 사용자가 로컬 빌드합니다.
+
 ## Windows GPU UNLOCK — RTX 3090 포트
 
 2026-10-19/20 수정. 직접 기반은 [rough2515-hub/rtx3080-unlock-public](https://github.com/rough2515-hub/rtx3080-unlock-public/tree/a08254d269af30ace9e57237abd3d8e6c261e8f5)입니다. RTX3090 24GiB / AMD iGPU 대상 검사·메모리 배치·entryLatchedSs1Full 프로필과 대응 테스트를 추가했습니다. 상세 변경 파일과 내용은 [CHANGES.md](CHANGES.md)를 참고하세요. 아래는 상위 코드의 보존 고지입니다. 하위의 MSI3080 관련 날짜·설명은 상위 코드의 이력이며 현재 지원 범위는 README와 docs/COMPATIBILITY.ko.md가 설명합니다.

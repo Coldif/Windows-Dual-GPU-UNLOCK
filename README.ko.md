@@ -2,6 +2,20 @@
 
 [English](README.md) | **한국어**
 
+## 새 기능: USB 없이 언락 → Windows
+
+**[단계별 내부 디스크 설치·자동 부팅·복구 가이드](docs/INTERNAL-BOOT.ko.md)**
+
+2026-10-23, 같은 ASUS BIOS 3057 / RTX 3090 환경에서 내부 EFI가 드라이버를 정리하고
+U 한 번 뒤 Windows로 직접 이어지는 경로를 확인했습니다. 3회 중앙값은 FP16
+**125.91**, BF16 **128.93 TFLOPS**입니다. [원자료](evidence/internal-handoff/summary.json).
+
+`internal-boot/`에는 출력 경로 자동 식별, 제한된 PCI 상태 비교, 자세한 인계 오류,
+**U 없는 자동 부팅용 별도 소스**와 설치·원복 도구가 있습니다. 자동판은 host 검사와
+로컬 설치까지 검증했으며 **첫 실제 자동 부팅은 아직 미검증**입니다. 다른 보드/BIOS
+지원은 추가하지 않았습니다. 자신의 파티션 설정으로 빌드하고 수동 시험부터 진행하세요.
+아래 USB 절차와 기존 `release/` EFI는 계속 수동판입니다.
+
 RTX 3090의 Windows Tensor 연산 성능 향상을 확인한 UEFI 실험 코드와 재현 가이드입니다. [rough2515-hub/rtx3080-unlock-public](https://github.com/rough2515-hub/rtx3080-unlock-public/tree/a08254d269af30ace9e57237abd3d8e6c261e8f5)의 RTX 3080 포트를 바탕으로 RTX 3090 24GiB / AMD 내장그래픽 환경에 맞췄습니다. 원천 코어는 [Zagitta/gpu-unlock](https://github.com/Zagitta/gpu-unlock/tree/0ebdb1c6308b6a2072be5bf04513472942541956)입니다.
 
 **핵심: 언락 성공 후 재부팅하지 않고 Windows Boot Manager로 이어서 부팅합니다.** ASUS에서 `Save Changes & Reset`을 누르면 다시 초기화될 수 있습니다. 이번 성공 사례는 `Boot Override → Windows Boot Manager`를 사용했습니다.
@@ -51,7 +65,7 @@ RTX 3090의 Windows Tensor 연산 성능 향상을 확인한 UEFI 실험 코드�
 - `release/`: 성공 사례 EFI와 해당 소스 연결 해시. 펌웨어는 제외.
 - `benchmark/`: 동일 측정 소스와 로컬 CUDA 12.6 준비·빌드·실행 스크립트.
 - `evidence/`: 개인정보와 원본 PROM을 제외한 측정 자료·실행 로그 발췌·해시.
-- Windows 직접 chainload와 내부 디스크 자동 부팅은 아직 구현하지 않았습니다. 현재 앱은 펌웨어로 반환합니다. 이 사례는 USB로 검증했습니다.
+- `internal-boot/`: 새 내부 디스크 수동 인계 성공 경로와 실기 미검증 자동 부팅판. 기존 루트 앱은 계속 펌웨어로 반환하는 USB 수동판입니다.
 - 이 저장소는 GPU VBIOS 플래싱이나 Windows 드라이버 교체를 안내하지 않습니다. 현재 실험은 사전 부팅 상태를 바꿉니다. 재시작·전원 차단 뒤에는 다시 적용하는 절차를 전제로 합니다.
 
 ## 라이선스와 출처

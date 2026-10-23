@@ -1,5 +1,8 @@
 # Windows GPU UNLOCK — RTX 3090 Windows case study
 
+이 문서는 **v0.1.0 USB 수동 릴리스 이력**입니다. 새 내부 부팅 소스·실험용 자동판은
+[v0.2.0 안내](RELEASE-v0.2.0.md)와 [단계별 가이드](docs/INTERNAL-BOOT.ko.md)를 참고하세요.
+
 실제 성공한 RTX3090 24GiB / AMD iGPU / ASUS B650M-PLUS WIFI 포트와 한국어 가이드입니다.
 
 - 언락 후 재부팅 없이 **Boot Override → Windows Boot Manager**로 진입.

@@ -2,6 +2,20 @@
 
 **English** | [한국어](README.ko.md)
 
+## New: internal disk unlock → Windows
+
+**[Step-by-step install, automatic boot and recovery](docs/INTERNAL-BOOT.en.md)**
+
+On 2026-10-23 the same ASUS BIOS 3057 / RTX 3090 system completed internal manual
+unlock, direct Windows handoff and Tensor verification: FP16 **125.91**, BF16
+**128.93 TFLOPS**, three-run medians. [Measurements](evidence/internal-handoff/summary.json).
+
+`internal-boot/` adds live display-endpoint discovery, bounded status-bit handling,
+detailed handoff failures and a separate **no-U automatic variant**. Automatic mode
+has host tests and a local installation, but **its first real firmware boot remains
+unverified**. No new hardware profile is supported. Build for your own partition
+GUIDs and verify manual operation first. The legacy USB instructions and release EFI below remain manual.
+
 Experimental UEFI code and a reproducible Windows guide for an **NVIDIA RTX 3090 Tensor compute case study**. Adapted from [rough2515-hub/rtx3080-unlock-public](https://github.com/rough2515-hub/rtx3080-unlock-public/tree/a08254d269af30ace9e57237abd3d8e6c261e8f5), using the original [Zagitta/gpu-unlock](https://github.com/Zagitta/gpu-unlock/tree/0ebdb1c6308b6a2072be5bf04513472942541956) core.
 
 > **Current scope: one verified RTX 3090 / ASUS / AMD iGPU system.** The shipped EFI contains exact-machine checks. Other RTX 3090 cards, motherboards, CPUs and display configurations are unverified. Do not bypass checks or replace constants to force execution.
@@ -62,7 +76,7 @@ We want to support more systems through **discovery, reviewed device profiles an
 | `benchmark/` | Measurement source and local CUDA 12.6 setup/build/run tools |
 | `evidence/` | Measurement data, selected logs and hashes; no original PROM or device UUIDs |
 
-Direct Windows chainloading and automatic internal-disk boot are **not implemented**. The app returns to firmware; this case used USB. The procedure does not require VBIOS flashing, Windows driver replacement or changes to the Windows EFI/recovery partitions. It changes pre-boot state; reapplication after reset or power loss is assumed.
+The original root app remains the USB manual version returning to firmware. The separate `internal-boot/` implementation adds a hardware-verified manual Windows handoff and an automatic variant awaiting real firmware validation. Neither procedure requires VBIOS flashing or Windows driver replacement. Existing Windows EFI/recovery partitions are preserved; internal installation uses a separate dedicated ESP.
 
 ## License and attribution
 

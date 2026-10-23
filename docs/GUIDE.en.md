@@ -79,4 +79,4 @@ Keep the display on integrated graphics after entering Windows and run the [benc
 - To return to normal boot, power off, remove the USB and boot Windows Boot Manager. No Windows EFI modification is needed.
 - Do not assume persistence across subsequent boots. Apply the procedure again and measure as needed.
 
-Automatic boot from a new internal FAT32 partition is not implemented. Deleting the existing Windows EFI partition is unnecessary.
+This guide covers the legacy manual USB version. Follow the [separate internal-disk guide](INTERNAL-BOOT.en.md) for the new manual handoff and automatic variant awaiting firmware validation. Never delete the existing Windows ESP.

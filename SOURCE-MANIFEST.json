@@ -1,7 +1,7 @@
 {
   "project": "Windows GPU UNLOCK",
   "format": 1,
-  "note": "Public source and release inventory; firmware, private fixtures and generated builds excluded.",
+  "note": "Public source and release inventory; firmware, private fixtures, machine configuration and generated builds excluded.",
   "files": [
     {
       "path": ".gitattributes",
@@ -9,9 +9,69 @@
       "sha256": "7e814425b43d54bd9d9b1eb0993b334e0452243920833208b12902dd5f56b24b"
     },
     {
+      "path": ".github/ISSUE_TEMPLATE/compatibility.yml",
+      "bytes": 2088,
+      "sha256": "e91d62cb1c6eb8c79f4d9b4de46deab7a1eaa0c58f7db9b8694d8f4328c2c7ad"
+    },
+    {
       "path": ".gitignore",
-      "bytes": 317,
-      "sha256": "31a1d5473a23eba14f53f8fc37646bae939d8420c1ffdacbad291f9b2e4e8067"
+      "bytes": 450,
+      "sha256": "f1c6099ba029ba18a6b52259fee908b590071c3f9a6647e29c44a39d51488469"
+    },
+    {
+      "path": "CHANGES.md",
+      "bytes": 3793,
+      "sha256": "45ab5863160519cdd69a1f10ce6661470631800c42658890cbea5e77dd57f192"
+    },
+    {
+      "path": "LICENSE",
+      "bytes": 18431,
+      "sha256": "189b1af95d661151e054cea10c91b3d754e4de4d3fecfb074c1fb29476f7167b"
+    },
+    {
+      "path": "LICENSES/CMP40HX-MIT.txt",
+      "bytes": 1079,
+      "sha256": "3d9eb567abded21047833b5a0b5acf827c504d15d191e1ca0129672a45f6a6f7"
+    },
+    {
+      "path": "LICENSES/EDK2-BSD-2-Clause-Patent.txt",
+      "bytes": 2732,
+      "sha256": "50ce20c9cfdb0e19ee34fe0a51fc0afe961f743697b068359ab2f862b494df80"
+    },
+    {
+      "path": "LICENSES/NVIDIA-Driver.txt",
+      "bytes": 22653,
+      "sha256": "c692fb14ad4f499c6aee1b9e144e6905148c420e6225b17cb2937366c1e507ad"
+    },
+    {
+      "path": "LICENSES/NVIDIA-MIT.txt",
+      "bytes": 1241,
+      "sha256": "c83f0e32786652a67625fb0770db09ee46fe1ebefba4790600a5ffce52dbde1d"
+    },
+    {
+      "path": "README.ko.md",
+      "bytes": 6886,
+      "sha256": "f4b9c8b243c5c77113f2698ef14d6955d3708e411f39b93d0069663875c0c5b3"
+    },
+    {
+      "path": "README.md",
+      "bytes": 6687,
+      "sha256": "36d59ca2ef86c1bc3a92d360d8819294327fa8ca253ee6c1746de7a1de28ecfc"
+    },
+    {
+      "path": "RELEASE-NOTES.md",
+      "bytes": 1636,
+      "sha256": "9e5c5127078f6d78cf22a0565e85bf6d828f1c7f6fdcb8033c7a918df42402f8"
+    },
+    {
+      "path": "RELEASE-v0.2.0.md",
+      "bytes": 1940,
+      "sha256": "5555e34aaa3035ed2e29e4813e27131a779f1805a4947abfacaa977888f980bd"
+    },
+    {
+      "path": "THIRD_PARTY_NOTICES.md",
+      "bytes": 3349,
+      "sha256": "e5341b8c5b6cebe0b98b177b7798bbc5167ca620d533450f0b21ace79976d88e"
     },
     {
       "path": "benchmark/build.ps1",
@@ -37,11 +97,6 @@
       "path": "benchmark/upstream-compute-benchmark.cu",
       "bytes": 4438,
       "sha256": "57b04fa8599ce298d58237246b4353e72000ce65d3d75bd406e97d1d26ec0fd2"
-    },
-    {
-      "path": "CHANGES.md",
-      "bytes": 2527,
-      "sha256": "8aa98c91d6516a7aa14f7a1873ce0b157ee1697065ade96d9fc03c75af42338a"
     },
     {
       "path": "deps/edk2/License.txt",
@@ -549,6 +604,11 @@
       "sha256": "4062d5451d543e40162deb672073cbfa908d029ba9ad1ce1c0b98509c200dd12"
     },
     {
+      "path": "deps/edk2/MdePkg/Include/IndustryStandard/IScsiBootFirmwareTable.h",
+      "bytes": 6762,
+      "sha256": "fcd99bbaeda649a49ecde65101ef8390c93808bacb3689428264bb4094232a60"
+    },
+    {
       "path": "deps/edk2/MdePkg/Include/IndustryStandard/IoRemappingTable.h",
       "bytes": 10242,
       "sha256": "086243bc1e9f2e88a94d06fa3f7a690d6a2759456ec9ed92ddae3d8d18093f24"
@@ -627,11 +687,6 @@
       "path": "deps/edk2/MdePkg/Include/IndustryStandard/IpmiSsif.h",
       "bytes": 2467,
       "sha256": "a7c2e134eae7caf12c575918b68badc730f41486f0bb010cb0e71876e2ff2e51"
-    },
-    {
-      "path": "deps/edk2/MdePkg/Include/IndustryStandard/IScsiBootFirmwareTable.h",
-      "bytes": 6762,
-      "sha256": "fcd99bbaeda649a49ecde65101ef8390c93808bacb3689428264bb4094232a60"
     },
     {
       "path": "deps/edk2/MdePkg/Include/IndustryStandard/LegacyBiosMpTable.h",
@@ -1144,11 +1199,6 @@
       "sha256": "9122b3712516407027d71e91f2e62ac816b31d3039b9c36387817085b97489b7"
     },
     {
-      "path": "deps/edk2/MdePkg/Include/Library/PeimEntryPoint.h",
-      "bytes": 3410,
-      "sha256": "8837a72ff18d8d6248c92cf00d2ac9bb1c0552ddc53f940f907e0cd1f4f5ddaa"
-    },
-    {
       "path": "deps/edk2/MdePkg/Include/Library/PeiServicesLib.h",
       "bytes": 20933,
       "sha256": "2d37e5c2485a746c2f109aa8d7fec385eec7d6e6e786229c81440908f2591c6c"
@@ -1157,6 +1207,11 @@
       "path": "deps/edk2/MdePkg/Include/Library/PeiServicesTablePointerLib.h",
       "bytes": 2050,
       "sha256": "434e9986faf1aa0614969d0b968c712ca79e27745e132be67a2e1540dcec7b52"
+    },
+    {
+      "path": "deps/edk2/MdePkg/Include/Library/PeimEntryPoint.h",
+      "bytes": 3410,
+      "sha256": "8837a72ff18d8d6248c92cf00d2ac9bb1c0552ddc53f940f907e0cd1f4f5ddaa"
     },
     {
       "path": "deps/edk2/MdePkg/Include/Library/PerformanceLib.h",
@@ -2154,6 +2209,11 @@
       "sha256": "4867e463cc6439cc18870f328ce7249a1ee2e7f9b8c7e82f320c173698168915"
     },
     {
+      "path": "deps/edk2/MdePkg/Include/Protocol/IScsiInitiatorName.h",
+      "bytes": 3184,
+      "sha256": "023f604d324ddbe5bffb7eaab28dc76e108a05a9cdb6316f1c91b024a9bcc400"
+    },
+    {
       "path": "deps/edk2/MdePkg/Include/Protocol/IdeControllerInit.h",
       "bytes": 24444,
       "sha256": "050420d0d091f335fc65299ce225bd3f2018de7829e0bd69bf3312eb8b51a190"
@@ -2199,11 +2259,6 @@
       "sha256": "c6380e88a0f0b23eb7446d0b80f79dfc68e9d3cd3205567f21e984e2b38c8cc5"
     },
     {
-      "path": "deps/edk2/MdePkg/Include/Protocol/IScsiInitiatorName.h",
-      "bytes": 3184,
-      "sha256": "023f604d324ddbe5bffb7eaab28dc76e108a05a9cdb6316f1c91b024a9bcc400"
-    },
-    {
       "path": "deps/edk2/MdePkg/Include/Protocol/Kms.h",
       "bytes": 81273,
       "sha256": "f951fc71a5a83df42161b003dd84980d38c836e1bc2e159abdef0d9da7a38090"
@@ -2234,11 +2289,6 @@
       "sha256": "22a008298bb49a9e7d902ae6cd7e402e82501c9d8c9703e7ff5155c1a326303e"
     },
     {
-      "path": "deps/edk2/MdePkg/Include/Protocol/LoadedImage.h",
-      "bytes": 3028,
-      "sha256": "c8e3e7d2b93b6cec475aea128ec6eec0f0328654037627197ac1cab43febc02b"
-    },
-    {
       "path": "deps/edk2/MdePkg/Include/Protocol/LoadFile.h",
       "bytes": 3130,
       "sha256": "1f7018047f729838315912f31580deff27b41299073e210de3353fabb5cab95b"
@@ -2247,6 +2297,11 @@
       "path": "deps/edk2/MdePkg/Include/Protocol/LoadFile2.h",
       "bytes": 2926,
       "sha256": "5fb84471d8cb14655493f691d7c220c437b99df603e5dbf0fee9dbb4187ace6a"
+    },
+    {
+      "path": "deps/edk2/MdePkg/Include/Protocol/LoadedImage.h",
+      "bytes": 3028,
+      "sha256": "c8e3e7d2b93b6cec475aea128ec6eec0f0328654037627197ac1cab43febc02b"
     },
     {
       "path": "deps/edk2/MdePkg/Include/Protocol/ManagedNetwork.h",
@@ -3034,6 +3089,11 @@
       "sha256": "59fc575aba70f0db7b907cc67dca56510a006d194d116d84eef5593cbab88458"
     },
     {
+      "path": "deps/edk2/MdePkg/Include/Register/Intel/Msr.h",
+      "bytes": 1588,
+      "sha256": "fcbd48cb82d56a8976b32143298467bf61d165604e8a53e3d9337e8a91260743"
+    },
+    {
       "path": "deps/edk2/MdePkg/Include/Register/Intel/Msr/AtomMsr.h",
       "bytes": 25256,
       "sha256": "e5ffea3339e3acc21d52af48cc06f4d8e60d9c194d8887c9525995d74d796e6b"
@@ -3139,11 +3199,6 @@
       "sha256": "933b2ba6fccd4455c05dcce32ae67b49030a6f3a253f8421c34b518d062e99f7"
     },
     {
-      "path": "deps/edk2/MdePkg/Include/Register/Intel/Msr.h",
-      "bytes": 1588,
-      "sha256": "fcbd48cb82d56a8976b32143298467bf61d165604e8a53e3d9337e8a91260743"
-    },
-    {
       "path": "deps/edk2/MdePkg/Include/Register/Intel/SmramSaveStateMap.h",
       "bytes": 5300,
       "sha256": "28b621f5c42e742ac937a8925b125ce9866a1f70a17c7accc8b8a009831ab628"
@@ -3199,6 +3254,11 @@
       "sha256": "2ce2aaf646c17853f9452eda26780a10f78559561e8cfecc9e4031bc02964573"
     },
     {
+      "path": "deps/edk2/MdePkg/Include/Uefi.h",
+      "bytes": 481,
+      "sha256": "1ec56991b282c4540aedee24b83dde7ff252eacfceec2d5d717192c8ce759683"
+    },
+    {
       "path": "deps/edk2/MdePkg/Include/Uefi/UefiAcpiDataTable.h",
       "bytes": 439,
       "sha256": "cd9ec112f29f9d34dd5693ae5243a212846658650ac4ae7d495e114bd8b20b45"
@@ -3234,11 +3294,6 @@
       "sha256": "b9ae7c3067e372690edef10299288007773496b810982bc5fcf81873dd651325"
     },
     {
-      "path": "deps/edk2/MdePkg/Include/Uefi.h",
-      "bytes": 481,
-      "sha256": "1ec56991b282c4540aedee24b83dde7ff252eacfceec2d5d717192c8ce759683"
-    },
-    {
       "path": "deps/edk2/MdePkg/Include/X64/Nasm.inc",
       "bytes": 1871,
       "sha256": "efc69b68f487ae0b472b61dd74210afb2848d4d3379d6cbb2e9cdbfe7cd24162"
@@ -3249,9 +3304,19 @@
       "sha256": "20b43822b0737cbd0f692ad8200cba4cfc47c192431827a98056c8a0068efb19"
     },
     {
+      "path": "docs/ASSETS.en.md",
+      "bytes": 2364,
+      "sha256": "4ec60ca6a2c171b3c3f89b41d1f030f5d754fc8f8bfc26c53e9b244227433c50"
+    },
+    {
       "path": "docs/ASSETS.ko.md",
       "bytes": 2598,
       "sha256": "8476a42672a91f3ff6f9f3c5cde68b57ebd7a396fd5ba9d3011d80d2a2c7c0b9"
+    },
+    {
+      "path": "docs/BENCHMARK.en.md",
+      "bytes": 1902,
+      "sha256": "2382ce2ba046bba4182594f0adf5c3d89b7dd734282c0f274ff9d32f6b7f3b1a"
     },
     {
       "path": "docs/BENCHMARK.ko.md",
@@ -3259,9 +3324,19 @@
       "sha256": "c21a74aa7bd245d15b0de5c0dc80be3eff795ab2a19d2cf6189d59a7dd9e8ad1"
     },
     {
+      "path": "docs/BUILD.en.md",
+      "bytes": 2774,
+      "sha256": "0959ce8ecf6a532a1cc835b6e665accfa40aa4f62dbde93325de23c11d8d113e"
+    },
+    {
       "path": "docs/BUILD.ko.md",
       "bytes": 2644,
       "sha256": "5cb646ad42f026cd3f020f5aad95e785d2f6410c08841d0ac8056ceb10f83deb"
+    },
+    {
+      "path": "docs/COMPATIBILITY.en.md",
+      "bytes": 2053,
+      "sha256": "bf6fafbdc5d52ad330aa83634e43dca88a754b9492ab3c49300d9958ca0e0aab"
     },
     {
       "path": "docs/COMPATIBILITY.ko.md",
@@ -3269,9 +3344,44 @@
       "sha256": "666056c20f89fa15b91df8536f4cdab4aa0b0ce1fe8d4920ea437c98d313f74d"
     },
     {
+      "path": "docs/CONTRIBUTING.en.md",
+      "bytes": 4101,
+      "sha256": "910f90c09a01ad19d520115251ff381f5340845bf62291a2ee6d7eb149b480bb"
+    },
+    {
+      "path": "docs/CONTRIBUTING.ko.md",
+      "bytes": 3462,
+      "sha256": "09c3a69c2cbfd9566f932ec208958d3f5b32b3c0b9cd1f096b20d606082f864d"
+    },
+    {
+      "path": "docs/GUIDE.en.md",
+      "bytes": 4531,
+      "sha256": "db970d4377c642dad015d2be171a9c5cd0fbd98a8b514cd1ddfc4ea54f65ca6a"
+    },
+    {
       "path": "docs/GUIDE.ko.md",
-      "bytes": 5048,
-      "sha256": "2c8943c8b749eb28d5c2f2cc4935c8154ddaa289549b96db21e2ce53de1478cc"
+      "bytes": 5093,
+      "sha256": "92bea5330791c013cfa9812021dbb1d801107dbdb87388b7eb1cdb96c9ea688b"
+    },
+    {
+      "path": "docs/INTERNAL-BOOT.en.md",
+      "bytes": 6404,
+      "sha256": "d1eb4943c16d3c6532224bb1e4ee497358dc1cc50cf63532914b919a4a2cf1e0"
+    },
+    {
+      "path": "docs/INTERNAL-BOOT.ko.md",
+      "bytes": 11492,
+      "sha256": "6c52f4944d08ccbeca60e457a85b84f2221ceef7d16e4b9ea042bb2c5c514bf8"
+    },
+    {
+      "path": "docs/PORTABILITY.en.md",
+      "bytes": 6020,
+      "sha256": "2370db77c7f1d30f218548d9c9319d8c22f589027ec0c1256eff1cb19ae0238a"
+    },
+    {
+      "path": "docs/RESULTS.en.md",
+      "bytes": 2315,
+      "sha256": "26a4639feb39675edfbb64b888711c9a2550610bee01e39c420097d8861dc100"
     },
     {
       "path": "docs/RESULTS.ko.md",
@@ -3294,39 +3404,624 @@
       "sha256": "2cd51903364692d5a8a1b9805b9d91169e5b12834e9290bb26bbe95537bbb6e1"
     },
     {
+      "path": "evidence/internal-handoff/README.md",
+      "bytes": 2324,
+      "sha256": "d164f4e19a5fcf2624e4f42f18a280a27e709e7a29b324d4371512faa8c2e9fa"
+    },
+    {
+      "path": "evidence/internal-handoff/summary.json",
+      "bytes": 313,
+      "sha256": "84829c74eaf594a67b35d7e9a0437d5629bac22035f713d8a6dd25fd3f061c80"
+    },
+    {
+      "path": "evidence/internal-handoff/trial-1.json",
+      "bytes": 690,
+      "sha256": "bccfd26adc3614cdc4e76ff0fc6bc912cb3c7732af29297c9375e45a6894fa22"
+    },
+    {
+      "path": "evidence/internal-handoff/trial-2.json",
+      "bytes": 690,
+      "sha256": "ee5999a592e11e7bec1e0a058f8ef04f173963ac11a0cfeb7a7719a4c80a486c"
+    },
+    {
+      "path": "evidence/internal-handoff/trial-3.json",
+      "bytes": 690,
+      "sha256": "a35d3c809c651cb2a920d15624ac671d2faa45249410d1ac383dad82d073d753"
+    },
+    {
       "path": "evidence/uefi-success-excerpt.txt",
       "bytes": 984,
       "sha256": "f56d5cdcee71f8ad0cfb8bc48a61b69b68b2b1c438c5e9263431f79f71a73edc"
     },
     {
-      "path": "LICENSE",
-      "bytes": 18431,
-      "sha256": "189b1af95d661151e054cea10c91b3d754e4de4d3fecfb074c1fb29476f7167b"
+      "path": "internal-boot/Build.ps1",
+      "bytes": 1335,
+      "sha256": "a4cbad13125c74caf0dcb84fed7f703a7e892ebec43ef552995aa031c62cad07"
     },
     {
-      "path": "LICENSES/CMP40HX-MIT.txt",
-      "bytes": 1079,
-      "sha256": "3d9eb567abded21047833b5a0b5acf827c504d15d191e1ca0129672a45f6a6f7"
+      "path": "internal-boot/Configure.ps1",
+      "bytes": 2363,
+      "sha256": "3cea02d55640a415843879d8ee68187eb84a3fa3c4522f3fa1308cd2e0f5ac4b"
     },
     {
-      "path": "LICENSES/EDK2-BSD-2-Clause-Patent.txt",
-      "bytes": 2732,
-      "sha256": "50ce20c9cfdb0e19ee34fe0a51fc0afe961f743697b068359ab2f862b494df80"
+      "path": "internal-boot/Install.ps1",
+      "bytes": 12372,
+      "sha256": "4d34f095e3f2e2da9620dcdd7cbe1ddbc08d6f0fa84481d8a2170133ef54e4de"
     },
     {
-      "path": "LICENSES/NVIDIA-Driver.txt",
-      "bytes": 22653,
-      "sha256": "c692fb14ad4f499c6aee1b9e144e6905148c420e6225b17cb2937366c1e507ad"
+      "path": "internal-boot/README.md",
+      "bytes": 1095,
+      "sha256": "af5c2ae06eb6cb4c89cbc75fd7f5692c7a16177583f03ffd0251d35597c29fed"
     },
     {
-      "path": "LICENSES/NVIDIA-MIT.txt",
-      "bytes": 1241,
-      "sha256": "c83f0e32786652a67625fb0770db09ee46fe1ebefba4790600a5ffce52dbde1d"
+      "path": "internal-boot/boot/build-automatic.ps1",
+      "bytes": 2591,
+      "sha256": "60d33e489e9242dcef0a9ea5ce60df7440c4a71a9305fc09865aea53490e7063"
     },
     {
-      "path": "README.md",
-      "bytes": 5795,
-      "sha256": "501c507b9ef055329554764ed981792cf81acb62d8b0082fe9c47592621efc6e"
+      "path": "internal-boot/boot/build-console.ps1",
+      "bytes": 1938,
+      "sha256": "c2b298434737ffdcdf2784146fa99746a4e540786b5d39463b8b49f32aa188b9"
+    },
+    {
+      "path": "internal-boot/boot/build-diagnostic.ps1",
+      "bytes": 1867,
+      "sha256": "bc1087a3b00274d7b10cdddd89ae12e99100a9dc02d39ecbe767035e17e9d713"
+    },
+    {
+      "path": "internal-boot/boot/build-full.ps1",
+      "bytes": 2197,
+      "sha256": "71a5ce5596ddbad32d6ccadcbd300ceb9dcfaab3ff02b927c2d9f0bf9c769aae"
+    },
+    {
+      "path": "internal-boot/boot/build.ps1",
+      "bytes": 2121,
+      "sha256": "5f8f6d5e7057d8aa1b5677f26fa1b0dd1db93eb0639b61e72cdab8b31f6cac06"
+    },
+    {
+      "path": "internal-boot/boot/console-flow.c",
+      "bytes": 1402,
+      "sha256": "603e81133092fa93e852e6f4c13d9163e010206a80ff4c5253229147aa5d24c2"
+    },
+    {
+      "path": "internal-boot/boot/console-flow.h",
+      "bytes": 561,
+      "sha256": "3fa9249e21f74b809301fd2bd9011e5e5bc6f9de51bb202f4424c0e5226523d1"
+    },
+    {
+      "path": "internal-boot/boot/decode-policy.h",
+      "bytes": 636,
+      "sha256": "7a0e9215ad942c1c88b86f003b71bb5e9ac415ae11607af0ecbc99c6d49a5dad"
+    },
+    {
+      "path": "internal-boot/boot/diagnostic.c",
+      "bytes": 10644,
+      "sha256": "f5ae5097b0f1e1925b45ed52c5b6b9ab18e0ef070272c994191c27df3a501d8b"
+    },
+    {
+      "path": "internal-boot/boot/diagnostic.h",
+      "bytes": 223,
+      "sha256": "be26ed39a4f04ad17c13521bf13d0aa8a31bd9a68e3afba02ac9cfcc711bf75f"
+    },
+    {
+      "path": "internal-boot/boot/flow.c",
+      "bytes": 954,
+      "sha256": "f2aa854437bf2fb78b9eca6843a694b21106a2332819790f97225bd6b1426bfa"
+    },
+    {
+      "path": "internal-boot/boot/flow.h",
+      "bytes": 466,
+      "sha256": "9ffb7b56427f90753a5b1b5da25dafddbad49d0cfa2bf58fdb94e7a3808e4a50"
+    },
+    {
+      "path": "internal-boot/boot/full-flow.c",
+      "bytes": 1642,
+      "sha256": "b4ab42d94045f70a9f684a5dfc6faf62ce628e1b46f5df292460b231f0ec11df"
+    },
+    {
+      "path": "internal-boot/boot/full-flow.h",
+      "bytes": 592,
+      "sha256": "09bf59b2223c9868db7cee360eef98bfc1b7f587f9485e644f7b244d1beb5422"
+    },
+    {
+      "path": "internal-boot/boot/full-release.c",
+      "bytes": 20737,
+      "sha256": "d0fdaca8144b4730b6386333f5f488b10753a5a397b67f172d019faab193b0d7"
+    },
+    {
+      "path": "internal-boot/boot/full-release.h",
+      "bytes": 498,
+      "sha256": "ceb4c1ac2d49152d71c6522c44ad690644d208d452d82ca9a0111c133d612a46"
+    },
+    {
+      "path": "internal-boot/boot/handoff.c",
+      "bytes": 16733,
+      "sha256": "ab9cdd60aa19bd795df61eba5cef506b20af130665a09b1a691f87dbbb97da8f"
+    },
+    {
+      "path": "internal-boot/boot/make-console-fixture.py",
+      "bytes": 4055,
+      "sha256": "2db13be0f70bf37bd3453ff3e85c2e797d5568272b4d84dac7282815da8cce5f"
+    },
+    {
+      "path": "internal-boot/boot/media.h",
+      "bytes": 2263,
+      "sha256": "4d52e5a681354b6bf56035e45c63cc749091f3dddf4d5d6e014fc85334ed5deb"
+    },
+    {
+      "path": "internal-boot/boot/prepare-console.c",
+      "bytes": 17628,
+      "sha256": "61cac046af3dfb7430cbcaf956f98386f0d711efe73ef5576557dfad4ae062d8"
+    },
+    {
+      "path": "internal-boot/boot/prepare-console.h",
+      "bytes": 427,
+      "sha256": "6ae5ccb901441b41a5cc3d90b7233607a7f8180e61d5738b27e5d15ff3261362"
+    },
+    {
+      "path": "internal-boot/boot/test-console.ps1",
+      "bytes": 1020,
+      "sha256": "e4bce8a6415a9f184b214c8915d5aaea9a82984d5eaf1daa2b9c214344e74de9"
+    },
+    {
+      "path": "internal-boot/boot/test-diagnostic.ps1",
+      "bytes": 924,
+      "sha256": "7e0a52201eb0fc0cb2fcb20f09ab1438e74d70eca970d6b96acdf6a39667e9a9"
+    },
+    {
+      "path": "internal-boot/boot/test-full.ps1",
+      "bytes": 2110,
+      "sha256": "edaa9438012bb90bf472d4c716d72d72b5e481755908a254b1a9bbc8f2fa4a04"
+    },
+    {
+      "path": "internal-boot/boot/test.ps1",
+      "bytes": 1013,
+      "sha256": "0293014a4e9174b2050212673d25040b063f8c7dcf06003d55944538d333d7da"
+    },
+    {
+      "path": "internal-boot/boot/test_console.c",
+      "bytes": 15147,
+      "sha256": "1ab16f293d4a42078b1a30d57d65aa955aa8994e0a5680238106f6c7a9fec5eb"
+    },
+    {
+      "path": "internal-boot/boot/test_diagnostic.c",
+      "bytes": 6499,
+      "sha256": "b2616051c8d2b48210f160d70d28a0d685911b91678dbf7d8c6748b3bab8b971"
+    },
+    {
+      "path": "internal-boot/boot/test_full.c",
+      "bytes": 13919,
+      "sha256": "34ba5ec1d90f491a3e99ca684743135b566ef24dd61250d4287c909c16a53045"
+    },
+    {
+      "path": "internal-boot/boot/test_full_flow.c",
+      "bytes": 3365,
+      "sha256": "18c7bf9ca4cf9478fd404315107c96f946c656f1efdbcbc035e6bd8d0f810074"
+    },
+    {
+      "path": "internal-boot/boot/test_handoff.c",
+      "bytes": 7377,
+      "sha256": "5d338ead6f018bb8fefe70f960780bd5510e4f286919f9663ee106a0b486ce08"
+    },
+    {
+      "path": "internal-boot/efi_runtime.c",
+      "bytes": 490,
+      "sha256": "8949b6cacbdf2f41c7248a4b290c6c2bb7c19cb1a231699fd310d1e526e2d3f4"
+    },
+    {
+      "path": "internal-boot/install/automatic-policy.ps1",
+      "bytes": 1259,
+      "sha256": "8f0edd350f0f2df617782388a63bda6391d98e25d9b6b16cd435ba26d7e73271"
+    },
+    {
+      "path": "internal-boot/install/test-automatic-policy.ps1",
+      "bytes": 3085,
+      "sha256": "7400d2699c2de4484ccbcf118599b94d376b8cf5d9f04d4b6e2f0c442666291f"
+    },
+    {
+      "path": "internal-boot/unlock/app.c",
+      "bytes": 29070,
+      "sha256": "b247d7acc9e71f0f15d620af4d23f8aa9aaefc700ce4a680c407746c60b70f49"
+    },
+    {
+      "path": "internal-boot/unlock/app.h",
+      "bytes": 101,
+      "sha256": "fc1aff4f479dfe0a3191927b3d76c55fc1f2bd8d0bc8a46b9fd84e02050f9e7b"
+    },
+    {
+      "path": "internal-boot/unlock/app_io.c",
+      "bytes": 8641,
+      "sha256": "823ea9627b3214ea5349b8cba4a08081c349fb7596e05ee247744f7e6c6c1493"
+    },
+    {
+      "path": "internal-boot/unlock/app_io.h",
+      "bytes": 241,
+      "sha256": "8bc26d9091c243aa8cf09f5d6a8628f47721cabe8a453062f14fc4e9f055fce4"
+    },
+    {
+      "path": "internal-boot/unlock/assets.json",
+      "bytes": 626,
+      "sha256": "644849b375f7c37f0a46118aac1d55c8c1428b0c29cc017fcaa94b462cc924b0"
+    },
+    {
+      "path": "internal-boot/unlock/build.ps1",
+      "bytes": 5474,
+      "sha256": "bf34f179871b17b431ccbf2a4c2cbd4d3c3ef0eb068d0a3f96fb59a4a962dfd5"
+    },
+    {
+      "path": "internal-boot/unlock/checks.c",
+      "bytes": 6964,
+      "sha256": "d0063086eff3693b4e48f6b1bfdbaac1634d49c264084d0ed2f0a0cc442b02e4"
+    },
+    {
+      "path": "internal-boot/unlock/checks.h",
+      "bytes": 810,
+      "sha256": "7de0b23d1847cb614778b51b08581c7fc351ef787884e128d9a4f4ffe833eb26"
+    },
+    {
+      "path": "internal-boot/unlock/compat.c",
+      "bytes": 5123,
+      "sha256": "6fd7ee9e8e6942b019a79060bcd5faa8315fccd5fe6d0fc5f7d85bf9cf87f7f1"
+    },
+    {
+      "path": "internal-boot/unlock/compat/compat.h",
+      "bytes": 4358,
+      "sha256": "62a7880e7fbc34b59d53b7c1b6922047f41bb9a047dfa99db275b62d307e9d6d"
+    },
+    {
+      "path": "internal-boot/unlock/compat/linux/aperture.h",
+      "bytes": 24,
+      "sha256": "6a7f9e48543f92e269e2a52b77b96575a9abbe3757477533442c54ab43e11bd4"
+    },
+    {
+      "path": "internal-boot/unlock/compat/linux/delay.h",
+      "bytes": 24,
+      "sha256": "6a7f9e48543f92e269e2a52b77b96575a9abbe3757477533442c54ab43e11bd4"
+    },
+    {
+      "path": "internal-boot/unlock/compat/linux/dma-mapping.h",
+      "bytes": 24,
+      "sha256": "6a7f9e48543f92e269e2a52b77b96575a9abbe3757477533442c54ab43e11bd4"
+    },
+    {
+      "path": "internal-boot/unlock/compat/linux/errno.h",
+      "bytes": 24,
+      "sha256": "6a7f9e48543f92e269e2a52b77b96575a9abbe3757477533442c54ab43e11bd4"
+    },
+    {
+      "path": "internal-boot/unlock/compat/linux/firmware.h",
+      "bytes": 24,
+      "sha256": "6a7f9e48543f92e269e2a52b77b96575a9abbe3757477533442c54ab43e11bd4"
+    },
+    {
+      "path": "internal-boot/unlock/compat/linux/io.h",
+      "bytes": 24,
+      "sha256": "6a7f9e48543f92e269e2a52b77b96575a9abbe3757477533442c54ab43e11bd4"
+    },
+    {
+      "path": "internal-boot/unlock/compat/linux/module.h",
+      "bytes": 24,
+      "sha256": "6a7f9e48543f92e269e2a52b77b96575a9abbe3757477533442c54ab43e11bd4"
+    },
+    {
+      "path": "internal-boot/unlock/compat/linux/pci.h",
+      "bytes": 24,
+      "sha256": "6a7f9e48543f92e269e2a52b77b96575a9abbe3757477533442c54ab43e11bd4"
+    },
+    {
+      "path": "internal-boot/unlock/compat/linux/printk.h",
+      "bytes": 24,
+      "sha256": "6a7f9e48543f92e269e2a52b77b96575a9abbe3757477533442c54ab43e11bd4"
+    },
+    {
+      "path": "internal-boot/unlock/compat/linux/slab.h",
+      "bytes": 24,
+      "sha256": "6a7f9e48543f92e269e2a52b77b96575a9abbe3757477533442c54ab43e11bd4"
+    },
+    {
+      "path": "internal-boot/unlock/compat/linux/string.h",
+      "bytes": 24,
+      "sha256": "6a7f9e48543f92e269e2a52b77b96575a9abbe3757477533442c54ab43e11bd4"
+    },
+    {
+      "path": "internal-boot/unlock/compat/linux/timekeeping.h",
+      "bytes": 24,
+      "sha256": "6a7f9e48543f92e269e2a52b77b96575a9abbe3757477533442c54ab43e11bd4"
+    },
+    {
+      "path": "internal-boot/unlock/compat/linux/types.h",
+      "bytes": 24,
+      "sha256": "6a7f9e48543f92e269e2a52b77b96575a9abbe3757477533442c54ab43e11bd4"
+    },
+    {
+      "path": "internal-boot/unlock/format.c",
+      "bytes": 2603,
+      "sha256": "564fc2cb36cac9580983121dc8b48f33773e264507c4b90aed140ba9abb2a2b9"
+    },
+    {
+      "path": "internal-boot/unlock/format.h",
+      "bytes": 213,
+      "sha256": "03b8c257be5f78462d006d8563cea9a623d7b6d5fe50e793e021ca9077330417"
+    },
+    {
+      "path": "internal-boot/unlock/ownership.c",
+      "bytes": 7119,
+      "sha256": "d4d1ccc9befeadde70bc6ee9461894a8397be6d2f35287110f283bf836d2aeee"
+    },
+    {
+      "path": "internal-boot/unlock/ownership.h",
+      "bytes": 580,
+      "sha256": "ef38e7183b29cf29bac16dd7d60089367a1a68ee3d33aa9dd768558fcc8ff888"
+    },
+    {
+      "path": "internal-boot/unlock/port.c",
+      "bytes": 16814,
+      "sha256": "0b3b65248c6d1f2d95d11c862fc285e7a1d6e7ed3949bdbd9dd78f109111f612"
+    },
+    {
+      "path": "internal-boot/unlock/port.h",
+      "bytes": 5011,
+      "sha256": "45fd84774ce31d40811c7396900ee29e9ad37665cadc70e0b29347adfb7da957"
+    },
+    {
+      "path": "internal-boot/unlock/runtime.c",
+      "bytes": 1024,
+      "sha256": "0f25ae89a31c5fc76ade8e39e07e0a47b634ae33969d40eef72673b517ea11b1"
+    },
+    {
+      "path": "internal-boot/unlock/runtime.h",
+      "bytes": 261,
+      "sha256": "da642d486d61f6600ced44bc5efad0bd95eba9e2a9a313f0a90f5aad81e6587e"
+    },
+    {
+      "path": "internal-boot/unlock/sha256.c",
+      "bytes": 5299,
+      "sha256": "5b707487e2aef3e582d689e36e1650b7f017180991c841dcd0cc2d115cdda567"
+    },
+    {
+      "path": "internal-boot/unlock/sha256.h",
+      "bytes": 670,
+      "sha256": "d58d123865b2df9c425ebea850d4c802e8c8fc1e0b6a0ce88a457c1535e11830"
+    },
+    {
+      "path": "internal-boot/unlock/test-all.ps1",
+      "bytes": 6991,
+      "sha256": "25ae3d055ddfe12a4c0f34046298bb635dd5dd6e15ad3f08779ffe7345eedf98"
+    },
+    {
+      "path": "internal-boot/unlock/test-automatic.ps1",
+      "bytes": 1697,
+      "sha256": "35d1c4f63ba958c0be7f756add0db2b08aa41aaf52e32feb089cd2db7e4bc114"
+    },
+    {
+      "path": "internal-boot/unlock/tests/check_fwsec_sequence.py",
+      "bytes": 2916,
+      "sha256": "9106bf55c9f02433c92e2f2fdd27ddb8c249444e5884db90b90aef15c4cd9eb1"
+    },
+    {
+      "path": "internal-boot/unlock/tests/reference/unlock_610_v06.c",
+      "bytes": 52655,
+      "sha256": "1440f0d0c974b8f1d985f48b5852be7287abe10bc66d468fca3833e3cdbc9bab"
+    },
+    {
+      "path": "internal-boot/unlock/tests/test_3090_experimental.c",
+      "bytes": 9467,
+      "sha256": "951997e7a1538e845f4fee4ffcc9fc2f205688cb08f4b90876513ae632f75179"
+    },
+    {
+      "path": "internal-boot/unlock/tests/test_3090_preflight.c",
+      "bytes": 4319,
+      "sha256": "bbf4bbd3f2a57ee9e8439a1c56c9c6fde4daf2312fc98a2967d4e753b040059b"
+    },
+    {
+      "path": "internal-boot/unlock/tests/test_app.c",
+      "bytes": 35780,
+      "sha256": "da1926d0d233576b67f4d95c94ea1fd19d6fb599920f680a8216f23308ddcb9c"
+    },
+    {
+      "path": "internal-boot/unlock/tests/test_automatic.c",
+      "bytes": 2950,
+      "sha256": "fd04bc4b68eb6ed596bed433c4d561a5fa266b1afb3f2f6077f71f196ca68ca0"
+    },
+    {
+      "path": "internal-boot/unlock/tests/test_checks.c",
+      "bytes": 15205,
+      "sha256": "869adcb549165c09c4470a5a85fb33a55837f8ea4c9cb9775b83b926d87b46cd"
+    },
+    {
+      "path": "internal-boot/unlock/tests/test_efi_transaction.c",
+      "bytes": 29051,
+      "sha256": "456b811af215e5c4baf13779c2261f92e3df2b88b59a35cbb2b86ce90bc53bb9"
+    },
+    {
+      "path": "internal-boot/unlock/tests/test_entry_latched.c",
+      "bytes": 11927,
+      "sha256": "6c4b5858c21a85d917432ea725e97901dd2d3dfa19d01b7a3f3cab7d37ac5654"
+    },
+    {
+      "path": "internal-boot/unlock/tests/test_fwsec_trace.c",
+      "bytes": 2067,
+      "sha256": "5db4074f1c82232255af5e1b42657462cb9cf99343c6fa4796d1ee0afd6205f8"
+    },
+    {
+      "path": "internal-boot/unlock/tests/test_master_attributes.c",
+      "bytes": 8755,
+      "sha256": "3e2b79465100f6cd0aaace336b58cf2bfbb7207beb01674b7b5ce4242f2d1c16"
+    },
+    {
+      "path": "internal-boot/unlock/tests/test_pe.py",
+      "bytes": 1214,
+      "sha256": "18fc32e785ed43c8603d30006d17ac134859262e9b4133e48758119a1a7ae988"
+    },
+    {
+      "path": "internal-boot/unlock/tests/test_port.c",
+      "bytes": 9365,
+      "sha256": "c45b6da087e3bb3c97cd86bd8d8b0f13457e2c09b7447299d057a67b726b9140"
+    },
+    {
+      "path": "internal-boot/unlock/tests/test_preflight_lock.c",
+      "bytes": 740,
+      "sha256": "8313870430e7a3b0f243f5c819aac05e5ee7d59776f139c94bd074a04f0dff13"
+    },
+    {
+      "path": "internal-boot/unlock/tests/test_profile_lock.c",
+      "bytes": 6631,
+      "sha256": "7224dc9d91f0506acd48e82873c5127775194b35534dd380c27054bf08e3a70d"
+    },
+    {
+      "path": "internal-boot/unlock/tests/test_runtime.c",
+      "bytes": 2727,
+      "sha256": "a2dd350fa47ad9a2cc5070f248c3165a697ed99d0eabad5d195d136a62fe9bc2"
+    },
+    {
+      "path": "internal-boot/unlock/tests/test_sha256.c",
+      "bytes": 8453,
+      "sha256": "8d648c968e6ebb8618069abc6c961425cf37045c29e68e6f41a1cae4ca8fa512"
+    },
+    {
+      "path": "internal-boot/unlock/tests/test_stock_selection.py",
+      "bytes": 2473,
+      "sha256": "356ae42b3a02c7873dc48116e2d54be850a56be98893698a59d1afac5af7faf7"
+    },
+    {
+      "path": "internal-boot/unlock/tests/test_transaction_3080.c",
+      "bytes": 40399,
+      "sha256": "270f618fb699c952f62a078f82eb52e7210be6a35775fc9c01dfcf68f3d0297c"
+    },
+    {
+      "path": "internal-boot/unlock/tests/transaction_shim/compat.h",
+      "bytes": 4183,
+      "sha256": "49cbc93761e43e675975c96501e036185a04f06cf452fd38d6b7d8153d643fb4"
+    },
+    {
+      "path": "internal-boot/unlock/tests/transaction_shim/linux/aperture.h",
+      "bytes": 69,
+      "sha256": "79c6c41125fc69f2775a4b14aa894497ab980794c995bec7e1226f68a6386ecc"
+    },
+    {
+      "path": "internal-boot/unlock/tests/transaction_shim/linux/delay.h",
+      "bytes": 69,
+      "sha256": "79c6c41125fc69f2775a4b14aa894497ab980794c995bec7e1226f68a6386ecc"
+    },
+    {
+      "path": "internal-boot/unlock/tests/transaction_shim/linux/dma-mapping.h",
+      "bytes": 69,
+      "sha256": "79c6c41125fc69f2775a4b14aa894497ab980794c995bec7e1226f68a6386ecc"
+    },
+    {
+      "path": "internal-boot/unlock/tests/transaction_shim/linux/errno.h",
+      "bytes": 698,
+      "sha256": "4f2cc119124257d1bb66b0ee4bbde929067116355a18408b19eb9c587ba8c75a"
+    },
+    {
+      "path": "internal-boot/unlock/tests/transaction_shim/linux/firmware.h",
+      "bytes": 69,
+      "sha256": "79c6c41125fc69f2775a4b14aa894497ab980794c995bec7e1226f68a6386ecc"
+    },
+    {
+      "path": "internal-boot/unlock/tests/transaction_shim/linux/io.h",
+      "bytes": 69,
+      "sha256": "79c6c41125fc69f2775a4b14aa894497ab980794c995bec7e1226f68a6386ecc"
+    },
+    {
+      "path": "internal-boot/unlock/tests/transaction_shim/linux/module.h",
+      "bytes": 69,
+      "sha256": "79c6c41125fc69f2775a4b14aa894497ab980794c995bec7e1226f68a6386ecc"
+    },
+    {
+      "path": "internal-boot/unlock/tests/transaction_shim/linux/pci.h",
+      "bytes": 69,
+      "sha256": "79c6c41125fc69f2775a4b14aa894497ab980794c995bec7e1226f68a6386ecc"
+    },
+    {
+      "path": "internal-boot/unlock/tests/transaction_shim/linux/printk.h",
+      "bytes": 121,
+      "sha256": "e288b1ef8fdbdda66d052087315b68bb5f6b3ebaa33153177389639ab9beea6f"
+    },
+    {
+      "path": "internal-boot/unlock/tests/transaction_shim/linux/slab.h",
+      "bytes": 69,
+      "sha256": "79c6c41125fc69f2775a4b14aa894497ab980794c995bec7e1226f68a6386ecc"
+    },
+    {
+      "path": "internal-boot/unlock/tests/transaction_shim/linux/string.h",
+      "bytes": 64,
+      "sha256": "1746b8e3bc86ab15105e78ffb7bff9a8b0136756101306f5322281b63d6f1acc"
+    },
+    {
+      "path": "internal-boot/unlock/tests/transaction_shim/linux/timekeeping.h",
+      "bytes": 69,
+      "sha256": "79c6c41125fc69f2775a4b14aa894497ab980794c995bec7e1226f68a6386ecc"
+    },
+    {
+      "path": "internal-boot/unlock/tests/transaction_shim/linux/types.h",
+      "bytes": 69,
+      "sha256": "79c6c41125fc69f2775a4b14aa894497ab980794c995bec7e1226f68a6386ecc"
+    },
+    {
+      "path": "internal-boot/unlock/tests/transaction_shim/vbios_fixture.h",
+      "bytes": 1225,
+      "sha256": "485cbd790ef7e2971bb252cbc9461d3c98bebdb69beeb6d4eaa7b7edb7bcf12b"
+    },
+    {
+      "path": "internal-boot/unlock/vendor/diagnostic.h",
+      "bytes": 1014,
+      "sha256": "055ef365611467aecbb083480f055de5d16c7500f42aa3d47a8025c8690e4baf"
+    },
+    {
+      "path": "internal-boot/unlock/vendor/gfw_eval.c",
+      "bytes": 859,
+      "sha256": "7664023b97719ba4ae4a7ad11a82de9a3ace72a2dcf308274aaf61d3ecbf7210"
+    },
+    {
+      "path": "internal-boot/unlock/vendor/gfw_eval.h",
+      "bytes": 1360,
+      "sha256": "cdd9f1db2343d4f4f8d0ee16ea9e7abb3da1d2f2cf6857e704be98399e4adfdd"
+    },
+    {
+      "path": "internal-boot/unlock/vendor/layout_610.c",
+      "bytes": 2915,
+      "sha256": "349eac5f12127aa367abe812e85e0ba7862d11cef9fccff7232a0d7add8f2749"
+    },
+    {
+      "path": "internal-boot/unlock/vendor/layout_610.h",
+      "bytes": 859,
+      "sha256": "62b1228ba75d9ca717c2a4cb95d1339e44dccb9eb5b99b831cb7837228a72b4a"
+    },
+    {
+      "path": "internal-boot/unlock/vendor/prep_610.c",
+      "bytes": 8028,
+      "sha256": "a041220dd2a68fe391bcf4a6323bcc9fefeea4f9ab46b076a20d628c0f0a8851"
+    },
+    {
+      "path": "internal-boot/unlock/vendor/prep_610.h",
+      "bytes": 2458,
+      "sha256": "ad08f934b950101ae9580bad27958d8ff95a8b9d848fc30b6dfad5eca0beb215"
+    },
+    {
+      "path": "internal-boot/unlock/vendor/unlock_610.c",
+      "bytes": 60189,
+      "sha256": "05b050c5db3d68ab3ec6ee1b92a759e69d17ef4134dce8e595b08b1045d1a8f0"
+    },
+    {
+      "path": "internal-boot/unlock/vendor/unlock_610.h",
+      "bytes": 1097,
+      "sha256": "f128929635727a578b0b765d6f74162d0f4e45c131ac860d4a8d7a8ad6e768f6"
+    },
+    {
+      "path": "internal-boot/unlock/vendor/vbios_610.c",
+      "bytes": 9923,
+      "sha256": "fa1a1a26ab54409010d490112a5b4503c6c72d4775e2f9b465c806f28266165f"
+    },
+    {
+      "path": "internal-boot/unlock/vendor/vbios_610.h",
+      "bytes": 972,
+      "sha256": "f433a1c27946047db74839813e65f538ffa4edd468117c08b889886d8031aabc"
+    },
+    {
+      "path": "internal-boot/unlock/verify_pe.py",
+      "bytes": 2397,
+      "sha256": "012e0dbbf406818182a88828ae9be86ea09f55ee8091fe19ddc56e44cd65e328"
     },
     {
       "path": "release/EFI/BOOT/BOOTX64.EFI",
@@ -3339,19 +4034,19 @@
       "sha256": "3d0a8a201045acc820c68f52c7a7cd8dd9bc58370af48ba9379d450d2826691b"
     },
     {
-      "path": "RELEASE-NOTES.md",
-      "bytes": 1417,
-      "sha256": "7e88f9af89e6c5d54eec6a680b625c294809ba11b42b8b75c12fc09b8f579b81"
-    },
-    {
-      "path": "THIRD_PARTY_NOTICES.md",
-      "bytes": 2760,
-      "sha256": "de20a495e139efd6e8c14a10898f4e227843bad5ecaf5470d1492ad5b01adb5a"
+      "path": "tools/collect_compatibility.py",
+      "bytes": 6498,
+      "sha256": "1447a60aaad211c830702b9fa50765e32d8f957d326d15a9f1a6f0817b8be5cf"
     },
     {
       "path": "tools/prepare_usb.py",
       "bytes": 4863,
       "sha256": "15678ee72a82bc8d03f96eac5036a816dd1783e76246cccdce6f730ba067d13c"
+    },
+    {
+      "path": "tools/test_collect_compatibility.py",
+      "bytes": 6583,
+      "sha256": "b8a464011c15bf732a937c4365b9851cdcc345b0c1fd589a5165364022a4de2c"
     },
     {
       "path": "tools/test_prepare_usb.py",
@@ -3397,6 +4092,11 @@
       "path": "unlock/checks.h",
       "bytes": 810,
       "sha256": "7de0b23d1847cb614778b51b08581c7fc351ef787884e128d9a4f4ffe833eb26"
+    },
+    {
+      "path": "unlock/compat.c",
+      "bytes": 5123,
+      "sha256": "6fd7ee9e8e6942b019a79060bcd5faa8315fccd5fe6d0fc5f7d85bf9cf87f7f1"
     },
     {
       "path": "unlock/compat/compat.h",
@@ -3467,11 +4167,6 @@
       "path": "unlock/compat/linux/types.h",
       "bytes": 24,
       "sha256": "6a7f9e48543f92e269e2a52b77b96575a9abbe3757477533442c54ab43e11bd4"
-    },
-    {
-      "path": "unlock/compat.c",
-      "bytes": 5123,
-      "sha256": "6fd7ee9e8e6942b019a79060bcd5faa8315fccd5fe6d0fc5f7d85bf9cf87f7f1"
     },
     {
       "path": "unlock/format.c",
@@ -3797,71 +4492,6 @@
       "path": "unlock/verify_pe.py",
       "bytes": 2397,
       "sha256": "012e0dbbf406818182a88828ae9be86ea09f55ee8091fe19ddc56e44cd65e328"
-    },
-    {
-      "path": ".github/ISSUE_TEMPLATE/compatibility.yml",
-      "bytes": 2088,
-      "sha256": "e91d62cb1c6eb8c79f4d9b4de46deab7a1eaa0c58f7db9b8694d8f4328c2c7ad"
-    },
-    {
-      "path": "README.ko.md",
-      "bytes": 5912,
-      "sha256": "c46c8a4cccba4d1909598a2768c5b6c04e9c520641f9ba35c508d1106f2795fb"
-    },
-    {
-      "path": "docs/ASSETS.en.md",
-      "bytes": 2364,
-      "sha256": "4ec60ca6a2c171b3c3f89b41d1f030f5d754fc8f8bfc26c53e9b244227433c50"
-    },
-    {
-      "path": "docs/BENCHMARK.en.md",
-      "bytes": 1902,
-      "sha256": "2382ce2ba046bba4182594f0adf5c3d89b7dd734282c0f274ff9d32f6b7f3b1a"
-    },
-    {
-      "path": "docs/BUILD.en.md",
-      "bytes": 2774,
-      "sha256": "0959ce8ecf6a532a1cc835b6e665accfa40aa4f62dbde93325de23c11d8d113e"
-    },
-    {
-      "path": "docs/COMPATIBILITY.en.md",
-      "bytes": 2053,
-      "sha256": "bf6fafbdc5d52ad330aa83634e43dca88a754b9492ab3c49300d9958ca0e0aab"
-    },
-    {
-      "path": "docs/CONTRIBUTING.en.md",
-      "bytes": 4101,
-      "sha256": "910f90c09a01ad19d520115251ff381f5340845bf62291a2ee6d7eb149b480bb"
-    },
-    {
-      "path": "docs/CONTRIBUTING.ko.md",
-      "bytes": 3462,
-      "sha256": "09c3a69c2cbfd9566f932ec208958d3f5b32b3c0b9cd1f096b20d606082f864d"
-    },
-    {
-      "path": "docs/GUIDE.en.md",
-      "bytes": 4432,
-      "sha256": "24c420296bb136b8170364bbf27ca2be325b6ed5402b78fb425f846745c1d0b3"
-    },
-    {
-      "path": "docs/PORTABILITY.en.md",
-      "bytes": 6020,
-      "sha256": "2370db77c7f1d30f218548d9c9319d8c22f589027ec0c1256eff1cb19ae0238a"
-    },
-    {
-      "path": "docs/RESULTS.en.md",
-      "bytes": 2315,
-      "sha256": "26a4639feb39675edfbb64b888711c9a2550610bee01e39c420097d8861dc100"
-    },
-    {
-      "path": "tools/collect_compatibility.py",
-      "bytes": 6498,
-      "sha256": "1447a60aaad211c830702b9fa50765e32d8f957d326d15a9f1a6f0817b8be5cf"
-    },
-    {
-      "path": "tools/test_collect_compatibility.py",
-      "bytes": 6583,
-      "sha256": "b8a464011c15bf732a937c4365b9851cdcc345b0c1fd589a5165364022a4de2c"
     }
   ]
 }

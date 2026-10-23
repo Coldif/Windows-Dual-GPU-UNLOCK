@@ -1,5 +1,15 @@
 # Changes
 
+## 2026-10-23 — v0.2.0 internal handoff and experimental automatic boot
+
+- Added a separate `internal-boot/` source tree; original USB release source and EFI remain unchanged.
+- Reviewed RTX console/EDID/GOP release, original IO/MEM restoration without BME, and direct Windows handoff. Original unlock transaction and card guards retained.
+- Discovered display ADR per boot while pinning PCI ancestry, GPU identity and subsequent whole-path checks. Allowed only old CED/URD status clearing after successful unlock; other config changes still fail.
+- Added precise handoff failure stages and config differences. Internal manual handoff and Tensor performance were verified on one BIOS 3057 system.
+- Added a separate compile-time automatic child with two Esc windows, strict input failures, fresh hardware gates and rejection of unexpected owners. Automatic firmware boot remains unverified.
+- Added local partition configuration, builds, stage/manual/automatic/recovery scripts and bilingual walkthroughs. Private partition GUIDs, firmware/PROM and raw boot graphs are excluded.
+- Public-source builds reproduced all four locally installed EFI hashes. Public installer registration/promotion remains experimental; host and policy tests are not hardware evidence.
+
 ## 2026-10-23 — International documentation and compatibility inventory
 
 - English default README and complete English USB, assets, build, compatibility, benchmark and results guides; Korean README and guides remain available through language links.
