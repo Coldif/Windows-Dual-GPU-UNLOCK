@@ -1,5 +1,12 @@
 # Windows GPU UNLOCK
 
+> **Research branch: `research/single-gpu-headless`.** This branch investigates
+> one RTX3090 without an iGPU display. It currently adds an offline capture
+> analyzer and staged research plan, **not a headless unlock EFI**.
+> [Research notes and experiments](research/headless/README.ko.md).
+> Existing installed boot settings are untouched; [main](https://github.com/impacifist/Windows-GPU-UNLOCK/tree/main)
+> remains the supported release path.
+
 **English** | [한국어](README.ko.md)
 
 ## Start here: choose USB or an internal partition

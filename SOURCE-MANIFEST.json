@@ -1,7 +1,7 @@
 {
   "project": "Windows GPU UNLOCK",
   "format": 1,
-  "note": "Public source and release inventory; firmware, private fixtures, machine configuration and generated builds excluded.",
+  "note": "Research branch public source inventory; firmware, private captures, machine configuration and generated builds excluded.",
   "files": [
     {
       "path": ".gitattributes",
@@ -15,8 +15,8 @@
     },
     {
       "path": ".gitignore",
-      "bytes": 450,
-      "sha256": "f1c6099ba029ba18a6b52259fee908b590071c3f9a6647e29c44a39d51488469"
+      "bytes": 468,
+      "sha256": "444e996c2c556d5d07aa409f32f0717af169c9f29183770d44152f93bd3f0736"
     },
     {
       "path": "CHANGES.md",
@@ -55,8 +55,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 10493,
-      "sha256": "126b0dcd171a8bd37f6f3d79c121df198188e43225300b077cbe513b90aec96a"
+      "bytes": 10941,
+      "sha256": "1854ddb2f1f19a1b6c54f4f0066310becbd41503e5bbd3a946ae6ba14d08ee82"
     },
     {
       "path": "RELEASE-NOTES.md",
@@ -4032,6 +4032,26 @@
       "path": "release/provenance.json",
       "bytes": 8857,
       "sha256": "3d0a8a201045acc820c68f52c7a7cd8dd9bc58370af48ba9379d450d2826691b"
+    },
+    {
+      "path": "research/headless/README.ko.md",
+      "bytes": 9836,
+      "sha256": "8265626e023c1878c6fa3c622fdce23264ebd85087cf39b7068bb3f02aae26ea"
+    },
+    {
+      "path": "research/headless/analyze_capture.py",
+      "bytes": 6787,
+      "sha256": "0b88200a6757f99c8e6ba669cccc7dfadb7627984e3542a8e4be3ca2135d1d38"
+    },
+    {
+      "path": "research/headless/build-observe.ps1",
+      "bytes": 2231,
+      "sha256": "55a8cfdbeb66e7bcfdae9f49fffd7c5853ac96a157b4bc4ed6569a38a7d7426e"
+    },
+    {
+      "path": "research/headless/test_analyze_capture.py",
+      "bytes": 5006,
+      "sha256": "86059f0cf22fd4297375dc557969a394cacb61be8d361242bf3483659e354211"
     },
     {
       "path": "tools/collect_compatibility.py",
