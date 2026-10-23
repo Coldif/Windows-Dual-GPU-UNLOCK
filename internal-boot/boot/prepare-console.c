@@ -12,6 +12,9 @@
 #include <Protocol/LoadedImage.h>
 #include <Protocol/SimpleTextOut.h>
 #include <Protocol/SimpleTextIn.h>
+#if defined(GU_SINGLE_RTX_CONSOLE) && (!defined(GU_DIAGNOSTIC_ONLY) || !defined(GU_CONSOLE_PREPARE) || defined(GU_FULL_UNLOCK) || defined(GU_AUTOMATIC_BOOT))
+#error Single RTX console research must remain a separate non-unlock build
+#endif
 
 #define MAX_HANDLES 1024
 #define MAX_RECORDS 4096
@@ -31,6 +34,11 @@ typedef struct {
   EFI_PCI_IO_PROTOCOL *AmdIo,*RtxIo;
   UINT32 AmdConfig[16],RtxConfig[16];
   UINT8 AmdDisplayPath[36],RtxDisplayPath[36];
+#ifdef GU_SINGLE_RTX_CONSOLE
+  EFI_GRAPHICS_OUTPUT_PROTOCOL *Gop;
+  EFI_GRAPHICS_OUTPUT_PROTOCOL_MODE *Mode,ModeCopy;
+  EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *Info,InfoCopy;
+#endif
 } PLAN;
 static PLAN PreparedPlan;
 static const GRAPH *PreparedGraph;
@@ -108,7 +116,13 @@ static EFI_STATUS PciFor(EFI_BOOT_SERVICES *bs,EFI_DEVICE_PATH_PROTOCOL *path,UI
 static EFI_STATUS Displays(EFI_SYSTEM_TABLE *t,PLAN *p,BOOLEAN first) {
   EFI_BOOT_SERVICES *bs=t->BootServices;EFI_HANDLE *handles=NULL,amd=NULL,rtx=NULL;UINTN count=0;
   EFI_STATUS s=bs->LocateHandleBuffer(ByProtocol,&GopGuid,NULL,&count,&handles);
-  if(s==EFI_SUCCESS && (!handles || count<2 || count>3))s=EFI_UNSUPPORTED;
+  if(s==EFI_SUCCESS && (!handles ||
+#ifdef GU_SINGLE_RTX_CONSOLE
+     count<1 || count>2
+#else
+     count<2 || count>3
+#endif
+     ))s=EFI_UNSUPPORTED;
   for(UINTN i=0;s==EFI_SUCCESS && i<count;i++) {
     EFI_DEVICE_PATH_PROTOCOL *path=NULL;EFI_GRAPHICS_OUTPUT_PROTOCOL *gop=NULL;
     s=Interface(bs,handles[i],&GopGuid,(VOID **)&gop);if(s!=EFI_SUCCESS)break;
@@ -122,20 +136,33 @@ static EFI_STATUS Displays(EFI_SYSTEM_TABLE *t,PLAN *p,BOOLEAN first) {
        m->Info->PixelFormat>PixelBlueGreenRedReserved8BitPerColor || !m->Info->HorizontalResolution || !m->Info->VerticalResolution ||
        m->Info->PixelsPerScanLine<m->Info->HorizontalResolution || (UINT64)m->Info->PixelsPerScanLine*m->Info->VerticalResolution>m->FrameBufferSize/4){s=EFI_UNSUPPORTED;break;}
     if(DisplayRoute(path,AmdPath) && !amd) {
+#ifdef GU_SINGLE_RTX_CONSOLE
+      s=EFI_UNSUPPORTED;break; /* Sole physical GOP must be this RTX. */
+#else
       amd=handles[i];UINT32 cfg[16];EFI_HANDLE h=NULL;EFI_PCI_IO_PROTOCOL *io=NULL;
       s=PciFor(bs,path,12,0x164e1002,0x88771043,&h,&io,cfg);
       if(s!=EFI_SUCCESS)break;
       if(first){p->AmdPci=h;p->AmdIo=io;for(UINTN j=0;j<16;j++)p->AmdConfig[j]=cfg[j];for(UINTN j=0;j<36;j++)p->AmdDisplayPath[j]=((UINT8 *)path)[j];}
       else if(p->AmdPci!=h || p->AmdIo!=io || !Bytes(cfg,p->AmdConfig,sizeof(cfg)) || !PathMatches(path,p->AmdDisplayPath))s=EFI_NOT_READY;
+#endif
     } else if(DisplayRoute(path,RtxPath) && !rtx) {
       rtx=handles[i];UINT32 cfg[16];EFI_HANDLE h=NULL;EFI_PCI_IO_PROTOCOL *io=NULL;
       s=PciFor(bs,path,1,0x220410de,0x145410de,&h,&io,cfg);
       if(s!=EFI_SUCCESS)break;
       if(first){p->RtxPci=h;p->RtxIo=io;for(UINTN j=0;j<16;j++)p->RtxConfig[j]=cfg[j];for(UINTN j=0;j<36;j++)p->RtxDisplayPath[j]=((UINT8 *)path)[j];}
       else if(p->RtxPci!=h || p->RtxIo!=io || !Bytes(cfg,p->RtxConfig,sizeof(cfg)) || !PathMatches(path,p->RtxDisplayPath))s=EFI_NOT_READY;
+#ifdef GU_SINGLE_RTX_CONSOLE
+      if(first){p->Gop=gop;p->Mode=m;p->ModeCopy=*m;p->Info=m->Info;p->InfoCopy=*m->Info;}
+      else if(p->Gop!=gop || p->Mode!=m || p->Info!=m->Info || !Bytes(&p->ModeCopy,m,sizeof(*m)) || !Bytes(&p->InfoCopy,m->Info,sizeof(*m->Info)))s=EFI_NOT_READY;
+#endif
     } else s=EFI_UNSUPPORTED;
   }
   if(handles && bs->FreePool(handles)!=EFI_SUCCESS)s=EFI_DEVICE_ERROR;
+#ifdef GU_SINGLE_RTX_CONSOLE
+  if(s!=EFI_SUCCESS || !rtx || amd || rtx==p->Console || rtx==p->Input || rtx==p->Error)return s==EFI_SUCCESS?EFI_UNSUPPORTED:s;
+  if(first)p->Rtx=rtx;else if(p->Rtx!=rtx)s=EFI_NOT_READY;
+  return s;
+#else
   if(s!=EFI_SUCCESS || !amd || !rtx || amd==rtx)return s==EFI_SUCCESS?EFI_UNSUPPORTED:s;
   EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *text=NULL;
   s=Interface(bs,amd,&TextGuid,(VOID **)&text);
@@ -143,6 +170,7 @@ static EFI_STATUS Displays(EFI_SYSTEM_TABLE *t,PLAN *p,BOOLEAN first) {
   if(first){p->Amd=amd;p->Rtx=rtx;p->AmdText=text;}
   else if(p->Amd!=amd || p->Rtx!=rtx || p->AmdText!=text)s=EFI_NOT_READY;
   return s;
+#endif
 }
 static BOOLEAN SameEdge(const EDGE *a,const EDGE *b) {
   return a->Handle==b->Handle && a->Agent==b->Agent && a->Controller==b->Controller && a->Attributes==b->Attributes && a->Count==b->Count && GuGuidEqual(&a->Protocol,&b->Protocol);
@@ -198,6 +226,7 @@ static EFI_STATUS Consumers(EFI_SYSTEM_TABLE *t,PLAN *p,const GRAPH *g) {
     if(e->Handle==p->Rtx && e->Agent==p->GfxAgent && !GuGuidEqual(&e->Protocol,&GopGuid))return EFI_ACCESS_DENIED;
     if(e->Handle==p->Rtx && GuGuidEqual(&e->Protocol,&TextGuid) && e->Agent!=p->OutAgent)return EFI_ACCESS_DENIED;
   }
+#ifndef GU_SINGLE_RTX_CONSOLE
   UINTN amdOut=0,amdChild=0,amdGfx=0;
   for(UINTN i=0;i<g->Count;i++) {
     const EDGE *e=&g->Edges[i];
@@ -213,6 +242,7 @@ static EFI_STATUS Consumers(EFI_SYSTEM_TABLE *t,PLAN *p,const GRAPH *g) {
     }
   }
   if(amdOut!=1 || amdChild!=1 || amdGfx!=1)return EFI_ACCESS_DENIED;
+#endif
   EFI_STATUS s=Driver(t->BootServices,p->OutAgent,&OutFile,0x7820,0x1494);
   if(s==EFI_SUCCESS)s=Driver(t->BootServices,p->GfxAgent,&GfxFile,0x48a0,0xf04);
   return s;
@@ -269,9 +299,11 @@ EFI_STATUS GuPrepareConsole(EFI_SYSTEM_TABLE *t,GU_PREPARE_LOG log,VOID *context
     }
     recorded=log(context,stage==1?"detach-textout-verified":"detach-graphics-console-verified",s);
     if(s!=EFI_SUCCESS || recorded!=EFI_SUCCESS)return s==EFI_SUCCESS?recorded:s;
+#ifndef GU_SINGLE_RTX_CONSOLE
     /* Active output test uses the already preserved AMD-backed console. */
     s=t->ConOut->OutputString(t->ConOut,L"RTX console consumer detached; AMD console retained.\r\n");
     if(s!=EFI_SUCCESS)return s;
+#endif
   }
   s=log(context,"stage2a-success-no-unlock-no-gop-removal",EFI_SUCCESS);
   if(s!=EFI_SUCCESS)return s;

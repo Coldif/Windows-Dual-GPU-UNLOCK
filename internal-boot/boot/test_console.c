@@ -8,7 +8,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef GU_SINGLE_RTX_CONSOLE
+#include "build/r2/replay-fixture.h"
+#else
 #include "build/console/replay-fixture.h"
+#endif
 
 static GRAPH Live;
 static int Scenario,Calls,Checks,OutputCalls,LogCalls;
@@ -47,12 +51,20 @@ static EFI_STATUS EFIAPI Locate(EFI_LOCATE_SEARCH_TYPE search,EFI_GUID *g,VOID *
     for(UINTN i=0;i<*n;i++)(*out)[i]=(EFI_HANDLE)(i+1);
   } else {
     Check(GuGuidEqual(g,&GopGuid),"only GOP-specific enumeration");
+#ifdef GU_SINGLE_RTX_CONSOLE
+    *n=Scenario==9?2:1;
+    *out=malloc(*n*sizeof(**out));(*out)[0]=FX_Rtx;
+    if(Scenario==29)(*out)[0]=FX_Amd;
+    if(*n==2)(*out)[1]=FX_Rtx;
+    return EFI_SUCCESS;
+#else
     *n=Scenario==9?3:2;
 #ifdef GU_FULL_REPLAY_TEST
     if(FullMode && Full.Released)*n=1;
 #endif
     *out=malloc(*n*sizeof(**out));(*out)[0]=FX_Amd;if(*n>1)(*out)[1]=FX_Rtx;
     if(*n==3)(*out)[2]=FX_Rtx;
+#endif
   }
   return EFI_SUCCESS;
 }
@@ -122,7 +134,11 @@ static EFI_STATUS EFIAPI Read(EFI_PCI_IO_PROTOCOL *io,EFI_PCI_IO_PROTOCOL_WIDTH 
 #endif
   if(width!=EfiPciIoWidthUint32 || at!=0 || n!=16)abort();
   if(Scenario==13)return EFI_DEVICE_ERROR;
-  memcpy(data,io==&AmdPci?FixtureAmdConfig:FixtureRtxConfig,64);return EFI_SUCCESS;
+  memcpy(data,io==&AmdPci?FixtureAmdConfig:FixtureRtxConfig,64);
+#ifdef GU_SINGLE_RTX_CONSOLE
+  if(Scenario==30)((UINT32 *)data)[1]^=4;
+#endif
+  return EFI_SUCCESS;
 }
 static VOID Drop(EFI_HANDLE handle,EFI_HANDLE agent,EFI_GUID *g) {
   UINTN n=0;
@@ -179,6 +195,9 @@ static EFI_STATUS Run(int scenario) {
   RtxInfo=AmdInfo;
   AmdMode=(EFI_GRAPHICS_OUTPUT_PROTOCOL_MODE){0};AmdMode.MaxMode=9;AmdMode.Info=&AmdInfo;AmdMode.SizeOfInfo=sizeof(AmdInfo);AmdMode.FrameBufferBase=0xfce0000000;AmdMode.FrameBufferSize=1920*1080*4;
   RtxMode=AmdMode;RtxMode.FrameBufferBase=0xfcc0000000;AmdGop.Mode=&AmdMode;RtxGop.Mode=&RtxMode;
+#ifdef GU_SINGLE_RTX_CONSOLE
+  RtxMode.Info=&RtxInfo;
+#endif
   TextMode=(EFI_SIMPLE_TEXT_OUTPUT_MODE){0};Text.Mode=&TextMode;Text.OutputString=Output;
   Keys=(EFI_SIMPLE_TEXT_INPUT_PROTOCOL){0};Keys.ReadKeyStroke=ReadKey;Keys.WaitForKey=(VOID *)1;
   AmdPci=(EFI_PCI_IO_PROTOCOL){0};AmdPci.GetLocation=Location;AmdPci.Pci.Read=Read;RtxPci=AmdPci;
@@ -209,13 +228,25 @@ static EFI_STATUS FlowPrepare(VOID *v) {return ((FLOW_TEST *)v)->prepare;}
 static EFI_STATUS FlowChoose(VOID *v,BOOLEAN *skip) {FLOW_TEST *f=v;*skip=f->skip;return f->choose;}
 static EFI_STATUS FlowCapture(VOID *v) {
   FLOW_TEST *f=v;f->captures++;
-  if(f->captures==2 && f->lateChange==1)AmdMode.FrameBufferBase=0;
+  if(f->captures==2 && f->lateChange==1)
+#ifdef GU_SINGLE_RTX_CONSOLE
+    RtxMode.FrameBufferBase=0;
+#else
+    AmdMode.FrameBufferBase=0;
+#endif
   return f->captures==1?f->before:f->after;
 }
 static EFI_STATUS FlowDetach(VOID *v) {FLOW_TEST *f=v;f->detaches++;return f->detach;}
 static EFI_STATUS FlowWindows(VOID *v) {FLOW_TEST *f=v;f->boots++;return f->windows;}
 static EFI_STATUS FlowReady(VOID *v) {
-  FLOW_TEST *f=v;if(f->lateChange==3)Drop(FX_Amd,FX_OutAgent,&TextGuid);return f->ready;
+  FLOW_TEST *f=v;
+  if(f->lateChange==3)
+#ifdef GU_SINGLE_RTX_CONSOLE
+    RtxMode.FrameBufferBase=0;
+#else
+    Drop(FX_Amd,FX_OutAgent,&TextGuid);
+#endif
+  return f->ready;
 }
 static EFI_STATUS FlowVerify(VOID *v) {FLOW_TEST *f=v;return f->realVerify?GuVerifyPreparedConsole(LastTable):f->verify;}
 static EFI_STATUS FlowRecord(VOID *v,const char *event,EFI_STATUS s) {

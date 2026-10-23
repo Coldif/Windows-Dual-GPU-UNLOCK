@@ -1,9 +1,10 @@
 # GPL-2.0-only. New manual observation entry only; preserve current boot priority.
-param([switch]$Register)
+param([switch]$Register,[switch]$ConsoleR2)
 $ErrorActionPreference='Stop'
 $repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 . (Join-Path $repo 'internal-boot/install/automatic-policy.ps1')
 $stateFile=Join-Path $PSScriptRoot 'registration.local.json'
+if($ConsoleR2){$stateFile=Join-Path $PSScriptRoot 'r2-registration.local.json'}
 $config=Get-Content -LiteralPath (Join-Path $repo 'internal-boot/local-config.json') -Raw | ConvertFrom-Json
 function Bcd([string[]]$Arguments){$lines=@(& bcdedit @Arguments);if($LASTEXITCODE -ne 0){throw ('BCDEdit failed: '+($Arguments -join ' '))};return ($lines -join "`r`n")}
 function Ids([string]$Text){return @([regex]::Matches($Text,'(?mi)^identifier\s+(\{[0-9a-f-]{36}\})') | ForEach-Object {$_.Groups[1].Value})}
@@ -28,12 +29,21 @@ CheckWindows
 if(Confirm-SecureBootUEFI){throw 'Unsigned observation EFI requires Secure Boot disabled'}
 $encryption=Get-BitLockerVolume -MountPoint C:
 if([int]$encryption.VolumeStatus -ne 0 -or [int]$encryption.ProtectionStatus -ne 0){throw 'Encryption state changed; observation installer does not change encryption settings'}
-$m=Get-Content -LiteralPath (Join-Path $PSScriptRoot 'build/manifest.json') -Raw | ConvertFrom-Json
-if($m.Mode -ne 'headless-research-observation-only' -or $m.CanUnlock -ne $false -or $m.CanDetach -ne $false){throw 'Unexpected observation capabilities'}
-$source=Join-Path $PSScriptRoot 'build/OBSERVE.EFI'
-$hash='4c0672952a2b2f4a1e97520be1fe3332cc1a519efd9dbf5d3326ff900790988e'
+$name='GPU Headless Observe - NO UNLOCK';$path='\EFI\WindowsGPUUnlock\OBSERVE.EFI'
+if($ConsoleR2){
+ $m=Get-Content -LiteralPath (Join-Path $repo 'internal-boot/boot/build/r2/manifest.json') -Raw | ConvertFrom-Json
+ if($m.Mode -ne 'single-rtx-console-consumers-only' -or $m.CanUnlock -ne $false -or $m.CanDetach -ne $true -or $m.CanDetachNvOwner -ne $false -or $m.CanDetachRuntimeEdid -ne $false -or $m.CanRemoveGop -ne $false){throw 'Unexpected R2 capabilities'}
+ $source=Join-Path $repo 'internal-boot/boot/build/r2/R2-CONSOLE.EFI'
+ $hash='a4363159b2ed4088ed84f96cd0a0e0d424843d4dd992c50c58cf732fd7854aad'
+ $name='GPU R2 Console Test - NO UNLOCK';$path='\EFI\WindowsGPUUnlock\R2-CONSOLE.EFI'
+}else{
+ $m=Get-Content -LiteralPath (Join-Path $PSScriptRoot 'build/manifest.json') -Raw | ConvertFrom-Json
+ if($m.Mode -ne 'headless-research-observation-only' -or $m.CanUnlock -ne $false -or $m.CanDetach -ne $false){throw 'Unexpected observation capabilities'}
+ $source=Join-Path $PSScriptRoot 'build/OBSERVE.EFI'
+ $hash='4c0672952a2b2f4a1e97520be1fe3332cc1a519efd9dbf5d3326ff900790988e'
+}
 if($m.EfiSha256 -ne $hash -or (Get-FileHash -LiteralPath $source).Hash -ne $hash){throw 'This registration requires the reviewed local observation image; different profiles need separate review'}
-$target=Join-Path $root 'EFI\WindowsGPUUnlock\OBSERVE.EFI'
+$target=Join-Path $root $path.TrimStart('\')
 if(Test-Path -LiteralPath $target){if((Get-FileHash -LiteralPath $target).Hash -ne $hash){throw 'Different observation EFI exists; never overwrite'}}
 else{[IO.File]::Copy($source,$target,$false)}
 function CheckTarget {CheckWindows;if((Target) -ne $root -or (Get-FileHash -LiteralPath $target).Hash -ne $hash){throw 'Observation target changed'}}
@@ -46,12 +56,11 @@ if($fw -match '(?mi)^bootsequence\s+'){throw 'Pending BootNext: observation regi
 $existing=@{}
 foreach($old in $order){$existing[$old]=Bcd @('/enum',$old)}
 $beforeIds=Ids (Bcd @('/enum','all'));$reg=@{Id=$null}
-$name='GPU Headless Observe - NO UNLOCK';$path='\EFI\WindowsGPUUnlock\OBSERVE.EFI'
 $backup=Join-Path $env:ProgramData ('WindowsGPUUnlock\ResearchBackups\'+(Get-Date -Format 'yyyyMMdd-HHmmssfff'))
 [void][IO.Directory]::CreateDirectory($backup)
 [void](Bcd @('/export',(Join-Path $backup 'BCD-export')))
 [IO.File]::WriteAllText((Join-Path $backup 'firmware-before.txt'),$firmwareBefore)
-$state=[ordered]@{EntryId=$null;Name=$name;Path=$path;BackupRoot=$backup;BootOrderBefore=$order;EfiSha256=$hash;CanUnlock=$false;CanDetach=$false;Status='registering';HardwareTested=$false}
+$state=[ordered]@{EntryId=$null;Name=$name;Path=$path;BackupRoot=$backup;BootOrderBefore=$order;EfiSha256=$hash;CanUnlock=$false;CanDetach=[bool]$ConsoleR2;Status='registering';HardwareTested=$false}
 CheckTarget
 if((Bcd @('/enum','{fwbootmgr}')) -cne $fw -or (Bcd @('/enum','firmware')) -cne $firmwareBefore){throw 'Firmware changed before registration'}
 Invoke-AutomaticTransition -Steps @(

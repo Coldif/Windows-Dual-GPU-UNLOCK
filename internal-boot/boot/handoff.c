@@ -19,6 +19,9 @@
 #ifdef GU_CONSOLE_PREPARE
 #include "prepare-console.h"
 #include "console-flow.h"
+#ifdef GU_SINGLE_RTX_CONSOLE
+#include "research-input.h"
+#endif
 #ifndef GU_DIAGNOSTIC_ONLY
 #error Console prepare must not load the unlock application
 #endif
@@ -43,8 +46,14 @@ static EFI_HANDLE Self,OwnDevice,WindowsImage;
 static EFI_HANDLE UnlockImage;
 #endif
 static EFI_FILE_PROTOCOL *Root,*Log;
+#ifdef GU_SINGLE_RTX_CONSOLE
+static BOOLEAN ResearchOutputDisabled;
+#endif
 
 static VOID Say(const CHAR16 *Text) {
+#ifdef GU_SINGLE_RTX_CONSOLE
+  if(ResearchOutputDisabled)return;
+#endif
   if(Table && Table->ConOut)Table->ConOut->OutputString(Table->ConOut,(CHAR16 *)Text);
 }
 #ifdef GU_FULL_UNLOCK
@@ -111,7 +120,11 @@ static EFI_STATUS OpenLog(VOID) {
 #ifdef GU_FULL_UNLOCK
     CHAR16 name[]=L"\\RTX3090-UNLOCK\\FULL00.TXT";
 #elif defined(GU_CONSOLE_PREPARE)
+#ifdef GU_SINGLE_RTX_CONSOLE
+    CHAR16 name[]=L"\\RTX3090-UNLOCK\\R2C00.TXT";
+#else
     CHAR16 name[]=L"\\RTX3090-UNLOCK\\PREP00.TXT";
+#endif
 #elif defined(GU_DIAGNOSTIC_ONLY)
     CHAR16 name[]=L"\\RTX3090-UNLOCK\\DIAG00.TXT";
 #else
@@ -305,6 +318,10 @@ static EFI_STATUS StartConsoleWindows(VOID *Context) {
 static EFI_STATUS PrepareChoice(VOID *Context,BOOLEAN *Skip) {
   (void)Context;*Skip=FALSE;
   if(!Table->ConIn || !Table->ConIn->ReadKeyStroke)return EFI_UNSUPPORTED;
+#ifdef GU_SINGLE_RTX_CONSOLE
+  Say(L"R2 RTX CONSOLE TEST: NO UNLOCK, NVIDIA GOP RETAINED.\r\nPress T within 30 seconds to detach console consumers; Esc/timeout boots Windows unchanged.\r\nAfter the screen stops updating, press ENTER within 30 seconds to continue to Windows.\r\nOn failure there is no reset or retry: power off, then F8 Windows Boot Manager.\r\n");
+  return GuResearchChooseInput(Table,Skip);
+#else
   Say(L"RTX console detach TEST. No unlock. Keep AMD display connected.\r\nPress Esc within 5 seconds to skip the test and start Windows.\r\n");
   for(UINTN i=0;i<50;i++) {
     EFI_INPUT_KEY key;EFI_STATUS s=Table->ConIn->ReadKeyStroke(Table->ConIn,&key);
@@ -313,12 +330,19 @@ static EFI_STATUS PrepareChoice(VOID *Context,BOOLEAN *Skip) {
     s=Table->BootServices->Stall(100000);if(s!=EFI_SUCCESS)return s;
   }
   return EFI_SUCCESS;
+#endif
 }
 static EFI_STATUS CaptureConsole(VOID *Context) {
   (void)Context;return GuCaptureGraph(Table,Log);
 }
 static EFI_STATUS DetachConsole(VOID *Context) {
+#ifdef GU_SINGLE_RTX_CONSOLE
+  (void)Context;ResearchOutputDisabled=TRUE;
+  EFI_STATUS s=GuPrepareConsole(Table,Record,NULL);
+  return s==EFI_SUCCESS?GuResearchConfirmInput(Table,Record,NULL):s;
+#else
   (void)Context;return GuPrepareConsole(Table,Record,NULL);
+#endif
 }
 #endif
 EFI_STATUS EFIAPI efi_main(EFI_HANDLE Image,EFI_SYSTEM_TABLE *St) {

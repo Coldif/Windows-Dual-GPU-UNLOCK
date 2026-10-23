@@ -10,6 +10,7 @@ import uuid
 from pathlib import Path
 
 source = Path(sys.argv[1])
+single = '--single-rtx' in sys.argv[2:]
 raw = source.read_bytes()
 text = raw.decode().replace('\r\n', '\n')
 if 'capture-complete=1\n' not in text or 'diagnostic-result status=0x0000000000000000' not in text:
@@ -37,7 +38,7 @@ roles = {
     'RtxPci': one(lambda b: 'pci config-dwords=220410de' in b),
     'AmdPci': one(lambda b: 'pci config-dwords=164e1002' in b),
     'Rtx': one(lambda b: 'gop framebuffer=0x000000fcc0000000' in b),
-    'Amd': one(lambda b: 'gop framebuffer=0x000000fce0000000' in b),
+    'Amd': 0 if single else one(lambda b: 'gop framebuffer=0x000000fce0000000' in b),
 }
 for role, protocol, controller in [
     ('OutAgent', '387477c2-69c7-11d2-8e39-00a0c969723b', roles['Rtx']),
@@ -69,7 +70,7 @@ for role in ['Rtx', 'Amd']:
     if len(cfg) != 16:
         raise ValueError('Incomplete PCI snapshot')
     lines.append('static const UINT32 Fixture' + role + 'Config[16]={' + ','.join('0x' + x for x in cfg) + '};')
-target = Path(__file__).parent / 'build/console/replay-fixture.h'
+target = Path(__file__).parent / ('build/r2/replay-fixture.h' if single else 'build/console/replay-fixture.h')
 target.parent.mkdir(parents=True, exist_ok=True)
 target.write_text('\n'.join(lines) + '\n')
 print(f'Local replay fixture: {len(blocks)} handles, {len(edges)} active ownership records; ordinal addresses only')

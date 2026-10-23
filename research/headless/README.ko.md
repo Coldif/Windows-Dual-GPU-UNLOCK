@@ -3,7 +3,8 @@
 브랜치: `research/single-gpu-headless` / 기준: `e26bccf`.
 목표는 **3090으로 부팅 화면 조작 → 출력 해제 → 화면 없이 언락 → Windows에서 출력
 복귀**라는 가설을 검증하는 것이다. 현재 상태는 **R1 단일 활성 RTX 출력 관찰 완료**다.
-단일 GPU 언락 EFI는 구현하거나 설치하지 않았다. 검증된 main의 GPU·입력·정리 검사를
+단일 GPU 언락 EFI는 구현하거나 설치하지 않았다. R2는 콘솔 소비자 해제만 시험한다.
+검증된 main의 GPU·입력·정리 검사를
 지워 통과시키지 않으며 기존 설치 파일·BootOrder·릴리스도 변경하지 않는다.
 
 ## 확인된 사실과 아직 모르는 점
@@ -177,7 +178,60 @@ BIOS/iGPU 설정을 지금 바꾸라는 안내가 아니다.
 언락·화면 해제·물리 GOP 0개 상태의 Windows 인계·FP16/BF16 향상은 시험하지 않았다.
 R1의 driver profile 및 입력 반응 등 해제 전 조건은 별도로 확인해야 한다.
 
-**다음 작업:** R2 전용 수동 시험 EFI를 준비한다. 정확한 RTX 신원·driver profile과
+**다음 시험:** 아래 R2 전용 수동 시험 EFI를 사용한다. 정확한 RTX 신원·driver profile과
 보존해야 할 입력/디스크/PCI 연결을 먼저 검증하고, TextOut/GraphicsConsole 소비자만
 해제하며 NVIDIA GOP는 유지한다. 전후 그래프와 파일 로그, 새 키 입력, Windows 인계를
-확인해야 한다. 이 문서 갱신은 R2 EFI 설치나 기본 부팅 변경을 포함하지 않는다.
+확인해야 한다. R1 기록 자체는 R2의 실행 성공 근거가 아니다.
+
+## R2 콘솔 소비자 해제 시험
+
+이 빌드는 **언락하지 않는다**. 정확한 RTX GOP child에 연결된 TextOut 소비자와
+GraphicsConsole만 순서대로 해제한다. NVIDIA GOP, NVIDIA PCI owner, 공유 EDID와
+별도 EDID-only child는 해제 대상이 아니다. 물리 GOP는 1개인 상태를 유지해야 한다.
+
+- R1과 같은 ASUS BIOS 3057 / RTX 3090 FE / 단일 활성 RTX 출력 조건을 사용한다.
+- 기존 AMD 출력 경로는 `GU_SINGLE_RTX_CONSOLE`이 없는 빌드에서 그대로 유지된다.
+- GPU PCI config와 GOP interface·mode·framebuffer·정보·전체 경로를 고정하고,
+  정확히 세 소비자 edge 외의 전체 active graph가 바뀌면 정지한다.
+- 해제 시작 후 화면 출력 함수를 호출하지 않는다. 파일 로그 오류·부분 해제·입력
+  오류/경고·30초 입력 timeout은 재연결·리셋·Windows 강행 없이 정지한다.
+- 파일 닫기를 마친 후 마지막 검증과 Windows StartImage 사이에는 출력·파일 I/O가 없다.
+
+로컬 빌드 및 검증:
+
+```powershell
+.\research\headless\build-r2.ps1 -Clang 'C:\TOOLS\LLVM20\bin\clang.exe' `
+  -LldLink 'C:\TOOLS\LLVM20\bin\lld-link.exe' -Capture 'U:\RTX3090-UNLOCK\DIAG02.TXT'
+.\research\headless\register-observe.ps1 -ConsoleR2 -Register
+```
+
+이미 Configure한 별도 ESP/Windows ESP의 로컬 설정이 필요하다. 등록은 검토된 로컬
+EFI 해시만 허용하며 다른 파티션 구성에는 그대로 사용할 수 없다. 기존 항목은
+보존하고 **GPU R2 Console Test - NO UNLOCK**을 기존 순서의 마지막에 추가한다.
+기본 Auto 항목과 BootNext는 바꾸지 않으며 재부팅도 하지 않는다.
+
+실제 시험은 사용자가 다음 순서로 한다.
+
+1. 작업을 저장하고 완전 종료 후 다시 켠다. 케이블과 BIOS는 R1 성공 상태를 유지한다.
+2. F8에서 **GPU R2 Console Test - NO UNLOCK**을 선택한다.
+3. 안내 화면에서 30초 안에 **T**를 한 번 누른다. Esc 또는 무입력 30초는 아무것도
+   해제하지 않고 Windows로 넘어가므로 시험 성공으로 세지 않는다.
+4. T 후 약 5초 기다렸다가 **Enter**를 누른다. 화면은 마지막 글자가 남거나 검게
+   보일 수 있다. 해제 후 입력 큐를 초기화하므로 Enter를 T와 동시에 누르지 않는다.
+   해제 후 30초 안의 새로운 Enter가 있어야 Windows 인계를 진행한다.
+5. Windows에 돌아오면 새 `RTX3090-UNLOCK/R2C00.TXT` 이후 번호의 로그를 확인한다.
+   전후 캡처와 각 해제 상태, `r2-new-enter-confirmed`, 최종 result를 함께 판정한다.
+6. Enter 후 1분 이상 진행되지 않으면 전원을 끄고 F8의 **Windows Boot Manager**로
+   복귀한다. 기존 Auto 항목은 AMD 출력이 없으면 중단될 수 있으므로 복구에 쓰지 않는다.
+
+호스트 재현·음성 경로 검사 1,078개와 PE 검증을 통과했다. 이는 실제 firmware에서의
+해제 성공 증거가 아니다. R2의 실기 성공 여부와 마지막 GOP 제거(R3)는 아직 미확인이다.
+
+2026-10-24 연구 PC에 `R2-CONSOLE.EFI` 20,480 bytes를 별도 설치하고 F8 항목을
+등록했다. 설치본 SHA256은
+`a4363159b2ed4088ed84f96cd0a0e0d424843d4dd992c50c58cf732fd7854aad`다.
+기존 모든 항목·우선순위의 순서와 Auto/UNLOCK-AUTO/OBSERVE 파일 해시 보존,
+BootNext 부재와 새 경로·설치 파일 해시를 검증했다. BCD 백업과 장치별 등록 정보는
+로컬에만 보존한다. 소스·설치 전 독립 검토에서 blocker는 없었으며, 에이전트가
+재부팅하거나 실제 GPU 해제를 실행하지 않았다. 기존 콘솔 경로 회귀 검사 291개,
+diagnostic 검사 35개, 오프라인 분석기 13개와 등록 transaction 복구 검사를 통과했다.
