@@ -2,7 +2,71 @@
 
 [English](README.md) | **한국어**
 
-## 새 기능: USB 없이 언락 → Windows
+## 처음 시작하기: USB 또는 내부 파티션 선택
+
+이 프로젝트는 **지원 조건이 일치하는 RTX 3090 / ASUS BIOS 3057 / AMD 내장그래픽**
+환경을 위한 실험입니다. 먼저 [지원 조건](docs/COMPATIBILITY.ko.md)을 확인하세요.
+소스 `.c` 파일만 USB에 복사해서 실행하는 방식이 아닙니다. **실행용 `.EFI`와
+펌웨어 5개**가 필요합니다. 기존 파일은 먼저 백업합니다.
+
+| 원하는 방식 | 저장 위치 | 부팅 흐름 | 안내 |
+|---|---|---|---|
+| USB로 먼저 수동 시험 | FAT32 USB | USB 부팅 → U → BIOS Boot Override → Windows | [USB 가이드](docs/GUIDE.ko.md) |
+| USB 없이 사용·자동 연결 | 별도 FAT32 EFI 파티션 | 내부 EFI → 언락 → Windows 직접 진입 | [파티션·자동 부팅 가이드](docs/INTERNAL-BOOT.ko.md) |
+
+### A. USB에 저장하고 수동으로 실행
+
+1. **준비** — [릴리스](https://github.com/impacifist/Windows-GPU-UNLOCK/releases)에서
+   소스를 받거나 저장소를 clone합니다. [펌웨어 준비 안내](docs/ASSETS.ko.md)에 따라
+   필요한 5개 파일을 로컬 `assets/` 폴더에 둡니다.
+2. **USB용 폴더 생성** — 저장소 폴더에서 아래 명령을 실행합니다. USB를 직접
+   포맷하거나 쓰지는 않으며, 기존 `usb-package`가 있으면 새 경로를 지정합니다.
+
+   ```powershell
+   python .\tools\prepare_usb.py --assets .\assets --output .\usb-package
+   ```
+
+3. **USB로 복사** — `usb-package` **안의 내용**을 FAT32 USB 최상위에 복사합니다.
+   `USB:/EFI/BOOT/BOOTX64.EFI`와 `USB:/RTX3090-UNLOCK/ASSETS/`가 있어야 합니다.
+4. **언락 실행** — 작업 저장 → 완전 종료 후 켜기 → ASUS F8 → UEFI USB 선택 →
+   사전 검사 통과 후 **U 한 번**.
+5. **Windows로 연결** — 성공·정리 완료 후 ASUS BIOS의 **Boot Override → Windows
+   Boot Manager**를 선택합니다. 중간에 `Save Changes & Reset`이나 재부팅을 하지 않습니다.
+6. **성능 확인** — Windows에서 [FP16/BF16 벤치마크](docs/BENCHMARK.ko.md)를 실행합니다.
+
+**이 USB판은 수동판입니다.** BIOS 순서를 `USB → Windows`로 바꾸는 것만으로
+리셋 없는 자동 인계가 구현되지는 않습니다. 자동 연결을 원하면 아래 B를 사용하세요.
+
+### B. 내부 파티션에 저장하고 언락 → Windows로 설정
+
+1. **별도 저장 공간 준비** — 기존 Windows EFI·복구 파티션을 보존하고, **별도 1GiB
+   이상 FAT32 EFI 파티션**을 준비합니다. 예: U:. [파티션 준비 절차](docs/INTERNAL-BOOT.ko.md#2-별도-파티션-준비)를 먼저 따릅니다.
+2. **내 PC에 맞게 빌드** — 기존 Windows ESP의 GUID와 새 파티션 문자를 지정해
+   `Configure.ps1`을 실행한 뒤 `Build.ps1`로 실행 파일을 만듭니다.
+   [설정·빌드 명령](docs/INTERNAL-BOOT.ko.md#3-소스-받기와-로컬-설정)을 그대로 따라가세요.
+3. **파일 배치·수동 항목 등록** — `Install.ps1 -Assets <펌웨어폴더>`로 EFI와 자산을
+   배치하고, `-RegisterManual`로 시험 항목을 만듭니다. Windows는 계속 첫 번째입니다.
+   [정확한 명령과 파일 위치](docs/INTERNAL-BOOT.ko.md#5-파일-설치와-수동-항목-등록).
+4. **먼저 한 번 수동 시험** — 완전 종료 후 F8 → **Windows GPU UNLOCK Manual** →
+   원본 앱이 나오면 U 한 번. **재부팅 없이 Windows 진입과 FP16/BF16 성능**을 확인합니다.
+5. **자동 부팅으로 전환** — 수동 시험에 성공한 뒤 다음 명령을 실행합니다.
+
+   ```powershell
+   .\internal-boot\Install.ps1 -Assets 'C:\LOCAL-FIRMWARE\assets' `
+     -EnableAutomaticBoot -ConfirmedManualSuccess
+   ```
+
+6. **다음부터 키 입력 없이 부팅** — 순서가 **Windows GPU UNLOCK Auto → Windows
+   Boot Manager**로 설정됩니다. 완전 종료 후 켜고 기다리면 자동 실행 경로를 탑니다.
+   처음 5초 안에 Esc를 누르면 언락 없이 Windows만 부팅합니다.
+
+자동판은 **첫 실제 자동 부팅이 아직 미검증인 실험 기능**입니다. 첫 자동 부팅의 Windows
+진입과 성능을 직접 확인해야 합니다. 수동 직접 인계는 실제 성공을 확인했습니다.
+문제가 생기면 전원을 완전히 끈 뒤 **F8 → Windows Boot Manager**로 복귀합니다.
+Windows에서 [자동 부팅 원복 명령](docs/INTERNAL-BOOT.ko.md#8-자동-부팅-원복)을 실행하면
+Windows를 다시 첫 번째로 돌릴 수 있습니다. 절전·최대 절전 복귀는 검증 범위가 아닙니다.
+
+## 내부 디스크 방식의 구현·검증 현황
 
 **[단계별 내부 디스크 설치·자동 부팅·복구 가이드](docs/INTERNAL-BOOT.ko.md)**
 

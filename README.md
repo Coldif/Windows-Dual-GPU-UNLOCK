@@ -2,7 +2,73 @@
 
 **English** | [한국어](README.ko.md)
 
-## New: internal disk unlock → Windows
+## Start here: choose USB or an internal partition
+
+This experiment requires the supported **RTX 3090 / ASUS BIOS 3057 / AMD iGPU**
+profile. Check [compatibility](docs/COMPATIBILITY.en.md) first. Copying `.c` source
+files onto a drive is not enough: you need an **EFI application and five firmware
+assets**. Back up existing files before preparing a drive.
+
+| Method | File location | Boot flow | Full instructions |
+|---|---|---|---|
+| First manual trial using USB | FAT32 USB | USB → U → firmware Boot Override → Windows | [USB guide](docs/GUIDE.en.md) |
+| Internal disk with optional automatic handoff | Separate FAT32 ESP | Internal EFI → unlock → Windows directly | [Internal boot guide](docs/INTERNAL-BOOT.en.md) |
+
+### A. Put the manual version on USB
+
+1. **Prepare** — get the source from [Releases](https://github.com/impacifist/Windows-GPU-UNLOCK/releases)
+   or clone this repository. Prepare the five [firmware assets](docs/ASSETS.en.md)
+   in a local `assets/` directory.
+2. **Generate a USB folder** — from the repository directory, run:
+
+   ```powershell
+   python .\tools\prepare_usb.py --assets .\assets --output .\usb-package
+   ```
+
+   This creates a new local folder; it does not format or write to USB. Choose a
+   new output path if `usb-package` already exists.
+3. **Copy** — copy the **contents** of `usb-package` to the FAT32 USB root. You
+   should have `USB:/EFI/BOOT/BOOTX64.EFI` and `USB:/RTX3090-UNLOCK/ASSETS/`.
+4. **Unlock** — save work, fully shut down, start, choose **ASUS F8 → UEFI USB**,
+   then press **U once after preflight passes**.
+5. **Continue to Windows** — after success and cleanup, use **Boot Override →
+   Windows Boot Manager**, without Save Changes & Reset or another reboot.
+6. **Measure** — check [FP16/BF16 performance](docs/BENCHMARK.en.md) in Windows.
+
+**This USB version is manual.** Setting firmware priority to `USB → Windows` alone
+does not implement a no-reset automatic handoff. Use method B for that implementation.
+
+### B. Put the internal version on a separate ESP
+
+1. **Prepare storage** — preserve the existing Windows ESP and recovery partition.
+   Create or select a **separate FAT32 ESP of at least 1 GiB**, such as U:.
+   Follow the [partition preparation steps](docs/INTERNAL-BOOT.en.md#prerequisites).
+2. **Build for your PC** — run `Configure.ps1` with the Windows ESP GUID and the
+   dedicated partition letter, then `Build.ps1`.
+   [Exact commands](docs/INTERNAL-BOOT.en.md#configure-and-build).
+3. **Stage and register** — use `Install.ps1 -Assets <directory>`, then add
+   `-RegisterManual`. Windows stays first. [File placement and registration](docs/INTERNAL-BOOT.en.md#stage-then-register-a-manual-test).
+4. **Test manually first** — fully power off, choose **F8 → Windows GPU UNLOCK
+   Manual**, then U once in the unlock app. Confirm direct Windows entry and
+   FP16/BF16 performance without an intervening reset.
+5. **Enable automatic boot** — after personally confirming that test, run:
+
+   ```powershell
+   .\internal-boot\Install.ps1 -Assets 'C:\LOCAL-FIRMWARE\assets' `
+     -EnableAutomaticBoot -ConfirmedManualSuccess
+   ```
+
+6. **Boot without key input** — firmware order becomes **Windows GPU UNLOCK Auto →
+   Windows Boot Manager**. On the next full power-on, wait for the automatic path.
+   Esc in the first five seconds boots Windows without unlocking.
+
+Automatic firmware boot is **still awaiting its first real validation**; confirm
+both Windows entry and performance yourself. The manual direct handoff is hardware
+verified. On failure, fully power off and choose **F8 → Windows Boot Manager**.
+Use the [recovery command](docs/INTERNAL-BOOT.en.md#restore-windows-first) to put
+Windows first again. Sleep/hibernate resume is outside the validated scope.
+
+## Internal implementation and validation status
 
 **[Step-by-step install, automatic boot and recovery](docs/INTERNAL-BOOT.en.md)**
 
