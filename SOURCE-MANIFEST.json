@@ -50,13 +50,13 @@
     },
     {
       "path": "README.ko.md",
-      "bytes": 12041,
-      "sha256": "d8d5a2bb042a7a93136e6d2e2322ce656658c3697cf6d3bda11f7a8389779639"
+      "bytes": 12067,
+      "sha256": "26499ccb5777f3b9d671090316485fe9a6d7d5ec049c2833d6ab5702e642de1e"
     },
     {
       "path": "README.md",
-      "bytes": 11109,
-      "sha256": "f0ff1c3c97e107880726da504f191290960baba4dbf5ee0ec758f35f81ebd088"
+      "bytes": 11150,
+      "sha256": "356ff158b2fe5273e8d0a268734c67571edceb3f7e1cbbef8611cfab3b8b78c7"
     },
     {
       "path": "RELEASE-NOTES.md",
@@ -3535,8 +3535,8 @@
     },
     {
       "path": "internal-boot/boot/handoff.c",
-      "bytes": 17666,
-      "sha256": "8a18af209babffb700a96685af3bbf82846628dc5f7a2b474c931bf6bc250a9f"
+      "bytes": 17614,
+      "sha256": "07c632c8ac3ae2054f1aacf958208defc37c43b413b3cac117a183bb30a759b8"
     },
     {
       "path": "internal-boot/boot/make-console-fixture.py",
@@ -3560,13 +3560,13 @@
     },
     {
       "path": "internal-boot/boot/research-input.c",
-      "bytes": 1866,
-      "sha256": "0f363b62c73dac9054129cf1a45d86a29b23e1f97691996cfed71d683395062c"
+      "bytes": 1573,
+      "sha256": "1860239127b29ca5f63236084718bb4df28382f26c6956f83b57b8199011c401"
     },
     {
       "path": "internal-boot/boot/research-input.h",
-      "bytes": 339,
-      "sha256": "c28c6a7f7bd43d17a6abe5e78f3f05c7da98e060b179a78c83c498ace33bb9b4"
+      "bytes": 342,
+      "sha256": "0fd33f3d5ba3721b417e56343749295a62fd9d046131e4fbe3c3e21a59e1bb36"
     },
     {
       "path": "internal-boot/boot/test-console.ps1",
@@ -3615,8 +3615,8 @@
     },
     {
       "path": "internal-boot/boot/test_r2.c",
-      "bytes": 6378,
-      "sha256": "f18d83d2bf3f767832e0809e9c6c64a73e9c0faad1a4a4ccc195eda698a6364a"
+      "bytes": 6408,
+      "sha256": "d6b74b0b5c8d8d0cc48b0395eda5e9f11f347cf95a4be22574ce46ba39c431e9"
     },
     {
       "path": "internal-boot/efi_runtime.c",
@@ -4050,8 +4050,8 @@
     },
     {
       "path": "research/headless/README.ko.md",
-      "bytes": 17351,
-      "sha256": "1f10869f33127110e300b45a877e3b9833e55245390cbb98484890f1d654bec1"
+      "bytes": 18417,
+      "sha256": "e41b17dc64a198c248ec94ce41fdb6f3e53fe8331b7c815c94691615e1100423"
     },
     {
       "path": "research/headless/analyze_capture.py",
@@ -4065,18 +4065,23 @@
     },
     {
       "path": "research/headless/build-r2.ps1",
-      "bytes": 3250,
-      "sha256": "aaa1475427d1c204698c49595934d6750a5937fdf0626b89875020af6d2972a7"
+      "bytes": 3274,
+      "sha256": "eb9e798093b3d36c2db67b2bb4a926cb5ac77f2b96020e3baa14754f29c1660e"
     },
     {
       "path": "research/headless/register-observe.ps1",
-      "bytes": 7891,
-      "sha256": "677961e2572da28e0f7ae70ebe5d2837353df78cfc3674af0dc5f1e9fcb1c156"
+      "bytes": 7920,
+      "sha256": "453bcc73b92a65b0d6efc34f6d55e3d37c30dde7b390acf049f5f211f86ef2cd"
     },
     {
       "path": "research/headless/test_analyze_capture.py",
       "bytes": 5006,
       "sha256": "86059f0cf22fd4297375dc557969a394cacb61be8d361242bf3483659e354211"
+    },
+    {
+      "path": "research/headless/update-r2-auto.ps1",
+      "bytes": 6515,
+      "sha256": "693e70b9eb3db1848403ceca7ec0b8752cde61a398ea2910f45fbee8b685f5d9"
     },
     {
       "path": "tools/collect_compatibility.py",

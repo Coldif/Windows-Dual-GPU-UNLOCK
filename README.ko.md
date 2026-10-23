@@ -2,7 +2,7 @@
 
 > **연구 브랜치 `research/single-gpu-headless`:** RTX 물리 GOP 하나만 활성화된
 > 상태에서 관찰용 EFI를 거쳐 Windows에 진입한 R1 결과를 확인했습니다.
-> R2 콘솔 소비자 해제용 수동 시험 EFI를 준비했습니다. 언락과 NVIDIA GOP 제거는
+> F8에서 선택하면 추가 키 입력 없이 진행하는 R2 시험 EFI를 준비했습니다. 언락과 NVIDIA GOP 제거는
 > 수행하지 않으며 R2의 실제 해제 결과는 아직 미확인입니다.
 > [실기 근거와 다음 단계](research/headless/README.ko.md#r1-실기-관찰-결과--2026-10-24).
 > 기존 기본 부팅 우선순위와 main 릴리스는 유지합니다.

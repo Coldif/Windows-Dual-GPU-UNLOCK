@@ -1,4 +1,4 @@
-/* GPL-2.0-only. Explicit bounded post-detach input; no output/device writes. */
+/* GPL-2.0-only. Automatic R2 choice and input protocol probe; no device writes. */
 #ifndef GU_RESEARCH_INPUT_H
 #define GU_RESEARCH_INPUT_H
 #include "prepare-console.h"

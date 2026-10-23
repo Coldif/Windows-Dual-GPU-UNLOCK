@@ -34,5 +34,5 @@ try {
  if($LASTEXITCODE -ne 0){throw 'R2 EFI link failed'}
  & python ../unlock/verify_pe.py build/r2/R2-CONSOLE.EFI build/r2/R2-CONSOLE.map --output build/r2/pe-verification.json
  if($LASTEXITCODE -ne 0){throw 'R2 PE verification failed'}
- [ordered]@{Mode='single-rtx-console-consumers-only';CanUnlock=$false;CanDetach=$true;CanDetachNvOwner=$false;CanDetachRuntimeEdid=$false;CanRemoveGop=$false;HardwareTested=$false;EfiSha256=(Get-FileHash -LiteralPath build/r2/R2-CONSOLE.EFI).Hash;BuiltUtc=[DateTime]::UtcNow.ToString('o')} | ConvertTo-Json | Set-Content -LiteralPath build/r2/manifest.json -Encoding utf8
+ [ordered]@{Mode='single-rtx-console-consumers-only';RequiresHumanKey=$false;CanUnlock=$false;CanDetach=$true;CanDetachNvOwner=$false;CanDetachRuntimeEdid=$false;CanRemoveGop=$false;HardwareTested=$false;EfiSha256=(Get-FileHash -LiteralPath build/r2/R2-CONSOLE.EFI).Hash;BuiltUtc=[DateTime]::UtcNow.ToString('o')} | ConvertTo-Json | Set-Content -LiteralPath build/r2/manifest.json -Encoding utf8
 } finally {Pop-Location}

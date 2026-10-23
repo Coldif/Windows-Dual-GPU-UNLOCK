@@ -36,10 +36,10 @@ static void InputTests(void) {
     EFI_BOOT_SERVICES bs={0};EFI_SIMPLE_TEXT_INPUT_PROTOCOL keys={0};EFI_SYSTEM_TABLE t={0};
     bs.Stall=StallKeys;keys.Reset=ResetKeys;keys.ReadKeyStroke=NewKey;t.BootServices=&bs;t.ConIn=&keys;
     EFI_STATUS s=GuResearchConfirmInput(&t,InputLog,NULL);
-    Check((KeyScenario==0)==(s==EFI_SUCCESS),"only fresh Enter with healthy input/log succeeds");
+    int success=KeyScenario==0 || KeyScenario==5 || KeyScenario==6 || KeyScenario==7 || KeyScenario==8;
+    Check(success==(s==EFI_SUCCESS),"input protocol probe accepts no key, rejects actual read/reset/log failures");
     Check(Resets==(KeyScenario==9?0:1),"queued input always reset before post-detach reads");
-    if(KeyScenario==5)Check(s==EFI_TIMEOUT && Reads==300 && Stalls==300,"no input is bounded failure");
-    if(KeyScenario==6)Check(s==EFI_ABORTED && Reads==1 && !Stalls,"post-detach Esc aborts without Windows fallback");
+    if(success)Check(Reads==1 && !Stalls && InputLogs==2,"one probe without waiting for human input");
   }
   int scenarios[]={0,1,2,3,4,5,6,7,8};
   for(UINTN i=0;i<sizeof(scenarios)/sizeof(scenarios[0]);i++) {
@@ -49,8 +49,8 @@ static void InputTests(void) {
     FLOW_TEST f={0};
     GU_CONSOLE_FLOW_OPS o={&f,FlowPrepare,FlowRealChoose,FlowCapture,FlowDetach,FlowReady,FlowVerify,FlowWindows,FlowRecord};
     EFI_STATUS s=GuConsoleFlow(&o);
-    if(KeyScenario==0)Check(s==EFI_ABORTED && f.detaches==1 && f.boots==1,"actual T chooses exactly one console transaction");
-    else if(KeyScenario==5 || KeyScenario==6)Check(s==EFI_ABORTED && !f.detaches && f.boots==1,"actual no-T timeout or Esc boots without detach");
+    if(KeyScenario==0 || KeyScenario==5)Check(s==EFI_ABORTED && f.detaches==1 && f.boots==1 && Stalls==50,"automatic path with or without keys chooses exactly one transaction");
+    else if(KeyScenario==6)Check(s==EFI_ABORTED && !f.detaches && f.boots==1,"optional initial Esc boots without detach");
     else Check(s!=EFI_SUCCESS && !f.detaches && !f.boots,"actual selection error/warning cannot detach or boot");
   }
 }

@@ -32,10 +32,10 @@ if([int]$encryption.VolumeStatus -ne 0 -or [int]$encryption.ProtectionStatus -ne
 $name='GPU Headless Observe - NO UNLOCK';$path='\EFI\WindowsGPUUnlock\OBSERVE.EFI'
 if($ConsoleR2){
  $m=Get-Content -LiteralPath (Join-Path $repo 'internal-boot/boot/build/r2/manifest.json') -Raw | ConvertFrom-Json
- if($m.Mode -ne 'single-rtx-console-consumers-only' -or $m.CanUnlock -ne $false -or $m.CanDetach -ne $true -or $m.CanDetachNvOwner -ne $false -or $m.CanDetachRuntimeEdid -ne $false -or $m.CanRemoveGop -ne $false){throw 'Unexpected R2 capabilities'}
+ if($m.Mode -ne 'single-rtx-console-consumers-only' -or $m.RequiresHumanKey -ne $false -or $m.CanUnlock -ne $false -or $m.CanDetach -ne $true -or $m.CanDetachNvOwner -ne $false -or $m.CanDetachRuntimeEdid -ne $false -or $m.CanRemoveGop -ne $false){throw 'Unexpected R2 capabilities'}
  $source=Join-Path $repo 'internal-boot/boot/build/r2/R2-CONSOLE.EFI'
- $hash='a4363159b2ed4088ed84f96cd0a0e0d424843d4dd992c50c58cf732fd7854aad'
- $name='GPU R2 Console Test - NO UNLOCK';$path='\EFI\WindowsGPUUnlock\R2-CONSOLE.EFI'
+ $hash='dada135fbaf8fa19ac1e627668e63387ce5387bf63054d3e3adfa7ca76824c67'
+ $name='GPU R2 Auto Test - NO UNLOCK';$path='\EFI\WindowsGPUUnlock\R2-AUTO.EFI'
 }else{
  $m=Get-Content -LiteralPath (Join-Path $PSScriptRoot 'build/manifest.json') -Raw | ConvertFrom-Json
  if($m.Mode -ne 'headless-research-observation-only' -or $m.CanUnlock -ne $false -or $m.CanDetach -ne $false){throw 'Unexpected observation capabilities'}
