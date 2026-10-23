@@ -3,9 +3,9 @@
 > **Research branch: `research/single-gpu-headless`.** This branch investigates
 > one RTX3090 without an iGPU display. R1 hardware observation confirmed one active
 > RTX GOP and Windows entry without unlocking or detaching drivers. This is
-> **not a headless unlock EFI**. A separate F8-selected R2 console-consumer test
-> proceeds without further keys. It is
-> available; hardware detachment remains unverified.
+> R2 console-consumer detachment and Windows return are hardware verified.
+> A separate F8-selected headless unlock research build is now implemented;
+> its full GOP release, unlock and Windows handoff remain hardware unverified.
 > [Research notes and experiments](research/headless/README.ko.md).
 > The observation entry preserves the existing default boot priority; [main](https://github.com/impacifist/Windows-GPU-UNLOCK/tree/main)
 > remains the supported release path.

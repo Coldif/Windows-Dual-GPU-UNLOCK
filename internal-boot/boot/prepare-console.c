@@ -12,7 +12,10 @@
 #include <Protocol/LoadedImage.h>
 #include <Protocol/SimpleTextOut.h>
 #include <Protocol/SimpleTextIn.h>
-#if defined(GU_SINGLE_RTX_CONSOLE) && (!defined(GU_DIAGNOSTIC_ONLY) || !defined(GU_CONSOLE_PREPARE) || defined(GU_FULL_UNLOCK) || defined(GU_AUTOMATIC_BOOT))
+#if defined(GU_HEADLESS_RESEARCH) && (!defined(GU_SINGLE_RTX_CONSOLE) || !defined(GU_FULL_UNLOCK) || !defined(GU_AUTOMATIC_BOOT) || defined(GU_DIAGNOSTIC_ONLY) || defined(GU_CONSOLE_PREPARE))
+#error Headless unlock requires an isolated automatic single RTX full build
+#endif
+#if defined(GU_SINGLE_RTX_CONSOLE) && !defined(GU_HEADLESS_RESEARCH) && (!defined(GU_DIAGNOSTIC_ONLY) || !defined(GU_CONSOLE_PREPARE) || defined(GU_FULL_UNLOCK) || defined(GU_AUTOMATIC_BOOT))
 #error Single RTX console research must remain a separate non-unlock build
 #endif
 
@@ -38,6 +41,8 @@ typedef struct {
   EFI_GRAPHICS_OUTPUT_PROTOCOL *Gop;
   EFI_GRAPHICS_OUTPUT_PROTOCOL_MODE *Mode,ModeCopy;
   EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *Info,InfoCopy;
+  UINTN KeyReset,KeyRead;
+  EFI_EVENT KeyWait;
 #endif
 } PLAN;
 static PLAN PreparedPlan;
@@ -248,6 +253,9 @@ static EFI_STATUS Consumers(EFI_SYSTEM_TABLE *t,PLAN *p,const GRAPH *g) {
   return s;
 }
 static EFI_STATUS Alive(EFI_SYSTEM_TABLE *t,PLAN *p) {
+#ifdef GU_SINGLE_RTX_CONSOLE
+  if(!t->ConIn || (UINTN)t->ConIn->Reset!=p->KeyReset || (UINTN)t->ConIn->ReadKeyStroke!=p->KeyRead || t->ConIn->WaitForKey!=p->KeyWait)return EFI_NOT_READY;
+#endif
   if(t->ConsoleOutHandle!=p->Console || t->ConsoleInHandle!=p->Input || t->StandardErrorHandle!=p->Error ||
      t->ConOut!=p->ConsoleText || t->StdErr!=p->ErrorText || t->ConIn!=p->Keys || !t->ConIn || !t->ConIn->ReadKeyStroke || !t->ConIn->WaitForKey)return EFI_NOT_READY;
   VOID *out=NULL,*in=NULL,*err=NULL;
@@ -262,9 +270,15 @@ EFI_STATUS GuPrepareConsole(EFI_SYSTEM_TABLE *t,GU_PREPARE_LOG log,VOID *context
   if(!t || !t->BootServices || !log || !t->ConOut || !t->StdErr || !t->ConIn || !t->ConsoleOutHandle || !t->ConsoleInHandle || !t->StandardErrorHandle)return EFI_INVALID_PARAMETER;
   EFI_BOOT_SERVICES *bs=t->BootServices;
   if(!bs->DisconnectController || !bs->RaiseTPL || !bs->RestoreTPL)return EFI_UNSUPPORTED;
+#ifdef GU_SINGLE_RTX_CONSOLE
+  if(!t->ConIn->Reset || !t->ConIn->ReadKeyStroke || !t->ConIn->WaitForKey)return EFI_UNSUPPORTED;
+#endif
   static GRAPH original,current;PLAN p={0};
   p.Console=t->ConsoleOutHandle;p.Input=t->ConsoleInHandle;p.Error=t->StandardErrorHandle;
   p.ConsoleText=t->ConOut;p.ErrorText=t->StdErr;p.Keys=t->ConIn;
+#ifdef GU_SINGLE_RTX_CONSOLE
+  p.KeyReset=(UINTN)t->ConIn->Reset;p.KeyRead=(UINTN)t->ConIn->ReadKeyStroke;p.KeyWait=t->ConIn->WaitForKey;
+#endif
   EFI_STATUS s=Displays(t,&p,TRUE);
   if(s==EFI_SUCCESS)s=Snapshot(bs,&original);
   if(s==EFI_SUCCESS)s=Consumers(t,&p,&original);

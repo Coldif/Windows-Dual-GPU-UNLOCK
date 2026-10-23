@@ -1,6 +1,11 @@
 #include "ownership.h"
 #include "runtime.h"
 #include <Protocol/LoadedImage.h>
+#ifdef GU_HEADLESS_RESEARCH
+static BOOLEAN GuOwnerError(EFI_STATUS s){return s!=EFI_SUCCESS;}
+#undef EFI_ERROR
+#define EFI_ERROR(Status) GuOwnerError(Status)
+#endif
 static EFI_GUID PciGuid=EFI_PCI_IO_PROTOCOL_GUID,
   BindingGuid=EFI_DRIVER_BINDING_PROTOCOL_GUID,LoadedGuid=EFI_LOADED_IMAGE_PROTOCOL_GUID;
 typedef struct {EFI_GUID protocol;EFI_OPEN_PROTOCOL_INFORMATION_ENTRY entry;} OWNER_RECORD;

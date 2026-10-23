@@ -1,10 +1,11 @@
 # GPL-2.0-only. New manual observation entry only; preserve current boot priority.
-param([switch]$Register,[switch]$ConsoleR2)
+param([switch]$Register,[switch]$ConsoleR2,[switch]$HeadlessUnlock)
 $ErrorActionPreference='Stop'
 $repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 . (Join-Path $repo 'internal-boot/install/automatic-policy.ps1')
 $stateFile=Join-Path $PSScriptRoot 'registration.local.json'
 if($ConsoleR2){$stateFile=Join-Path $PSScriptRoot 'r2-registration.local.json'}
+if($HeadlessUnlock){if($ConsoleR2){throw 'Choose one research mode'};$stateFile=Join-Path $PSScriptRoot 'headless-registration.local.json'}
 $config=Get-Content -LiteralPath (Join-Path $repo 'internal-boot/local-config.json') -Raw | ConvertFrom-Json
 function Bcd([string[]]$Arguments){$lines=@(& bcdedit @Arguments);if($LASTEXITCODE -ne 0){throw ('BCDEdit failed: '+($Arguments -join ' '))};return ($lines -join "`r`n")}
 function Ids([string]$Text){return @([regex]::Matches($Text,'(?mi)^identifier\s+(\{[0-9a-f-]{36}\})') | ForEach-Object {$_.Groups[1].Value})}
@@ -30,7 +31,21 @@ if(Confirm-SecureBootUEFI){throw 'Unsigned observation EFI requires Secure Boot 
 $encryption=Get-BitLockerVolume -MountPoint C:
 if([int]$encryption.VolumeStatus -ne 0 -or [int]$encryption.ProtectionStatus -ne 0){throw 'Encryption state changed; observation installer does not change encryption settings'}
 $name='GPU Headless Observe - NO UNLOCK';$path='\EFI\WindowsGPUUnlock\OBSERVE.EFI'
-if($ConsoleR2){
+if($HeadlessUnlock){
+ $m=Get-Content -LiteralPath (Join-Path $repo 'internal-boot/boot/build/headless/manifest.json') -Raw | ConvertFrom-Json
+ $hash='6839bbc9987fa26b794dc6e2ffe98791642ac6e21ef01c388da9fffef3a878a3'
+ $childHash='4dce4c2d06e4950af39cd20bdb267f888df8e3563cbc7011be5aeffcfd3ca469'
+ if($m.Mode -ne 'single-rtx-headless-unlock-then-windows' -or $m.CanUnlock -ne $true -or $m.RequiresHumanKey -ne $false -or $m.ChildSha256 -ne $childHash -or $m.ChildBytes -ne 67584){throw 'Unexpected headless unlock contract'}
+ $source=Join-Path $repo 'internal-boot/boot/build/headless/HEADLESS.EFI'
+ $child=Join-Path $repo 'internal-boot/unlock/build/experimental/entryLatchedSs1Full/internal/automatic/headless-research/RTX3090-EXPERIMENTAL-entryLatchedSs1Full-INTERNAL-AUTO-HEADLESS-RESEARCH.EFI'
+ $childManifest=Get-Content (Join-Path (Split-Path $child) 'build-manifest.json') -Raw | ConvertFrom-Json
+ if($childManifest.Mode -ne 'headless-research-automatic-internal-exact-card-unlock' -or $childManifest.StockProfile -ne 'entryLatchedSs1Full' -or $childManifest.EfiSha256 -ne $childHash -or (Get-FileHash -LiteralPath $child).Hash -ne $childHash){throw 'Headless child build identity mismatch'}
+ # New filenames only: preserve every existing manual, automatic and R2 image.
+ $childTarget=Join-Path $root 'EFI\WindowsGPUUnlock\UNLOCK-HEADLESS.EFI'
+ if(Test-Path -LiteralPath $childTarget){if((Get-FileHash -LiteralPath $childTarget).Hash -ne $childHash){throw 'Different headless child exists; refusing overwrite'}}
+ else{[IO.File]::Copy($child,$childTarget,$false)}
+ $name='GPU Headless UNLOCK - EXPERIMENTAL';$path='\EFI\WindowsGPUUnlock\HEADLESS.EFI'
+}elseif($ConsoleR2){
  $m=Get-Content -LiteralPath (Join-Path $repo 'internal-boot/boot/build/r2/manifest.json') -Raw | ConvertFrom-Json
  if($m.Mode -ne 'single-rtx-console-consumers-only' -or $m.RequiresHumanKey -ne $false -or $m.CanUnlock -ne $false -or $m.CanDetach -ne $true -or $m.CanDetachNvOwner -ne $false -or $m.CanDetachRuntimeEdid -ne $false -or $m.CanRemoveGop -ne $false){throw 'Unexpected R2 capabilities'}
  $source=Join-Path $repo 'internal-boot/boot/build/r2/R2-CONSOLE.EFI'
@@ -46,7 +61,7 @@ if($m.EfiSha256 -ne $hash -or (Get-FileHash -LiteralPath $source).Hash -ne $hash
 $target=Join-Path $root $path.TrimStart('\')
 if(Test-Path -LiteralPath $target){if((Get-FileHash -LiteralPath $target).Hash -ne $hash){throw 'Different observation EFI exists; never overwrite'}}
 else{[IO.File]::Copy($source,$target,$false)}
-function CheckTarget {CheckWindows;if((Target) -ne $root -or (Get-FileHash -LiteralPath $target).Hash -ne $hash){throw 'Observation target changed'}}
+function CheckTarget {CheckWindows;if((Target) -ne $root -or (Get-FileHash -LiteralPath $target).Hash -ne $hash){throw 'Observation target changed'};if($HeadlessUnlock -and (Get-FileHash -LiteralPath $childTarget).Hash -ne $childHash){throw 'Headless child target changed'}}
 CheckTarget
 if(!$Register){Write-Output 'Observation EFI staged only; no boot entry/order changes.';return}
 if(Test-Path -LiteralPath $stateFile){throw 'Registration state already exists; inspect it before registering again'}
@@ -60,7 +75,7 @@ $backup=Join-Path $env:ProgramData ('WindowsGPUUnlock\ResearchBackups\'+(Get-Dat
 [void][IO.Directory]::CreateDirectory($backup)
 [void](Bcd @('/export',(Join-Path $backup 'BCD-export')))
 [IO.File]::WriteAllText((Join-Path $backup 'firmware-before.txt'),$firmwareBefore)
-$state=[ordered]@{EntryId=$null;Name=$name;Path=$path;BackupRoot=$backup;BootOrderBefore=$order;EfiSha256=$hash;CanUnlock=$false;CanDetach=[bool]$ConsoleR2;Status='registering';HardwareTested=$false}
+$state=[ordered]@{EntryId=$null;Name=$name;Path=$path;BackupRoot=$backup;BootOrderBefore=$order;EfiSha256=$hash;CanUnlock=[bool]$HeadlessUnlock;CanDetach=([bool]$ConsoleR2 -or [bool]$HeadlessUnlock);Status='registering';HardwareTested=$false}
 CheckTarget
 if((Bcd @('/enum','{fwbootmgr}')) -cne $fw -or (Bcd @('/enum','firmware')) -cne $firmwareBefore){throw 'Firmware changed before registration'}
 Invoke-AutomaticTransition -Steps @(

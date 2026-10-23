@@ -32,6 +32,9 @@ static UINT8 TestAmdPath[36],TestRtxPath[36];
 static EFI_GUID Dummy={0x12345678,0,0,{0}};
 #ifdef GU_FULL_REPLAY_TEST
 static BOOLEAN FullMode;
+#ifdef GU_HEADLESS_RESEARCH
+static BOOLEAN PhaseForHeadlessTest(VOID);
+#endif
 static EFI_STATUS ExtraHandle(EFI_HANDLE h,EFI_GUID *g,VOID **out);
 static EFI_STATUS ExtraRead(EFI_PCI_IO_PROTOCOL *io,EFI_PCI_IO_PROTOCOL_WIDTH width,UINT32 at,UINTN n,VOID *data);
 static EFI_STATUS ExtraDisconnect(EFI_HANDLE h,EFI_HANDLE agent,EFI_HANDLE child);
@@ -52,6 +55,9 @@ static EFI_STATUS EFIAPI Locate(EFI_LOCATE_SEARCH_TYPE search,EFI_GUID *g,VOID *
   } else {
     Check(GuGuidEqual(g,&GopGuid),"only GOP-specific enumeration");
 #ifdef GU_SINGLE_RTX_CONSOLE
+#ifdef GU_HEADLESS_RESEARCH
+    if(FullMode && PhaseForHeadlessTest()) {*n=0;*out=NULL;return EFI_NOT_FOUND;}
+#endif
     *n=Scenario==9?2:1;
     *out=malloc(*n*sizeof(**out));(*out)[0]=FX_Rtx;
     if(Scenario==29)(*out)[0]=FX_Amd;
@@ -85,6 +91,9 @@ static EFI_STATUS EFIAPI Opens(EFI_HANDLE h,EFI_GUID *g,EFI_OPEN_PROTOCOL_INFORM
   return EFI_SUCCESS;
 }
 static EFI_STATUS EFIAPI ReadKey(EFI_SIMPLE_TEXT_INPUT_PROTOCOL *in,EFI_INPUT_KEY *key) {(void)in;(void)key;return EFI_NOT_READY;}
+#ifdef GU_SINGLE_RTX_CONSOLE
+static EFI_STATUS EFIAPI ResetInput(EFI_SIMPLE_TEXT_INPUT_PROTOCOL *in,BOOLEAN extended) {(void)in;(void)extended;return EFI_SUCCESS;}
+#endif
 static EFI_STATUS EFIAPI Output(EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *out,CHAR16 *s) {
   (void)out;(void)s;OutputCalls++;
   if(Scenario==21 && OutputCalls==2)AmdMode.FrameBufferBase=0;
@@ -200,6 +209,10 @@ static EFI_STATUS Run(int scenario) {
 #endif
   TextMode=(EFI_SIMPLE_TEXT_OUTPUT_MODE){0};Text.Mode=&TextMode;Text.OutputString=Output;
   Keys=(EFI_SIMPLE_TEXT_INPUT_PROTOCOL){0};Keys.ReadKeyStroke=ReadKey;Keys.WaitForKey=(VOID *)1;
+#ifdef GU_SINGLE_RTX_CONSOLE
+  Keys.Reset=ResetInput;
+  if(scenario==31)Keys.Reset=NULL;
+#endif
   AmdPci=(EFI_PCI_IO_PROTOCOL){0};AmdPci.GetLocation=Location;AmdPci.Pci.Read=Read;RtxPci=AmdPci;
   OutBinding=(EFI_DRIVER_BINDING_PROTOCOL){0};GfxBinding=OutBinding;
   OutBinding.Version=GfxBinding.Version=0x10;

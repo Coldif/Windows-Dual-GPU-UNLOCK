@@ -15,8 +15,8 @@
     },
     {
       "path": ".gitignore",
-      "bytes": 555,
-      "sha256": "9fbb777dbbe5c41ef0cc3cf637843601514b67797426cddb36594e53747c5c94"
+      "bytes": 606,
+      "sha256": "57632035eb0cacc66f30653b44a2c16b871d043beb962f6ecd768ada730f8054"
     },
     {
       "path": "CHANGES.md",
@@ -50,13 +50,13 @@
     },
     {
       "path": "README.ko.md",
-      "bytes": 12067,
-      "sha256": "26499ccb5777f3b9d671090316485fe9a6d7d5ec049c2833d6ab5702e642de1e"
+      "bytes": 12086,
+      "sha256": "b7e07918fa9a32b334ce8cbf9b8c064e77e075826b27a0675ba8f2b5536e0f30"
     },
     {
       "path": "README.md",
-      "bytes": 11150,
-      "sha256": "356ff158b2fe5273e8d0a268734c67571edceb3f7e1cbbef8611cfab3b8b78c7"
+      "bytes": 11207,
+      "sha256": "d5bb693bf6672df86418dac1c1960139124c139a4cc269710b23363e07fd1efa"
     },
     {
       "path": "RELEASE-NOTES.md",
@@ -3525,8 +3525,8 @@
     },
     {
       "path": "internal-boot/boot/full-release.c",
-      "bytes": 20737,
-      "sha256": "d0fdaca8144b4730b6386333f5f488b10753a5a397b67f172d019faab193b0d7"
+      "bytes": 27113,
+      "sha256": "abc401b78103680a45a3dcb57a3bdcc65783252a272461ecd420dbefec67a9c4"
     },
     {
       "path": "internal-boot/boot/full-release.h",
@@ -3535,13 +3535,13 @@
     },
     {
       "path": "internal-boot/boot/handoff.c",
-      "bytes": 17614,
-      "sha256": "07c632c8ac3ae2054f1aacf958208defc37c43b413b3cac117a183bb30a759b8"
+      "bytes": 18420,
+      "sha256": "c14c93f8b1556816eaa2c08156670b10adb06cb48736aca9b8def3191e229973"
     },
     {
       "path": "internal-boot/boot/make-console-fixture.py",
-      "bytes": 4157,
-      "sha256": "1e8a0c1ae095e13e879d19b801413186f1ad4e678f8039fb9fb053cdb99526e1"
+      "bytes": 4478,
+      "sha256": "0ceaf4cdee3ec5c554d7ac92ed0ec865401b283373357154617d39cb9bc7c88a"
     },
     {
       "path": "internal-boot/boot/media.h",
@@ -3550,8 +3550,8 @@
     },
     {
       "path": "internal-boot/boot/prepare-console.c",
-      "bytes": 18846,
-      "sha256": "e71f7c0d97d69233701ee7dc51cb38bfb468e48d1e043ee19867798620c6da08"
+      "bytes": 19676,
+      "sha256": "f45a04612cc173c9c2be82fb9aea087ab5aa9719ad2a750e1b6d8e56fc88c162"
     },
     {
       "path": "internal-boot/boot/prepare-console.h",
@@ -3590,8 +3590,8 @@
     },
     {
       "path": "internal-boot/boot/test_console.c",
-      "bytes": 15741,
-      "sha256": "532aebc678489fb4381c279dda2d65d20a8ad5b690d1b51c64e317835ee0da46"
+      "bytes": 16203,
+      "sha256": "b15a29df8a22d74f143585b143034d90642c1f2cfa963a5aabe26f0aefa63040"
     },
     {
       "path": "internal-boot/boot/test_diagnostic.c",
@@ -3600,8 +3600,8 @@
     },
     {
       "path": "internal-boot/boot/test_full.c",
-      "bytes": 13919,
-      "sha256": "34ba5ec1d90f491a3e99ca684743135b566ef24dd61250d4287c909c16a53045"
+      "bytes": 16394,
+      "sha256": "912e6b506dbd3c604a95f961ac59b9b623e805c77466b9e68db97da90a18907e"
     },
     {
       "path": "internal-boot/boot/test_full_flow.c",
@@ -3612,6 +3612,11 @@
       "path": "internal-boot/boot/test_handoff.c",
       "bytes": 7377,
       "sha256": "5d338ead6f018bb8fefe70f960780bd5510e4f286919f9663ee106a0b486ce08"
+    },
+    {
+      "path": "internal-boot/boot/test_headless_full.c",
+      "bytes": 2997,
+      "sha256": "cd30a927d23ca83dda67a0b969b804f1be2425dc11a31096b2fbed601c493adb"
     },
     {
       "path": "internal-boot/boot/test_r2.c",
@@ -3635,8 +3640,8 @@
     },
     {
       "path": "internal-boot/unlock/app.c",
-      "bytes": 29070,
-      "sha256": "b247d7acc9e71f0f15d620af4d23f8aa9aaefc700ce4a680c407746c60b70f49"
+      "bytes": 30745,
+      "sha256": "cfd140b57200e18ad40085aa16e14ba50e707766673f1c6e289940c5ffdcfec4"
     },
     {
       "path": "internal-boot/unlock/app.h",
@@ -3645,8 +3650,8 @@
     },
     {
       "path": "internal-boot/unlock/app_io.c",
-      "bytes": 8641,
-      "sha256": "823ea9627b3214ea5349b8cba4a08081c349fb7596e05ee247744f7e6c6c1493"
+      "bytes": 9187,
+      "sha256": "a353e7a0b6c6bf208573abdd5632a4ab4e7d1a11e1345f18e3bf17fa8c603db9"
     },
     {
       "path": "internal-boot/unlock/app_io.h",
@@ -3660,8 +3665,8 @@
     },
     {
       "path": "internal-boot/unlock/build.ps1",
-      "bytes": 5474,
-      "sha256": "bf34f179871b17b431ccbf2a4c2cbd4d3c3ef0eb068d0a3f96fb59a4a962dfd5"
+      "bytes": 5907,
+      "sha256": "6442abc220bb372790a295639fe4c7f0b602a86fe65d8d365cbbf4598ee8d23b"
     },
     {
       "path": "internal-boot/unlock/checks.c",
@@ -3759,9 +3764,14 @@
       "sha256": "03b8c257be5f78462d006d8563cea9a623d7b6d5fe50e793e021ca9077330417"
     },
     {
+      "path": "internal-boot/unlock/headless-policy.h",
+      "bytes": 7805,
+      "sha256": "696d97893dfb970f162708c8fd315fc6a6fba2a4ce23c5b34997fe7561067dc8"
+    },
+    {
       "path": "internal-boot/unlock/ownership.c",
-      "bytes": 7119,
-      "sha256": "d4d1ccc9befeadde70bc6ee9461894a8397be6d2f35287110f283bf836d2aeee"
+      "bytes": 7284,
+      "sha256": "870e6a19f5058467500118ed94b51df0c6fbcd0d9270c7312b0a48dc15db9f35"
     },
     {
       "path": "internal-boot/unlock/ownership.h",
@@ -3805,8 +3815,8 @@
     },
     {
       "path": "internal-boot/unlock/test-automatic.ps1",
-      "bytes": 1697,
-      "sha256": "35d1c4f63ba958c0be7f756add0db2b08aa41aaf52e32feb089cd2db7e4bc114"
+      "bytes": 1962,
+      "sha256": "2826cd4c5144a487724e99ced79d3cf3f310658bfc7cfa90db39fc85f6e54e28"
     },
     {
       "path": "internal-boot/unlock/tests/check_fwsec_sequence.py",
@@ -3857,6 +3867,11 @@
       "path": "internal-boot/unlock/tests/test_fwsec_trace.c",
       "bytes": 2067,
       "sha256": "5db4074f1c82232255af5e1b42657462cb9cf99343c6fa4796d1ee0afd6205f8"
+    },
+    {
+      "path": "internal-boot/unlock/tests/test_headless.c",
+      "bytes": 5080,
+      "sha256": "c667b5a073428abbe6709bf48040d4f0f4cff361db0200fcdd1aaa1f249e9450"
     },
     {
       "path": "internal-boot/unlock/tests/test_master_attributes.c",
@@ -4050,8 +4065,8 @@
     },
     {
       "path": "research/headless/README.ko.md",
-      "bytes": 18417,
-      "sha256": "e41b17dc64a198c248ec94ce41fdb6f3e53fe8331b7c815c94691615e1100423"
+      "bytes": 25520,
+      "sha256": "5c64a500caa717d4e01dc7669af917220123136abf5bf0505f58406f76ee08d0"
     },
     {
       "path": "research/headless/analyze_capture.py",
@@ -4069,9 +4084,19 @@
       "sha256": "eb9e798093b3d36c2db67b2bb4a926cb5ac77f2b96020e3baa14754f29c1660e"
     },
     {
+      "path": "research/headless/build-unlock.ps1",
+      "bytes": 2951,
+      "sha256": "26ffe39fdc4ee03684065e02877904dd4c63ecb2cfd07c0e973f2085ba7401ac"
+    },
+    {
       "path": "research/headless/register-observe.ps1",
-      "bytes": 7920,
-      "sha256": "453bcc73b92a65b0d6efc34f6d55e3d37c30dde7b390acf049f5f211f86ef2cd"
+      "bytes": 9913,
+      "sha256": "71c582e8bbf8f8e243969849eec004f424b9a352c3c087cf5cc7e7604c57a747"
+    },
+    {
+      "path": "research/headless/test-full.ps1",
+      "bytes": 1979,
+      "sha256": "87d0e1348492ef7d1555280023d4504fc2d0d6c2b062d4a108450fc546bd9994"
     },
     {
       "path": "research/headless/test_analyze_capture.py",

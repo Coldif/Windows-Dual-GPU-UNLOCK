@@ -29,3 +29,4 @@ internal-boot/install/state.json
 research/results/
 research/headless/registration.local.json
 research/headless/r2-registration.local.json
+research/headless/headless-registration.local.json

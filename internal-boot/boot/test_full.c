@@ -12,6 +12,10 @@ static UINT8 MousePath[24],NvPath[32];
 static UINT32 InitialFullConfig[64],MockConfig[64];
 static UINT64 MockAttributes;
 static int FullScenario,EnableCalls,ClaimCalls,CloseCalls,Phase,ColdCalls;
+#ifdef GU_HEADLESS_RESEARCH
+static UINT8 SecondChildPath[36];
+static BOOLEAN PhaseForHeadlessTest(VOID) {return Phase>=4;}
+#endif
 static const UINT32 MockCold[]={0xb72000a1,0x8b8f,0x3ff,0x10,0,0xffffff8f,0x03000062,6,0x6000};
 
 static VOID LoadMapped(const char *path,UINT8 *memory,UINTN size) {
@@ -28,6 +32,10 @@ static VOID LoadMapped(const char *path,UINT8 *memory,UINTN size) {
   free(data);
 }
 static EFI_STATUS ExtraHandle(EFI_HANDLE h,EFI_GUID *g,VOID **out) {
+#ifdef GU_HEADLESS_RESEARCH
+  if(h==FX_EdidChild && GuGuidEqual(g,&PathGuid) && Phase<4){*out=SecondChildPath;return EFI_SUCCESS;}
+  if((h==FX_Rtx || h==FX_EdidChild) && GuGuidEqual(g,&EdidGuid) && Phase<4){*out=&MouseBinding;return EFI_SUCCESS;}
+#endif
   if(GuGuidEqual(g,&BindingGuid) && (h==FX_NvAgent || h==FX_EdidAgent)){*out=h==FX_NvAgent?(VOID *)&NvBinding:(VOID *)&MouseBinding;return EFI_SUCCESS;}
   if(GuGuidEqual(g,&ImageGuid) && (h==FX_NvImage || h==FX_EdidImage)){*out=h==FX_NvImage?(VOID *)&NvImage:(VOID *)&MouseImage;return EFI_SUCCESS;}
   if(h==FX_Rtx && Phase>=4 && (GuGuidEqual(g,&GopGuid) || GuGuidEqual(g,&PathGuid))){*out=NULL;return EFI_UNSUPPORTED;}
@@ -50,6 +58,9 @@ static EFI_STATUS EFIAPI MemRead(EFI_PCI_IO_PROTOCOL *io,EFI_PCI_IO_PROTOCOL_WID
     *(UINT32 *)dst=MockCold[i];ColdCalls++;
     if(FullScenario==11 && Phase==4 && i==7)*(UINT32 *)dst^=1;
     if(FullScenario==19 && Phase==3 && i==8)Live.Edges[Live.Count++]=(EDGE){FX_RtxPci,FX_NvAgent,FX_Input,PathGuid,8,1};
+#ifdef GU_HEADLESS_RESEARCH
+    if(FullScenario==32 && Phase==3 && i==8)RtxInfo.HorizontalResolution--;
+#endif
     return EFI_SUCCESS;
   }
   abort();
@@ -91,6 +102,22 @@ static EFI_STATUS EFIAPI Close(EFI_HANDLE h,EFI_GUID *g,EFI_HANDLE agent,EFI_HAN
 }
 static EFI_STATUS ExtraDisconnect(EFI_HANDLE h,EFI_HANDLE agent,EFI_HANDLE child) {
   Check(child==NULL,"no arbitrary child selection");Calls++;
+#ifdef GU_HEADLESS_RESEARCH
+  if(Calls==3 || Calls==4) {
+    Check(h==(Calls==3?FX_Rtx:FX_EdidChild) && agent==FX_EdidAgent,"only each reviewed EDID child stopped");
+    if(FullScenario==1 || (FullScenario==2 && Calls==4))return EFI_DEVICE_ERROR;
+    if(FullScenario==29)return EFI_WARN_UNKNOWN_GLYPH;
+    Drop(h,agent,&EdidGuid);Phase=3;
+  }else {
+    Check(Calls==5 && h==FX_RtxPci && agent==FX_NvAgent,"NV stop only after two reviewed EDID stops");
+    if(FullScenario==3)return EFI_DEVICE_ERROR;
+    if(FullScenario==30){for(UINTN i=0;i<Live.Count;i++)if(Live.Edges[i].Handle==h && GuGuidEqual(&Live.Edges[i].Protocol,&PathGuid)){Live.Edges[i]=Live.Edges[--Live.Count];break;}return EFI_DEVICE_ERROR;}
+    Drop(h,agent,&PciGuid);Drop(h,agent,&PathGuid);Phase=4;
+    MockConfig[1]&=~3U;MockAttributes&=~0x700ULL;
+    if(FullScenario==5)MockConfig[4]^=0x1000000;
+    if(FullScenario==14)Live.Edges[0].Count++;
+  }
+#else
   if(Calls==3) {
     Check(h==FX_Rtx && agent==FX_EdidAgent,"EDID stop only RTX child/binding");
     if(FullScenario==1)return EFI_DEVICE_ERROR;
@@ -104,14 +131,33 @@ static EFI_STATUS ExtraDisconnect(EFI_HANDLE h,EFI_HANDLE agent,EFI_HANDLE child
     if(FullScenario==5)MockConfig[4]^=0x1000000;
     if(FullScenario==14)Live.Edges[0].Count++;
   }
+#endif
   return EFI_SUCCESS;
 }
 static EFI_STATUS FullLog(VOID *ctx,const char *event,EFI_STATUS status) {
   (void)ctx;(void)status;
+#ifdef GU_HEADLESS_RESEARCH
+  if(status!=EFI_SUCCESS)fprintf(stderr,"full event=%s status=%llx scenario=%d\n",event,(unsigned long long)status,FullScenario);
+  if(!strcmp(event,"headless-console-pre-release-verification")) {
+    if(FullScenario==23)Live.Edges[Live.Count++]=(EDGE){FX_RtxPci,FX_NvAgent,FX_Input,PathGuid,8,1};
+    if(FullScenario==24)Live.Edges[Live.Count++]=(EDGE){FX_EdidChild,FX_OutAgent,FX_EdidChild,TextGuid,16,1};
+    if(FullScenario==27)return EFI_WARN_UNKNOWN_GLYPH;
+    if(FullScenario==28)Drop(FX_EdidChild,FX_EdidAgent,&EdidGuid);
+  }
+  if(!strcmp(event,"detach-nvidia-gop-intent")) {
+    if(FullScenario==25)SecondChildPath[28]^=1;
+    if(FullScenario==26)NvMemory[0x280]^=1;
+  }
+#endif
   if(FullScenario==18 && !strcmp(event,"nvidia-detach-verified"))Live.Edges[Live.Count++]=(EDGE){FX_RtxPci,FX_Input,FX_RtxPci,Dummy,16,1};
   if(!strcmp(event,"pci-decode-restore-intent-io-mem-only")) {
     if(FullScenario==15)return EFI_DEVICE_ERROR;
-    if(FullScenario==16)Drop(FX_Amd,FX_OutAgent,&TextGuid);
+    if(FullScenario==16)
+#ifdef GU_HEADLESS_RESEARCH
+      Keys.WaitForKey=NULL;
+#else
+      Drop(FX_Amd,FX_OutAgent,&TextGuid);
+#endif
     if(FullScenario==20)Live.Edges[0].Count++;
   }
   return EFI_SUCCESS;
@@ -119,6 +165,9 @@ static EFI_STATUS FullLog(VOID *ctx,const char *event,EFI_STATUS status) {
 static EFI_STATUS RunFull(int scenario) {
   FullMode=FALSE;Check(Run(scenario==21?23:scenario==22?24:0)==EFI_SUCCESS,"hardware-validated Stage2A replay prerequisite");
   FullScenario=scenario;EnableCalls=ClaimCalls=CloseCalls=0;Phase=2;ColdCalls=0;
+#ifdef GU_HEADLESS_RESEARCH
+  memcpy(SecondChildPath,TestRtxPath,36);SecondChildPath[28]^=0x50;
+#endif
   memcpy(MockConfig,InitialFullConfig,sizeof(MockConfig));MockAttributes=0x300;
   MouseBinding=(EFI_DRIVER_BINDING_PROTOCOL){0};NvBinding=MouseBinding;
   MouseBinding.Version=1;MouseBinding.DriverBindingHandle=MouseBinding.ImageHandle=FX_EdidAgent;MouseBinding.Stop=(EFI_DRIVER_BINDING_STOP)(MouseMemory+0x157c);
@@ -133,6 +182,9 @@ static EFI_STATUS RunFull(int scenario) {
   if(scenario==17)MouseMemory[0x1000]^=1;
   FullMode=TRUE;
   EFI_STATUS s=GuReleaseGop(LastTable,(VOID *)9999,FullLog,NULL);
+#ifdef GU_HEADLESS_RESEARCH
+  if(scenario==26)NvMemory[0x280]^=1;
+#endif
   if(scenario==17)MouseMemory[0x1000]^=1;
   return s;
 }
@@ -146,7 +198,11 @@ static VOID DecodeTests(VOID) {
     Check(ok==(word==1 && bit<2),"every other config bit rejected");
   }
 }
+#ifdef GU_HEADLESS_RESEARCH
+int LegacyFullMain(int argc,char **argv) {
+#else
 int main(int argc,char **argv) {
+#endif
   Check(argc==5,"need two driver PE files, PROM and 256-byte config fixture");
   LoadMapped(argv[1],MouseMemory,sizeof(MouseMemory));LoadMapped(argv[2],NvMemory,sizeof(NvMemory));
   FILE *f=fopen(argv[3],"rb");Check(f && fread(PromMemory,1,sizeof(PromMemory),f)==sizeof(PromMemory),"read pinned PROM fixture");fclose(f);

@@ -40,6 +40,11 @@ roles = {
     'Rtx': one(lambda b: 'gop framebuffer=0x000000fcc0000000' in b),
     'Amd': 0 if single else one(lambda b: 'gop framebuffer=0x000000fce0000000' in b),
 }
+if single:
+    child_records = [e for e in edges if e[0] == roles['RtxPci'] and str(e[3]) == '09576e91-6d3f-11d2-8e39-00a0c969723b' and e[4] == 8 and e[2] != roles['Rtx']]
+    if len(child_records) != 1:
+        raise ValueError('Expected one additional RTX EDID-only child')
+    roles['EdidChild'] = child_records[0][2]
 for role, protocol, controller in [
     ('OutAgent', '387477c2-69c7-11d2-8e39-00a0c969723b', roles['Rtx']),
     ('GfxAgent', '9042a9de-23dc-4a38-96fb-7aded080516a', roles['Rtx']),

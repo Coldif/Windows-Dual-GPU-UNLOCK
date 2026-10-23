@@ -2,10 +2,10 @@
 
 브랜치: `research/single-gpu-headless` / 기준: `e26bccf`.
 목표는 **3090으로 부팅 화면 조작 → 출력 해제 → 화면 없이 언락 → Windows에서 출력
-복귀**라는 가설을 검증하는 것이다. 현재 상태는 **R1 단일 활성 RTX 출력 관찰 완료**다.
-단일 GPU 언락 EFI는 구현하거나 설치하지 않았다. R2는 콘솔 소비자 해제만 시험한다.
+복귀**라는 가설을 검증하는 것이다. 현재 상태는 **R2 실기 성공 / 단일 GPU 언락 연구판 준비**다.
+R2는 콘솔 소비자 해제만 시험했고, 새 headless 언락판의 실제 GPU 성공은 미확인이다.
 검증된 main의 GPU·입력·정리 검사를
-지워 통과시키지 않으며 기존 설치 파일·BootOrder·릴리스도 변경하지 않는다.
+지워 통과시키지 않으며 기존 설치 EFI·기본 부팅 우선순위·main 릴리스를 보존한다.
 
 ## 확인된 사실과 아직 모르는 점
 
@@ -247,4 +247,97 @@ diagnostic 검사 35개, 오프라인 분석기 13개와 등록 transaction 복�
 기존 R2 항목만 **GPU R2 Auto Test - NO UNLOCK**과 새 경로로 바꾸고, BootOrder·
 다른 항목·기존 수동 R2 파일·기존 Auto/OBSERVE 해시를 보존한 것을 검증했다.
 변경 전 BCD·수동 EFI·등록 상태를 백업했고 독립 소스 검토에서도 설치 blocker는 없었다.
-자동판의 실제 부팅·콘솔 해제·Windows 복귀는 다음 사용자의 시험으로 확인해야 한다.
+자동판의 실제 부팅·콘솔 해제·Windows 복귀 결과는 아래 R2 실기 기록으로 추가했다.
+
+### R2 실제 성공 기록
+
+2026-10-24 02:43:38 KST에 생성한 `R2C00.TXT`(847,903 bytes)의 SHA256은
+`61821560d65ba7f1b8794b033404a4b6dab48356428e458e82454463cd92333d`다.
+두 캡처가 모두 완료됐고, 정확한 RTX 소비자 세 관계만 제거됐다(active 165 → 162).
+TextOut/GraphicsConsole 해제·검증과 무입력 protocol probe, 최종 preparation result가
+모두 status 0이었다. 전후 물리 GOP는 RTX 하나이며 AMD 출력은 없었다.
+Windows LastBootUpTime은 같은 날 02:43:40 KST였고 사용자가 재부팅 복귀를 보고했다.
+이는 **콘솔 소비자 분리와 Windows 복귀**의 근거이며 NVIDIA GOP 제거·언락의 근거는 아니다.
+
+## 단일 RTX 언락 연구판 — 실기 미검증
+
+사용자의 언락 실행 요청에 따라 R3/R4/R5를 별도 연구 빌드로 연결했다. 단계별 실기
+검증이 모두 끝났다는 뜻은 아니다. 마지막 물리 GOP 해제 후 Windows Boot Manager가
+동작하고 NVIDIA가 화면을 복구할지는 실제 첫 시험에서 확인해야 한다.
+
+동작 순서는 다음과 같다.
+
+1. F8에서 새 **GPU Headless UNLOCK - EXPERIMENTAL**을 선택한다.
+2. 초기 5초 동안 Esc를 누르면 아무 GPU 변경 없이 Windows로 간다. 아무 키도 누르지
+   않으면 정확한 RTX 신원·GOP·driver binding·경로·입력·보호 graph를 검사한다.
+3. 콘솔 소비자 세 관계, 같은 AMI 드라이버가 관리하는 출력용/EDID 전용 두 child의
+   EDID 관계 두 개, NVIDIA root의 정확한 세 관계를 각각 검증하며 순서대로 해제한다.
+   추가 child/owner 또는 경로·코드·보호 graph 변화는 거부한다.
+4. 물리 GOP 0개와 원래 콘솔/입력 protocol 보존을 확인한 뒤 독점 소유 아래 원래의
+   IO/MEM decode만 복원한다. BME를 복원하지 않으며 config·PROM·cold 상태를 재검증한다.
+5. 별도 headless child가 파일 전용 로그로 기존 exact-card 언락 transaction 한 번을
+   실행한다. U/Enter는 필요 없다. child의 3초 Esc 취소 창은 해제 후이므로 취소 시
+   Windows를 강행하지 않고 정지한다.
+6. selector 결과, containment, BME=0과 mapping/할당 정리를 통과한 경우에만 반환한다.
+   wrapper는 파일을 닫은 뒤 마지막 zero-GOP/입력/config/전체 graph 검증을 하고
+   리셋 없이 Windows Boot Manager를 시작한다.
+
+오류·부분 해제·파일 오류/경고·알 수 없는 owner·정리 실패에서는 자동 재연결·재시도·
+리셋 없이 정지한다. 화면 출력 함수는 해제 시작 이후 호출하지 않는다. 입력 protocol
+보존은 실제 사람의 키 입력 반응 검증이 아니다. NV GOP의 두-child Stop 순회는 로컬
+원본 PE의 disassembly로 확인했지만, mock의 성공을 실기 성공으로 취급하지 않는다.
+
+설치와 빌드 명령:
+
+```powershell
+.\research\headless\test-full.ps1 -Clang 'C:\TOOLS\LLVM20\bin\clang.exe'
+.\research\headless\build-unlock.ps1 -Clang 'C:\TOOLS\LLVM20\bin\clang.exe' `
+  -LldLink 'C:\TOOLS\LLVM20\bin\lld-link.exe'
+.\research\headless\register-observe.ps1 -HeadlessUnlock -Register
+```
+
+`test-full.ps1`은 local private graph/driver PE/PROM/config fixture를 요구한다.
+`-FixtureRoot`와 `-Prom`으로 자신의 검토된 fixture를 지정해야 하며, 기본 경로는
+이 연구 PC의 경로다. 별도 ESP/Windows ESP를 Configure한 local 설정과 기존 검증된
+ASSETS가 필요하다. 등록 도구의 하드코딩된 EFI 해시는 이 PC의 검토한 빌드만 허용한다.
+범용 installer·다른 3090/BIOS 지원·main 릴리스의 지원 조건 변경으로 해석하지 않는다.
+
+파일은 `HEADLESS.EFI`, `UNLOCK-HEADLESS.EFI` 두 개를 새로 배치하고 F8 항목을 기존
+순서의 끝에 추가한다. 기존 Auto/Windows/R2/관찰 항목과 기본 부팅 순서를 보존한다.
+상태 파일 `headless-registration.local.json`, BCD 백업, 원본 graph/PROM/firmware와
+생성 EFI는 공개 소스에 포함하지 않는다.
+
+시험 시에는 R2 성공 때의 케이블·BIOS를 유지한다. 새 F8 항목 선택 후 아무 키도
+누르지 않고 기다린다. 최대 2분 정도 기다려도 진행되지 않으면 전원을 끄고 F8의
+**Windows Boot Manager**로 직접 복귀한다. reset 후 언락 상태는 유지된다고 가정하지
+않는다. 복귀 후 `HLS000000.TXT` 이후 wrapper 로그와 새 `AUTO000000/REPORT.TXT`
+이후 child 로그를 확인하고, 정상 직접 인계됐을 때 FP16/BF16 성능을 별도로 측정한다.
+
+### 설치 및 검증 기록 — 2026-10-24
+
+연구 PC에 새 F8 항목과 두 EFI를 설치했고 경로·해시·등록 상태를 사후 검증했다.
+기존 모든 부팅 항목의 필드와 우선순위의 순서, BootNext 부재를 보존했으며 기존
+Auto/UNLOCK-AUTO/R2-AUTO 파일 해시와 필수 ASSETS 5개의 크기·해시도 검증했다.
+에이전트는 재부팅하거나 실제 headless 언락 transaction을 실행하지 않았다.
+
+| 완료 조건 | 결과 | 근거와 한계 |
+|---|---|---|
+| 별도 wrapper/child 빌드·설치 | 통과 | wrapper 35,840 bytes / child 67,584 bytes, 아래 SHA256, AMD64 EFI/무 import/NX/PE 검사 통과 |
+| 두 child 해제·IO/MEM-only 복원 및 실패 차단 | 호스트 통과 | 실제 로컬 graph/driver PE/PROM fixture 기반 6,305 checks; 실제 firmware 호출 없음 |
+| 전체 인계 제어 흐름 | 호스트 통과 | 39 checks, release/unlock/log/close/verify 실패 시 Windows 강행 없음 |
+| 실제 child app + 원본 transaction | 호스트 통과 | 16개 모드; zero-GOP/virtual-only 성공, 늦은 GOP/입력/owner/config/SS0 변화 및 파일 오류/경고 차단, 화면 호출 0 |
+| 기존 경로 보존 | 통과 | 일반 release 9,842 checks, 기존 AUTO/manual 통합 검사, 재빌드 EFI 해시 동일 |
+| 설치 실패 복구 | 호스트 통과 | 부분 mutation/최종 검증 실패 rollback 및 boot-copy 귀속 검사 |
+| 실제 단일 RTX 언락 + 화면 복구 + 성능 | 미검증 | 다음 F8 시험과 새 로그, Windows FP16/BF16 측정 필요 |
+
+- HEADLESS.EFI SHA256: `6839bbc9987fa26b794dc6e2ffe98791642ac6e21ef01c388da9fffef3a878a3`.
+- UNLOCK-HEADLESS.EFI SHA256: `4dce4c2d06e4950af39cd20bdb267f888df8e3563cbc7011be5aeffcfd3ca469`.
+- 기존 AUTO wrapper: `6b6beb8608b7e70d7b424149b948bab14f4a0e80c6d73ac920e9788d3a589e87`.
+- 기존 AUTO child: `b512bd7f17dd8dc37e94dffe88c2646693e86f95852214002ca7eb88b3b06507`.
+- 기존 manual child: `5d45abff1cffff1aeaf329725b94ae5f33d7b7c3647afe37812e60f713bce963`.
+
+headless 정책의 console/input/GOP/graph 관찰·비교·baseline 저장 전체와 wrapper의
+최종 검증은 TPL_NOTIFY 구간에 두고 모든 반환에서 TPL을 복구한다. TPL 복원 후 늦은
+알림이 GOP/입력을 바꾸는 호스트 사례도 원본 core의 transaction 경계 검사에서
+GPU write 없이 차단했다. 이는 임의 firmware 동시성 전체나 실제 Windows 성공을
+증명하는 것이 아니며, 실기 결과가 없으면 기본 부팅 승격·범용 지원을 선언하지 않는다.
