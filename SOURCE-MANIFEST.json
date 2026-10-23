@@ -15,8 +15,8 @@
     },
     {
       "path": ".gitignore",
-      "bytes": 468,
-      "sha256": "444e996c2c556d5d07aa409f32f0717af169c9f29183770d44152f93bd3f0736"
+      "bytes": 510,
+      "sha256": "37443144640fe32e07c755b35ac3f27e6e1ca7aa13c7029595939a3cd9b19f53"
     },
     {
       "path": "CHANGES.md",
@@ -4035,8 +4035,8 @@
     },
     {
       "path": "research/headless/README.ko.md",
-      "bytes": 9836,
-      "sha256": "8265626e023c1878c6fa3c622fdce23264ebd85087cf39b7068bb3f02aae26ea"
+      "bytes": 11178,
+      "sha256": "6f2ed091193cfcca9da3acb0353a3b7cc00a07beed4ef3d452a53a3005be4131"
     },
     {
       "path": "research/headless/analyze_capture.py",
@@ -4047,6 +4047,11 @@
       "path": "research/headless/build-observe.ps1",
       "bytes": 2231,
       "sha256": "55a8cfdbeb66e7bcfdae9f49fffd7c5853ac96a157b4bc4ed6569a38a7d7426e"
+    },
+    {
+      "path": "research/headless/register-observe.ps1",
+      "bytes": 7173,
+      "sha256": "13d74b542619843e035fe412627a94409d20b046d59e44ac7e6889a69c3997e6"
     },
     {
       "path": "research/headless/test_analyze_capture.py",

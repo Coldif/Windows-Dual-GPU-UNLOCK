@@ -27,3 +27,4 @@ internal-boot/boot/generated.h
 internal-boot/local-config.json
 internal-boot/install/state.json
 research/results/
+research/headless/registration.local.json
