@@ -1,5 +1,7 @@
 # 실행 펌웨어 준비
 
+[English](ASSETS.en.md) | **한국어**
+
 이 공개본에는 NVIDIA 펌웨어, VBIOS/PROM 덤프, 드라이버 DLL을 넣지 않습니다. 필요한 파일의 정확한 크기·SHA-256은 [unlock/assets.json](../unlock/assets.json)에 있습니다.
 
 상위 코어의 [고정 커밋 firmware 안내](https://github.com/Zagitta/gpu-unlock/tree/0ebdb1c6308b6a2072be5bf04513472942541956/firmware)를 따라 합법적으로 이용할 수 있는 원본에서 추출·생성합니다. 이번 사례의 펌웨어 계열은 **GA102 / 610.43.03**입니다. 이것은 Windows에 설치할 드라이버 버전 지시가 아닙니다. 실제 Windows 드라이버는 617.14로 성공했습니다.

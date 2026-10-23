@@ -19,5 +19,6 @@ usb-package/
 *.pyc
 __pycache__/
 .env*
+compatibility-report*.json
 *.key
 *.pem

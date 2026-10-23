@@ -1,5 +1,7 @@
 # USB 부팅부터 Windows 측정까지
 
+[English](GUIDE.en.md) | **한국어**
+
 ## 1. 적용 범위와 준비
 
 [지원 조건](COMPATIBILITY.ko.md)에 맞는지 먼저 확인합니다. 이 공개본의 실행 검사는 실제 검증한 PC에 고정되어 있습니다. 다른 시스템을 지원하려면 PCI/MMIO/DMA·GOP·PROM·메모리 배치 검증을 포함한 별도 포팅이 필요합니다.

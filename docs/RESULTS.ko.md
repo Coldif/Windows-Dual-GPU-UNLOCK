@@ -1,5 +1,7 @@
 # RTX 3090 Windows 성공 사례 — 2026-10-20
 
+[English](RESULTS.en.md) | **한국어**
+
 ## 측정 조건
 
 - 같은 RTX 3090 24GiB, NVIDIA Windows 617.14, CUDA Runtime API `12060`, cuBLAS `120600`.

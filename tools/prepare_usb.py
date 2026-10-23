@@ -76,7 +76,8 @@ def prepare(root, assets, output):
         shutil.copyfile(root / 'THIRD_PARTY_NOTICES.md', payload / 'THIRD_PARTY_NOTICES.md')
         shutil.copytree(root / 'docs', payload / 'docs')
         (stage / 'USB-README.md').write_text(
-            '# Windows GPU UNLOCK\n\nRead RTX3090-UNLOCK/docs/GUIDE.ko.md before booting.\n'
+            '# Windows GPU UNLOCK\n\nRead RTX3090-UNLOCK/docs/GUIDE.en.md before booting.\n'
+            'Korean: RTX3090-UNLOCK/docs/GUIDE.ko.md\n'
             'Full public guide: https://github.com/impacifist/Windows-GPU-UNLOCK\n'
             'After unlock, use Boot Override -> Windows Boot Manager WITHOUT resetting.\n', encoding='utf-8')
         with zipfile.ZipFile(payload / 'SOURCE.zip', 'w', zipfile.ZIP_DEFLATED) as archive:

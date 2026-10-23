@@ -1,5 +1,7 @@
 # 빌드와 검사
 
+[English](BUILD.en.md) | **한국어**
+
 Python 3.9+, LLVM/clang + lld-link가 필요합니다. 실제 EFI는 **clang 20.1.8**로 빌드했습니다. 기본 빌드는 무쓰기 preflight이며 언락을 실행하지 않습니다.
 
 ```powershell

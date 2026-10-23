@@ -10,8 +10,8 @@
     },
     {
       "path": ".gitignore",
-      "bytes": 290,
-      "sha256": "8153345bb3cb6a612ed9d2f78fd6dc978d3bc2ded9525b518db841b1a88993b8"
+      "bytes": 317,
+      "sha256": "31a1d5473a23eba14f53f8fc37646bae939d8420c1ffdacbad291f9b2e4e8067"
     },
     {
       "path": "benchmark/build.ps1",
@@ -40,8 +40,8 @@
     },
     {
       "path": "CHANGES.md",
-      "bytes": 1704,
-      "sha256": "260fca252aabb4ca69b9a6097565f3997d98e4098dd0619d6fbed4a4c891e3be"
+      "bytes": 2527,
+      "sha256": "8aa98c91d6516a7aa14f7a1873ce0b157ee1697065ade96d9fc03c75af42338a"
     },
     {
       "path": "deps/edk2/License.txt",
@@ -3250,33 +3250,33 @@
     },
     {
       "path": "docs/ASSETS.ko.md",
-      "bytes": 2557,
-      "sha256": "ad1ff222fda15478d5551f97be2daa184151af04b9c5271f01a1ce227ffd33bc"
+      "bytes": 2598,
+      "sha256": "8476a42672a91f3ff6f9f3c5cde68b57ebd7a396fd5ba9d3011d80d2a2c7c0b9"
     },
     {
       "path": "docs/BENCHMARK.ko.md",
-      "bytes": 1946,
-      "sha256": "6f36a90bc3e0682b03f087b55d67845204b346ec1a0a2ce72919b36ce2e4fd77"
+      "bytes": 1990,
+      "sha256": "c21a74aa7bd245d15b0de5c0dc80be3eff795ab2a19d2cf6189d59a7dd9e8ad1"
     },
     {
       "path": "docs/BUILD.ko.md",
-      "bytes": 2604,
-      "sha256": "91607ab60638a63eb9580d5ae1961b7dab5e0591a89f88609e9ddec802273e09"
+      "bytes": 2644,
+      "sha256": "5cb646ad42f026cd3f020f5aad95e785d2f6410c08841d0ac8056ceb10f83deb"
     },
     {
       "path": "docs/COMPATIBILITY.ko.md",
-      "bytes": 1406,
-      "sha256": "ea26ee844ee3dd7bdb37603097bf067b1d1e257b561d14b393375c5431b2cc4e"
+      "bytes": 1454,
+      "sha256": "666056c20f89fa15b91df8536f4cdab4aa0b0ce1fe8d4920ea437c98d313f74d"
     },
     {
       "path": "docs/GUIDE.ko.md",
-      "bytes": 5008,
-      "sha256": "366b8c618db2de04829524afbb44363612f1c569c2010152835edf89a0352d57"
+      "bytes": 5048,
+      "sha256": "2c8943c8b749eb28d5c2f2cc4935c8154ddaa289549b96db21e2ce53de1478cc"
     },
     {
       "path": "docs/RESULTS.ko.md",
-      "bytes": 2412,
-      "sha256": "42ea2dc6488b42a61d472fc406f9237a8347df5ea7c2d31987f5c8261df7eafb"
+      "bytes": 2454,
+      "sha256": "18b036167ad6a0360f07673d89d9832876e21301c263d4bb00f5cd5c870f5eb2"
     },
     {
       "path": "efi_runtime.c",
@@ -3325,8 +3325,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 5312,
-      "sha256": "19e3e5d017b6c6f7ba555cee550d14f12b4a1184bcc58d9afaafd4e36e74a5ba"
+      "bytes": 5795,
+      "sha256": "501c507b9ef055329554764ed981792cf81acb62d8b0082fe9c47592621efc6e"
     },
     {
       "path": "release/EFI/BOOT/BOOTX64.EFI",
@@ -3350,13 +3350,13 @@
     },
     {
       "path": "tools/prepare_usb.py",
-      "bytes": 4807,
-      "sha256": "80a4e443a8e65ce95601482ec8cd4e1a22dc2da70caab3193cffd2d20f1271b4"
+      "bytes": 4863,
+      "sha256": "15678ee72a82bc8d03f96eac5036a816dd1783e76246cccdce6f730ba067d13c"
     },
     {
       "path": "tools/test_prepare_usb.py",
-      "bytes": 3996,
-      "sha256": "2f164bc10236b2b0954220db9d9f6d351a4955fa1a013d12615c61295c0e1dc3"
+      "bytes": 4326,
+      "sha256": "38024120f7bf0f12ee70002507fc3a4e99acc87f2d549919b368b7092a60faf8"
     },
     {
       "path": "unlock/app.c",
@@ -3797,6 +3797,71 @@
       "path": "unlock/verify_pe.py",
       "bytes": 2397,
       "sha256": "012e0dbbf406818182a88828ae9be86ea09f55ee8091fe19ddc56e44cd65e328"
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/compatibility.yml",
+      "bytes": 2088,
+      "sha256": "e91d62cb1c6eb8c79f4d9b4de46deab7a1eaa0c58f7db9b8694d8f4328c2c7ad"
+    },
+    {
+      "path": "README.ko.md",
+      "bytes": 5912,
+      "sha256": "c46c8a4cccba4d1909598a2768c5b6c04e9c520641f9ba35c508d1106f2795fb"
+    },
+    {
+      "path": "docs/ASSETS.en.md",
+      "bytes": 2364,
+      "sha256": "4ec60ca6a2c171b3c3f89b41d1f030f5d754fc8f8bfc26c53e9b244227433c50"
+    },
+    {
+      "path": "docs/BENCHMARK.en.md",
+      "bytes": 1902,
+      "sha256": "2382ce2ba046bba4182594f0adf5c3d89b7dd734282c0f274ff9d32f6b7f3b1a"
+    },
+    {
+      "path": "docs/BUILD.en.md",
+      "bytes": 2774,
+      "sha256": "0959ce8ecf6a532a1cc835b6e665accfa40aa4f62dbde93325de23c11d8d113e"
+    },
+    {
+      "path": "docs/COMPATIBILITY.en.md",
+      "bytes": 2053,
+      "sha256": "bf6fafbdc5d52ad330aa83634e43dca88a754b9492ab3c49300d9958ca0e0aab"
+    },
+    {
+      "path": "docs/CONTRIBUTING.en.md",
+      "bytes": 4101,
+      "sha256": "910f90c09a01ad19d520115251ff381f5340845bf62291a2ee6d7eb149b480bb"
+    },
+    {
+      "path": "docs/CONTRIBUTING.ko.md",
+      "bytes": 3462,
+      "sha256": "09c3a69c2cbfd9566f932ec208958d3f5b32b3c0b9cd1f096b20d606082f864d"
+    },
+    {
+      "path": "docs/GUIDE.en.md",
+      "bytes": 4432,
+      "sha256": "24c420296bb136b8170364bbf27ca2be325b6ed5402b78fb425f846745c1d0b3"
+    },
+    {
+      "path": "docs/PORTABILITY.en.md",
+      "bytes": 6020,
+      "sha256": "2370db77c7f1d30f218548d9c9319d8c22f589027ec0c1256eff1cb19ae0238a"
+    },
+    {
+      "path": "docs/RESULTS.en.md",
+      "bytes": 2315,
+      "sha256": "26a4639feb39675edfbb64b888711c9a2550610bee01e39c420097d8861dc100"
+    },
+    {
+      "path": "tools/collect_compatibility.py",
+      "bytes": 6498,
+      "sha256": "1447a60aaad211c830702b9fa50765e32d8f957d326d15a9f1a6f0817b8be5cf"
+    },
+    {
+      "path": "tools/test_collect_compatibility.py",
+      "bytes": 6583,
+      "sha256": "b8a464011c15bf732a937c4365b9851cdcc345b0c1fd589a5165364022a4de2c"
     }
   ]
 }

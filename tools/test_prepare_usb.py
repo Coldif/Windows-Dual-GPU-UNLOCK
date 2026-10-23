@@ -23,6 +23,7 @@ class PackagingTests(unittest.TestCase):
             'unlock/app.c': b'fake source', 'LICENSE': b'license',
             'LICENSES/notice.txt': b'notice', 'THIRD_PARTY_NOTICES.md': b'notices',
             'docs/GUIDE.ko.md': b'guide',
+            'docs/GUIDE.en.md': b'English guide',
         }.items():
             path = self.root / name
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -59,6 +60,11 @@ class PackagingTests(unittest.TestCase):
         prepare(self.root, self.assets, self.output)
         self.assertEqual((self.output / 'EFI/BOOT/BOOTX64.EFI').read_bytes(), b'fake EFI')
         self.assertEqual(len(list((self.output / 'RTX3090-UNLOCK/ASSETS').iterdir())), 5)
+        readme = (self.output / 'USB-README.md').read_text(encoding='utf-8')
+        for language in ('en', 'ko'):
+            guide = f'RTX3090-UNLOCK/docs/GUIDE.{language}.md'
+            self.assertIn(guide, readme)
+            self.assertTrue((self.output / guide).is_file())
         with zipfile.ZipFile(self.output / 'RTX3090-UNLOCK/SOURCE.zip') as archive:
             self.assertIn('unlock/app.c', archive.namelist())
             self.assertIn('SOURCE-MANIFEST.json', archive.namelist())
