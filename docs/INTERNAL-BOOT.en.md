@@ -1,5 +1,9 @@
 # Internal disk unlock → Windows boot
 
+> This guide covers the legacy path that retains the AMD display. For the
+> v0.3.0 RTX-display headless path, use the [headless guide](HEADLESS.en.md).
+> Statements below about unverified automatic boot refer to the older AMD profile.
+
 **English** | [한국어: detailed walkthrough](INTERNAL-BOOT.ko.md)
 
 This experimental profile remains restricted to **ASUS TUF GAMING B650M-PLUS WIFI,

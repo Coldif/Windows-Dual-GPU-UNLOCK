@@ -1,4 +1,4 @@
-param([Parameter(Mandatory)][string]$Prom,[Parameter(Mandatory)][string]$ColdCapture,[Parameter(Mandatory)][string]$Assets,[string]$Clang='clang',[switch]$ManualRegression)
+param([Parameter(Mandatory)][string]$Prom,[Parameter(Mandatory)][string]$ColdCapture,[Parameter(Mandatory)][string]$Assets,[string]$Clang='clang',[switch]$ManualRegression,[switch]$HeadlessResearch)
 $ErrorActionPreference='Stop'
 Push-Location $PSScriptRoot
 try {
@@ -8,6 +8,8 @@ try {
  [void][IO.Directory]::CreateDirectory((Join-Path $PSScriptRoot 'build/automatic-tests'))
  $flags=@('-std=c11','-O1','-Wall','-Wextra','-Werror','-Wno-unused-parameter','-Wno-unused-function','-D_CRT_SECURE_NO_WARNINGS','-D__KERNEL__','-DGU_UEFI_PORT','-DGU_TARGET_PCI_ID=0x220410deU','-DGU_EXPERIMENTAL_3090','-DGU_ENTRY_LATCHED_SS1_FULL','-DGU_INTERNAL_BOOT','-DGU_AUTOMATIC_BOOT','-Icompat','-I../../deps/edk2/MdePkg/Include','-I../../deps/edk2/MdePkg/Include/X64')
  $test='tests/test_automatic.c';$exe='build/automatic-tests/test-automatic.exe'
+ if($HeadlessResearch -and $ManualRegression){throw 'Headless and manual regression are separate tests'}
+ if($HeadlessResearch){$flags+='-DGU_HEADLESS_RESEARCH';$test='tests/test_headless.c';$exe='build/automatic-tests/test-headless.exe'}
  if($ManualRegression){$flags=@($flags | Where-Object {$_ -ne '-DGU_AUTOMATIC_BOOT'});$test='tests/test_entry_latched.c';$exe='build/automatic-tests/test-manual.exe'}
  $sources=@($test,'app_io.c','ownership.c','format.c','sha256.c','checks.c','port.c','compat.c','vendor/unlock_610.c','vendor/prep_610.c','vendor/layout_610.c','vendor/vbios_610.c','vendor/gfw_eval.c')
  & $Clang @flags @sources -o $exe

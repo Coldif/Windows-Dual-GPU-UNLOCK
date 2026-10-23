@@ -9,11 +9,21 @@
 #include <Protocol/GraphicsOutput.h>
 #include <IndustryStandard/Acpi.h>
 #include <Guid/GlobalVariable.h>
+#ifdef GU_HEADLESS_RESEARCH
+#include "headless-policy.h"
+static BOOLEAN GuAppError(EFI_STATUS s){return s!=EFI_SUCCESS;}
+#undef EFI_ERROR
+#define EFI_ERROR(Status) GuAppError(Status)
+#endif
 #if defined(GU_AUTOMATIC_BOOT) && (!defined(GU_EXPERIMENTAL_3090) || !defined(GU_INTERNAL_BOOT) || !defined(GU_ENTRY_LATCHED_SS1_FULL))
 #error Automatic boot requires experimental internal entryLatchedSs1Full
 #endif
+#ifdef GU_HEADLESS_RESEARCH
+static EFI_GUID PciGuid=EFI_PCI_IO_PROTOCOL_GUID,GlobalGuid=EFI_GLOBAL_VARIABLE;
+#else
 static EFI_GUID PciGuid=EFI_PCI_IO_PROTOCOL_GUID,GopGuid=EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID,
   PathGuid=EFI_DEVICE_PATH_PROTOCOL_GUID,GlobalGuid=EFI_GLOBAL_VARIABLE;
+#endif
 static EFI_SYSTEM_TABLE *Table;
 static UINT32 InitialConfig[64];
 static const char *Stage;
@@ -29,6 +39,7 @@ static VOID ConfigLog(const UINT32 *Config) {
   for(UINTN i=0;i<64;i+=4)GuLog("config[%02x]=%08x %08x %08x %08x\n",
     (unsigned)(i*4),Config[i],Config[i+1],Config[i+2],Config[i+3]);
 }
+#ifndef GU_HEADLESS_RESEARCH
 static VOID GopInfoLog(UINTN Index,const EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *Info) {
   GuLog("GOP[%u] format=%u size=%ux%u stride=%u\n",(unsigned)Index,
     (unsigned)Info->PixelFormat,Info->HorizontalResolution,Info->VerticalResolution,Info->PixelsPerScanLine);
@@ -75,7 +86,11 @@ static BOOLEAN AmdGopParent(EFI_DEVICE_PATH_PROTOCOL *Path) {
   GuLog("AMD GOP PCI parent: status=%#llx id=%#x subsystem=%#x\n",(unsigned long long)status,id,subsystem);
   return !EFI_ERROR(status) && id==GU_AMD_ID && subsystem==GU_AMD_SUBSYSTEM;
 }
+#endif
 static BOOLEAN DisplayCheck(VOID) {
+#ifdef GU_HEADLESS_RESEARCH
+  return GuHeadlessCheck() && GuLogReady();
+#else
   EFI_HANDLE *handles=NULL;UINTN count=0,intel=0;BOOLEAN valid=TRUE;
   EFI_GRAPHICS_OUTPUT_MODE_INFORMATION physical={0},forwarded={0};BOOLEAN forwarding=FALSE;
   EFI_STATUS status=Gu.bs->LocateHandleBuffer(ByProtocol,&GopGuid,NULL,&count,&handles);
@@ -127,6 +142,7 @@ static BOOLEAN DisplayCheck(VOID) {
   }
   GuFree(handles);GuLog("GOP result: valid=%u amd_physical=%zu\n",valid,(size_t)intel);
   return valid && intel==1 && GuLogReady();
+#endif
 }
 static EFI_STATUS ReadConfig(UINT32 *Config) {
   for(UINTN i=0;i<64;i++)if(EFI_ERROR(GuConfigRead(EfiPciIoWidthUint32,(UINT32)i*4,&Config[i]))) {
@@ -329,6 +345,9 @@ static EFI_STATUS Arm(VOID) {
   GuLogText("AUTOMATIC INTERNAL UNLOCK: Esc within 3 seconds cancels. No U required. One guarded attempt only.\n");
   if(!GuLogReady())return EFI_DEVICE_ERROR;
   for(UINTN i=0;i<30;i++) {
+#ifdef GU_HEADLESS_RESEARCH
+    if(!GuHeadlessCheck())return EFI_NOT_READY;
+#endif
     EFI_INPUT_KEY key;status=Table->ConIn->ReadKeyStroke(Table->ConIn,&key);
     if(status==EFI_SUCCESS) {
       if(key.ScanCode==0x17 || key.UnicodeChar==27)return EFI_ABORTED;
@@ -362,6 +381,19 @@ static VOID Halt(VOID) {
   /* No ResetSystem, ExitBootServices, retry, protocol close or memory release. */
   for(;;)Gu.bs->Stall(1000000);
 }
+#ifdef GU_HEADLESS_RESEARCH
+/* Last file log can execute firmware callbacks. Revalidate without logging. */
+static BOOLEAN HeadlessFinalHardware(VOID) {
+  UINT32 cfg[64],ss0=0,ss1=0;
+  if(ReadConfig(cfg)!=EFI_SUCCESS || memcmp(cfg,InitialConfig,sizeof(cfg)) ||
+     !Gu.profile_verified || !Gu.prom_verified || !Gu.owned || !GuGetEntrySelectors(&ss0,&ss1))return FALSE;
+  struct gpu_unlock_gfw_sample sample={.config_ok=true,.plm=GuRead32(GU_GFW_PLM_OFFSET),
+    .boot=GuRead32(GU_GFW_BOOT_OFFSET),.cpuctl=GuRead32(GU_GFW_CPUCTL_OFFSET)};
+  return !gpu_unlock_gfw_assess(&sample) && sample.plm==0x8b8f && sample.boot==0x3ff && sample.cpuctl==0x10 &&
+    GuRead32(0)==0xb72000a1 && GuRead32(0x1fa828)==0 && GuRead32(GU_FEAT_PLM_OFFSET)==0xffffff8f &&
+    GuRead32(0x1183a4)==GU_DEVICE_MEMORY_SIZE && GuRead32(GU_FEAT_SS0_OFFSET)==ss0 && GuRead32(GU_FEAT_SS1_OFFSET)==ss1 && !Gu.fault;
+}
+#endif
 static VOID LogContainment(VOID) {
   /* Called only after any TPL_NOTIFY containment section has ended. */
   GuLog("BME containment: attribute_status=%#llx hardware_status=%#llx command=%#x cached=%#llx pending=%u\n",
@@ -383,6 +415,9 @@ static VOID ReleaseHalt(EFI_STATUS Status,BOOLEAN Attempted) {
 EFI_STATUS EFIAPI efi_main(EFI_HANDLE Image,EFI_SYSTEM_TABLE *St) {
   if(!St || !St->BootServices || !St->RuntimeServices)return EFI_INVALID_PARAMETER;
   Table=St;GuInit(St->BootServices,NULL);Gu.image=Image;Gu.display_check=DisplayCheck;
+#ifdef GU_HEADLESS_RESEARCH
+  GuHeadlessReset(St);
+#endif
   memset(&PendingOwner,0,sizeof(PendingOwner));
   Stage="usb-log";EFI_STATUS status=GuIoOpen(Image,St);BOOLEAN attempted=FALSE,release_attempted=FALSE;
   if(EFI_ERROR(status))goto finish;
@@ -458,6 +493,10 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE Image,EFI_SYSTEM_TABLE *St) {
   if(!Gu.profile_verified || Gu.fault){status=EFI_ACCESS_DENIED;goto finish;}
   GuLogText("ARMED: one transaction is starting. Do not reset or remove the USB.\n");
   if(!GuLogReady()){status=EFI_DEVICE_ERROR;goto finish;}
+#ifdef GU_HEADLESS_RESEARCH
+  /* File callbacks may change devices; no log/output between this gate and core. */
+  if(!HeadlessFinalHardware() || !GuHeadlessCheck()){status=EFI_NOT_READY;goto finish;}
+#endif
   Stage="transaction";Gu.armed=TRUE;attempted=TRUE;
   UINT64 mask=0xffffffffULL;
   struct pci_dev device={.dev={.dma_mask=&mask,.coherent_dma_mask=0xffffffffULL},.pm_cap=Gu.pm_cap,.refs=1};

@@ -13,6 +13,12 @@ static EFI_GUID LoadedGuid=EFI_LOADED_IMAGE_PROTOCOL_GUID,PathGuid=EFI_DEVICE_PA
 static EFI_SYSTEM_TABLE *Table;
 static EFI_FILE_PROTOCOL *Root,*Parent,*Run,*Report;
 static BOOLEAN LogFault;
+#ifdef GU_HEADLESS_RESEARCH
+/* Convert warnings at every file/protocol boundary, before consuming outputs. */
+static BOOLEAN GuIoError(EFI_STATUS s){return s!=EFI_SUCCESS;}
+#undef EFI_ERROR
+#define EFI_ERROR(Status) GuIoError(Status)
+#endif
 typedef struct {const char *name;CHAR16 *file;UINTN size;const char *hash;} ASSET_SPEC;
 static const ASSET_SPEC Specs[]={
  {"gpu-unlock/610.43.03/booter_load_ga102.bin",L"ASSETS\\booter_load_ga102.bin",61256,"056cbc064a888f80717726c54d7f64fcd68044d123870c95a74f37f4975dcaa4"},
@@ -23,15 +29,21 @@ static const ASSET_SPEC Specs[]={
 };
 static VOID LogError(VOID){LogFault=TRUE;if(Gu.armed)Gu.fault=TRUE;}
 VOID GuConsole(const char *Text) {
+#ifdef GU_HEADLESS_RESEARCH
+  (void)Text; /* No console calls, including failure and overflow paths. */
+#else
   if(!Table || !Table->ConOut || !Table->ConOut->OutputString){LogError();return;}
   while(*Text) {
     CHAR16 line[128];UINTN n=0;
     while(*Text && n<126){if(*Text=='\n')line[n++]='\r';line[n++]=(UINT8)*Text++;}
     line[n]=0;if(EFI_ERROR(Table->ConOut->OutputString(Table->ConOut,line))){LogError();return;}
   }
+#endif
 }
 VOID GuLogText(const char *Text) {
+#ifndef GU_HEADLESS_RESEARCH
   GuConsole(Text);
+#endif
   if(!Report || LogFault){LogError();return;}
   UINTN expected=strlen(Text),written=expected;
   EFI_STATUS status=Report->Write(Report,&written,(VOID *)Text);
@@ -110,6 +122,9 @@ EFI_STATUS GuIoOpen(EFI_HANDLE Image,EFI_SYSTEM_TABLE *St) {
     status=Run->Open(Run,&Report,L"REPORT.TXT",EFI_FILE_MODE_READ|EFI_FILE_MODE_WRITE|EFI_FILE_MODE_CREATE,0);
     if(EFI_ERROR(status) || !Report)return EFI_DEVICE_ERROR;
 #if defined(GU_AUTOMATIC_BOOT)
+#ifdef GU_HEADLESS_RESEARCH
+    GuLog("HEADLESS RESEARCH: file-only log; zero physical GOP; automatic exact-card unlock; hardware untested.\n");
+#endif
     GuLog("RTX3090 AUTOMATIC INTERNAL UNLOCK\nAUTO%06u\nEsc cancels; exact hardware gates and one transaction only.\n",(unsigned)slot);
 #elif defined(GU_EXPERIMENTAL_3090)
     GuLog("RTX3090 AMD EXPERIMENTAL MANUAL UNLOCK\nRUN%02u\nManual U starts one hardware transaction; Esc or timeout cancels. Hardware success unverified.\n",(unsigned)slot);

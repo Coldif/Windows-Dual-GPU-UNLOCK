@@ -6,6 +6,7 @@ param(
  [switch]$ExperimentalUnlock,
  [switch]$InternalBoot,
  [switch]$AutomaticBoot,
+ [switch]$HeadlessResearch,
  [ValidateSet('original03100062','observed03000062','entryLatchedSs1Preserve','entryLatchedSs1Full')][string]$StockProfile
 )
 $ErrorActionPreference='Stop'
@@ -17,12 +18,14 @@ try {
  $out=if($ExperimentalUnlock){"build/experimental/$StockProfile"}else{'build'}
  $name=if($ExperimentalUnlock){"RTX3090-EXPERIMENTAL-$StockProfile"}else{'RTX3090-PREFLIGHT'}
  $defines=@()
+ if($HeadlessResearch -and (!$AutomaticBoot -or !$InternalBoot -or !$ExperimentalUnlock -or $StockProfile -ne 'entryLatchedSs1Full')){throw 'Headless research requires automatic internal exact full profile'}
  if($AutomaticBoot -and (!$InternalBoot -or !$ExperimentalUnlock -or $StockProfile -ne 'entryLatchedSs1Full')){throw 'Automatic boot requires internal full experimental profile'}
  if($InternalBoot) {
   if(!$ExperimentalUnlock -or $StockProfile -ne 'entryLatchedSs1Full'){throw 'Internal boot requires the validated full experimental profile'}
   $out+='/internal';$name+='-INTERNAL';$defines+='-DGU_INTERNAL_BOOT'
  }
  if($AutomaticBoot){$out+='/automatic';$name+='-AUTO';$defines+='-DGU_AUTOMATIC_BOOT'}
+ if($HeadlessResearch){$out+='/headless-research';$name+='-HEADLESS-RESEARCH';$defines+='-DGU_HEADLESS_RESEARCH'}
   if($ExperimentalUnlock){$defines+= '-DGU_EXPERIMENTAL_3090';$defines+=$(switch($StockProfile){'original03100062'{'-DGU_STOCK_PROFILE_ORIGINAL_03100062'} 'observed03000062'{'-DGU_STOCK_PROFILE_OBSERVED_03000062'} 'entryLatchedSs1Preserve'{'-DGU_ENTRY_LATCHED_SS1_PRESERVE'} 'entryLatchedSs1Full'{'-DGU_ENTRY_LATCHED_SS1_FULL'}})}
  New-Item -ItemType Directory -Path $out -Force | Out-Null
  $sources=@('app','app_io','ownership','format','runtime','sha256','checks','port','compat',
@@ -38,7 +41,7 @@ try {
  & $Python verify_pe.py "$out/$name.EFI" "$out/$name.map" --output "$out/pe-verification.json"
  if($LASTEXITCODE -ne 0){throw 'PE verification failed'}
  [ordered]@{BuiltUtc=[DateTime]::UtcNow.ToString('o');TargetPci='220410de';Subsystem='145410de';
-  Mode=$(if($AutomaticBoot){'automatic-internal-exact-card-unlock'}elseif($ExperimentalUnlock){'experimental-exact-card-manual-unlock'}else{'diagnostic-preflight-only'});
+  Mode=$(if($HeadlessResearch){'headless-research-automatic-internal-exact-card-unlock'}elseif($AutomaticBoot){'automatic-internal-exact-card-unlock'}elseif($ExperimentalUnlock){'experimental-exact-card-manual-unlock'}else{'diagnostic-preflight-only'});
   CanArm=[bool]$ExperimentalUnlock;Defines=$defines;ManualConfirmation=$(if($AutomaticBoot){'none; Esc within 3 seconds cancels'}else{'U once; Esc or 30-second timeout cancels'});
   StockProfile=$(if($ExperimentalUnlock){$StockProfile}else{$null});ColdChipExpected='0xb72000a1';ColdSS0Expected=$(if($StockProfile -like 'entryLatchedSs1*'){'first fully validated cold entry; immutable'}elseif($ExperimentalUnlock){if($StockProfile -eq 'original03100062'){'0x03100062'}else{'0x03000062'}}else{'unknown'});ColdSS1Expected=$(if($StockProfile -like 'entryLatchedSs1*'){'first fully validated cold entry <= 0xf; immutable'}else{'0x6'});
   SS0Target='0x88888888';SS1Target=$(if($StockProfile -eq 'entryLatchedSs1Preserve'){'preserve entry; no SS1 writes'}elseif($StockProfile -eq 'entryLatchedSs1Full'){'0x8; one guarded write'}elseif($ExperimentalUnlock){'0x8'}else{'no writes'});
@@ -47,7 +50,7 @@ try {
   PromSha256='8ea297373e9e5d3600ff41ad9fae88f2d14c98c017d100669f7333981da673b4';
   DeviceMemorySize='0x6000';HardwareTested=$false;
   EfiSha256=(Get-FileHash -LiteralPath "$out/$name.EFI" -Algorithm SHA256).Hash;
-  Headers=@(Get-ChildItem -LiteralPath . -Recurse -File -Filter '*.h' | Where-Object {$_.FullName -notlike '*\build\*'} | Sort-Object FullName | ForEach-Object {[ordered]@{Path=$_.FullName.Substring($PSScriptRoot.Length+1);Sha256=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash}});
+  Headers=@(Get-ChildItem -LiteralPath . -Recurse -File -Filter '*.h' | Where-Object {$_.FullName.Substring($PSScriptRoot.Length+1) -notmatch '(^|[\\/])build([\\/]|$)'} | Sort-Object FullName | ForEach-Object {[ordered]@{Path=$_.FullName.Substring($PSScriptRoot.Length+1);Sha256=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash}});
   Sources=@($sources | ForEach-Object {[ordered]@{Path="$_.c";Sha256=(Get-FileHash -LiteralPath "$_.c" -Algorithm SHA256).Hash}})
   } | ConvertTo-Json -Depth 5 | Set-Content -Encoding UTF8 -LiteralPath "$out/build-manifest.json"
  "Built $name.EFI; ExperimentalUnlock=$([bool]$ExperimentalUnlock); hardware untested."

@@ -7,7 +7,9 @@
 #include <Guid/FileInfo.h>
 #include "media.h"
 #include "flow.h"
-#ifdef GU_AUTOMATIC_BOOT
+#ifdef GU_HEADLESS_RESEARCH
+#include "build/headless/child-contract.h"
+#elif defined(GU_AUTOMATIC_BOOT)
 #include "build/automatic/child-contract.h"
 #else
 #include "generated.h"
@@ -19,6 +21,9 @@
 #ifdef GU_CONSOLE_PREPARE
 #include "prepare-console.h"
 #include "console-flow.h"
+#ifdef GU_SINGLE_RTX_CONSOLE
+#include "research-input.h"
+#endif
 #ifndef GU_DIAGNOSTIC_ONLY
 #error Console prepare must not load the unlock application
 #endif
@@ -43,8 +48,14 @@ static EFI_HANDLE Self,OwnDevice,WindowsImage;
 static EFI_HANDLE UnlockImage;
 #endif
 static EFI_FILE_PROTOCOL *Root,*Log;
+#ifdef GU_SINGLE_RTX_CONSOLE
+static BOOLEAN ResearchOutputDisabled;
+#endif
 
 static VOID Say(const CHAR16 *Text) {
+#ifdef GU_SINGLE_RTX_CONSOLE
+  if(ResearchOutputDisabled)return;
+#endif
   if(Table && Table->ConOut)Table->ConOut->OutputString(Table->ConOut,(CHAR16 *)Text);
 }
 #ifdef GU_FULL_UNLOCK
@@ -105,13 +116,21 @@ static EFI_STATUS OpenLog(VOID) {
   s=fs->OpenVolume(fs,&Root);if(s!=EFI_SUCCESS || !Root)return EFI_DEVICE_ERROR;
 #ifdef GU_AUTOMATIC_BOOT
   for(UINTN i=0;i<1000000;i++) {
+#ifdef GU_HEADLESS_RESEARCH
+    CHAR16 name[]=L"\\RTX3090-UNLOCK\\HLS000000.TXT";
+#else
     CHAR16 name[]=L"\\RTX3090-UNLOCK\\BOOT000000.TXT";
+#endif
 #else
   for(UINTN i=0;i<100;i++) {
 #ifdef GU_FULL_UNLOCK
     CHAR16 name[]=L"\\RTX3090-UNLOCK\\FULL00.TXT";
 #elif defined(GU_CONSOLE_PREPARE)
+#ifdef GU_SINGLE_RTX_CONSOLE
+    CHAR16 name[]=L"\\RTX3090-UNLOCK\\R2C00.TXT";
+#else
     CHAR16 name[]=L"\\RTX3090-UNLOCK\\PREP00.TXT";
+#endif
 #elif defined(GU_DIAGNOSTIC_ONLY)
     CHAR16 name[]=L"\\RTX3090-UNLOCK\\DIAG00.TXT";
 #else
@@ -150,7 +169,9 @@ static EFI_STATUS Record(VOID *Context,const char *Event,EFI_STATUS Status) {
 #ifndef GU_DIAGNOSTIC_ONLY
 static EFI_STATUS LoadUnlock(VOID) {
   EFI_FILE_PROTOCOL *file=NULL;
-#ifdef GU_AUTOMATIC_BOOT
+#ifdef GU_HEADLESS_RESEARCH
+  EFI_STATUS s=Root->Open(Root,&file,L"\\EFI\\WindowsGPUUnlock\\UNLOCK-HEADLESS.EFI",EFI_FILE_MODE_READ,0);
+#elif defined(GU_AUTOMATIC_BOOT)
   EFI_STATUS s=Root->Open(Root,&file,L"\\EFI\\WindowsGPUUnlock\\UNLOCK-AUTO.EFI",EFI_FILE_MODE_READ,0);
 #else
   EFI_STATUS s=Root->Open(Root,&file,L"\\EFI\\WindowsGPUUnlock\\UNLOCK.EFI",EFI_FILE_MODE_READ,0);
@@ -171,7 +192,11 @@ static EFI_STATUS LoadUnlock(VOID) {
   EFI_STATUS closed=file->Close(file);if(s==EFI_SUCCESS)s=closed;
   if(s==EFI_SUCCESS && !GuHashMatches(data,GU_UNLOCK_BYTES,GU_UNLOCK_SHA256))s=EFI_CRC_ERROR;
   EFI_DEVICE_PATH_PROTOCOL *path=NULL;
+#ifdef GU_HEADLESS_RESEARCH
+  if(s==EFI_SUCCESS)s=FilePath(OwnDevice,L"\\EFI\\WindowsGPUUnlock\\UNLOCK-HEADLESS.EFI",&path);
+#else
   if(s==EFI_SUCCESS)s=FilePath(OwnDevice,L"\\EFI\\WindowsGPUUnlock\\UNLOCK.EFI",&path);
+#endif
   /* Execute the verified in-memory bytes; never re-open between hash and load. */
   if(s==EFI_SUCCESS)s=Table->BootServices->LoadImage(FALSE,Self,path,data,GU_UNLOCK_BYTES,&UnlockImage);
   if(path)Table->BootServices->FreePool(path);
@@ -228,7 +253,9 @@ static EFI_STATUS Unlock(VOID *Context) {
 static EFI_STATUS FullChoice(VOID *Context,BOOLEAN *Skip) {
   (void)Context;*Skip=FALSE;
   if(!Table->ConIn || !Table->ConIn->ReadKeyStroke)return EFI_UNSUPPORTED;
-#ifdef GU_AUTOMATIC_BOOT
+#ifdef GU_HEADLESS_RESEARCH
+  Say(L"SINGLE RTX HEADLESS UNLOCK RESEARCH: one guarded attempt, then Windows.\r\nNo key required. Esc within 5 seconds skips all changes.\r\nScreen may stop updating. Errors stop without reset/retry; power off and F8 Windows Boot Manager.\r\n");
+#elif defined(GU_AUTOMATIC_BOOT)
   Say(L"Windows GPU UNLOCK AUTO: Esc within 5 seconds boots Windows only.\r\nOtherwise one guarded unlock, then Windows. No U required.\r\nKeep AMD display/keyboard connected. Firmware mouse/cursor may pause.\r\n");
 #else
   Say(L"GPU UNLOCK TEST: driver release + original IO/MEM restore.\r\nFirmware mouse/cursor may pause. AMD display/keyboard must remain connected.\r\nEsc within 5 seconds skips all changes. Otherwise press U later in the original unlock app.\r\n");
@@ -243,6 +270,9 @@ static EFI_STATUS FullChoice(VOID *Context,BOOLEAN *Skip) {
 }
 static EFI_STATUS FullCapture(VOID *Context) {(void)Context;return GuCaptureGraph(Table,Log);}
 static EFI_STATUS FullRelease(VOID *Context) {
+#ifdef GU_HEADLESS_RESEARCH
+  ResearchOutputDisabled=TRUE;
+#endif
   (void)Context;EFI_STATUS s=GuPrepareConsole(Table,Record,NULL);
   return s==EFI_SUCCESS?GuReleaseGop(Table,Self,Record,NULL):s;
 }
@@ -305,6 +335,10 @@ static EFI_STATUS StartConsoleWindows(VOID *Context) {
 static EFI_STATUS PrepareChoice(VOID *Context,BOOLEAN *Skip) {
   (void)Context;*Skip=FALSE;
   if(!Table->ConIn || !Table->ConIn->ReadKeyStroke)return EFI_UNSUPPORTED;
+#ifdef GU_SINGLE_RTX_CONSOLE
+  Say(L"R2 AUTO CONSOLE TEST: NO UNLOCK, NVIDIA GOP RETAINED.\r\nNo key required: console detach, state verification, then Windows.\r\nEsc within 5 seconds skips all changes and starts Windows.\r\nOn failure there is no reset or retry: power off, then F8 Windows Boot Manager.\r\n");
+  return GuResearchChooseInput(Table,Skip);
+#else
   Say(L"RTX console detach TEST. No unlock. Keep AMD display connected.\r\nPress Esc within 5 seconds to skip the test and start Windows.\r\n");
   for(UINTN i=0;i<50;i++) {
     EFI_INPUT_KEY key;EFI_STATUS s=Table->ConIn->ReadKeyStroke(Table->ConIn,&key);
@@ -313,12 +347,19 @@ static EFI_STATUS PrepareChoice(VOID *Context,BOOLEAN *Skip) {
     s=Table->BootServices->Stall(100000);if(s!=EFI_SUCCESS)return s;
   }
   return EFI_SUCCESS;
+#endif
 }
 static EFI_STATUS CaptureConsole(VOID *Context) {
   (void)Context;return GuCaptureGraph(Table,Log);
 }
 static EFI_STATUS DetachConsole(VOID *Context) {
+#ifdef GU_SINGLE_RTX_CONSOLE
+  (void)Context;ResearchOutputDisabled=TRUE;
+  EFI_STATUS s=GuPrepareConsole(Table,Record,NULL);
+  return s==EFI_SUCCESS?GuResearchConfirmInput(Table,Record,NULL):s;
+#else
   (void)Context;return GuPrepareConsole(Table,Record,NULL);
+#endif
 }
 #endif
 EFI_STATUS EFIAPI efi_main(EFI_HANDLE Image,EFI_SYSTEM_TABLE *St) {
