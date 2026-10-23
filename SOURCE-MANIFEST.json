@@ -1,7 +1,7 @@
 {
   "project": "Windows GPU UNLOCK",
   "format": 1,
-  "note": "Research branch public source inventory; firmware, private captures, machine configuration and generated builds excluded.",
+  "note": "Public v0.3.0 source inventory; firmware, private captures, machine configuration and generated headless builds excluded.",
   "files": [
     {
       "path": ".gitattributes",
@@ -15,13 +15,13 @@
     },
     {
       "path": ".gitignore",
-      "bytes": 606,
-      "sha256": "57632035eb0cacc66f30653b44a2c16b871d043beb962f6ecd768ada730f8054"
+      "bytes": 700,
+      "sha256": "f31448f88e14ffb1dd70f128faa2a5ec6df5f59ea3aaf5438d78b50ea0c35afa"
     },
     {
       "path": "CHANGES.md",
-      "bytes": 3793,
-      "sha256": "45ab5863160519cdd69a1f10ce6661470631800c42658890cbea5e77dd57f192"
+      "bytes": 5288,
+      "sha256": "c870e9ebb9e0f29ed898caf8ba8950c5b827f8425b34f5e8f664bec16d753cbe"
     },
     {
       "path": "LICENSE",
@@ -50,13 +50,13 @@
     },
     {
       "path": "README.ko.md",
-      "bytes": 12086,
-      "sha256": "b7e07918fa9a32b334ce8cbf9b8c064e77e075826b27a0675ba8f2b5536e0f30"
+      "bytes": 8116,
+      "sha256": "e1120a220f920fc36e1552921cedee2bfc6aaeae1e13dc3517a3d8777e54a1e7"
     },
     {
       "path": "README.md",
-      "bytes": 11207,
-      "sha256": "d5bb693bf6672df86418dac1c1960139124c139a4cc269710b23363e07fd1efa"
+      "bytes": 7352,
+      "sha256": "734ee9f5a16ce5c0ce9cc004699146b6495e27a54e8626c6866e6f3a7f5c2e85"
     },
     {
       "path": "RELEASE-NOTES.md",
@@ -3335,13 +3335,13 @@
     },
     {
       "path": "docs/COMPATIBILITY.en.md",
-      "bytes": 2053,
-      "sha256": "bf6fafbdc5d52ad330aa83634e43dca88a754b9492ab3c49300d9958ca0e0aab"
+      "bytes": 3619,
+      "sha256": "3427bc5762604a1b999e5a54a2c28f08e122edaccc31ecbab1389424b59afbe1"
     },
     {
       "path": "docs/COMPATIBILITY.ko.md",
-      "bytes": 1454,
-      "sha256": "666056c20f89fa15b91df8536f4cdab4aa0b0ce1fe8d4920ea437c98d313f74d"
+      "bytes": 3736,
+      "sha256": "664a313074f712827bcbb9ad371b0c144f8172f7cc28548a8788e2c53bbaf5ca"
     },
     {
       "path": "docs/CONTRIBUTING.en.md",
@@ -3364,14 +3364,24 @@
       "sha256": "92bea5330791c013cfa9812021dbb1d801107dbdb87388b7eb1cdb96c9ea688b"
     },
     {
+      "path": "docs/HEADLESS.en.md",
+      "bytes": 7870,
+      "sha256": "ba10fb8791209bf2151284f21903a97a11a8a5d4ac25a0c793bd448559950b43"
+    },
+    {
+      "path": "docs/HEADLESS.ko.md",
+      "bytes": 8139,
+      "sha256": "147725ea6587f298d6f420288cede0e441c17e8ce4f8af975ca9d385833f2599"
+    },
+    {
       "path": "docs/INTERNAL-BOOT.en.md",
-      "bytes": 6404,
-      "sha256": "d1eb4943c16d3c6532224bb1e4ee497358dc1cc50cf63532914b919a4a2cf1e0"
+      "bytes": 6640,
+      "sha256": "83f837d9b6c95e35d457ecd286644b5b71d19f377ac9833615c08bf3255e6091"
     },
     {
       "path": "docs/INTERNAL-BOOT.ko.md",
-      "bytes": 11492,
-      "sha256": "6c52f4944d08ccbeca60e457a85b84f2221ceef7d16e4b9ea042bb2c5c514bf8"
+      "bytes": 11782,
+      "sha256": "ba54bed1b7dda5f8a1c5a547c66a67cb5789fcb7577c636385436d2d9bfbce2f"
     },
     {
       "path": "docs/PORTABILITY.en.md",
@@ -3380,13 +3390,13 @@
     },
     {
       "path": "docs/RESULTS.en.md",
-      "bytes": 2315,
-      "sha256": "26a4639feb39675edfbb64b888711c9a2550610bee01e39c420097d8861dc100"
+      "bytes": 2516,
+      "sha256": "cb1feb91c3e852fb50c5bae242eb6ddf5fdc145464aa5975a26a2b2870a85cb9"
     },
     {
       "path": "docs/RESULTS.ko.md",
-      "bytes": 2454,
-      "sha256": "18b036167ad6a0360f07673d89d9832876e21301c263d4bb00f5cd5c870f5eb2"
+      "bytes": 2711,
+      "sha256": "b5c66627cfaee32b7482221cf4b5d43c4952e9898d9a978da6bcb7b9fe6d667a"
     },
     {
       "path": "efi_runtime.c",
@@ -3397,6 +3407,31 @@
       "path": "evidence/benchmark.json",
       "bytes": 10541,
       "sha256": "0ed0dcec36349f132b118b68d6c0ee85cbe464baa3ec2013e73aacf6ef74103d"
+    },
+    {
+      "path": "evidence/headless-handoff/README.md",
+      "bytes": 2842,
+      "sha256": "03bc832afde7877b0227cb98221f7266e27ca5e362fd6fd4e95931fdf8a3b084"
+    },
+    {
+      "path": "evidence/headless-handoff/summary.json",
+      "bytes": 1124,
+      "sha256": "1d10045e5915b98f4f62d9e01b8a64c3961e3c90308932aee4fe0e148a37329e"
+    },
+    {
+      "path": "evidence/headless-handoff/trial-1.json",
+      "bytes": 690,
+      "sha256": "bbdfd5abe78a52ccd2eeaf4165e7ed58a842671d29345824c1ce33261ac93363"
+    },
+    {
+      "path": "evidence/headless-handoff/trial-2.json",
+      "bytes": 690,
+      "sha256": "3341da6f851dbc1d2e712611b98cfcbc2057e3e43613c61780c128a15fc821ef"
+    },
+    {
+      "path": "evidence/headless-handoff/trial-3.json",
+      "bytes": 690,
+      "sha256": "a82959fb55ec461db2e116d636e795fd44f2e537fddf7ea5540b4ca3dd4c8375"
     },
     {
       "path": "evidence/host-tests.json",
@@ -3440,8 +3475,13 @@
     },
     {
       "path": "internal-boot/Configure.ps1",
-      "bytes": 2363,
-      "sha256": "3cea02d55640a415843879d8ee68187eb84a3fa3c4522f3fa1308cd2e0f5ac4b"
+      "bytes": 2469,
+      "sha256": "0f4b876d788f9562fe0e74d12e4651ae84d3056e12afdceca93b0e3360a09213"
+    },
+    {
+      "path": "internal-boot/Headless.ps1",
+      "bytes": 13826,
+      "sha256": "82931274cb8445909b57b2065fcb53fda54fbe95f9e55544d92c7f96fc540ee2"
     },
     {
       "path": "internal-boot/Install.ps1",
@@ -3634,9 +3674,24 @@
       "sha256": "8f0edd350f0f2df617782388a63bda6391d98e25d9b6b16cd435ba26d7e73271"
     },
     {
+      "path": "internal-boot/install/headless-package.ps1",
+      "bytes": 6337,
+      "sha256": "52b1a4af4d633fdef0801e66f01bd66c441fa2b11c79ebba10fc9f9db4f2e3eb"
+    },
+    {
       "path": "internal-boot/install/test-automatic-policy.ps1",
       "bytes": 3085,
       "sha256": "7400d2699c2de4484ccbcf118599b94d376b8cf5d9f04d4b6e2f0c442666291f"
+    },
+    {
+      "path": "internal-boot/install/test-headless-installer.ps1",
+      "bytes": 10679,
+      "sha256": "48110f5b560ea2a277f4b585f2b6def2368cb72488574802e5ad6116f3fd8a7b"
+    },
+    {
+      "path": "internal-boot/install/test-headless-package.ps1",
+      "bytes": 13344,
+      "sha256": "bc694328ae96e5c73fa7037ac87a67db5ec92956212b1e48ccbc72fb3467d0f2"
     },
     {
       "path": "internal-boot/unlock/app.c",
@@ -3665,8 +3720,8 @@
     },
     {
       "path": "internal-boot/unlock/build.ps1",
-      "bytes": 5907,
-      "sha256": "6442abc220bb372790a295639fe4c7f0b602a86fe65d8d365cbbf4598ee8d23b"
+      "bytes": 5956,
+      "sha256": "765a73b9aab14f7d2e92312710ac69755a77ee13002999e5a5d9ca132ae3f6ea"
     },
     {
       "path": "internal-boot/unlock/checks.c",
@@ -4065,8 +4120,8 @@
     },
     {
       "path": "research/headless/README.ko.md",
-      "bytes": 25520,
-      "sha256": "5c64a500caa717d4e01dc7669af917220123136abf5bf0505f58406f76ee08d0"
+      "bytes": 25800,
+      "sha256": "ff5c950c4e78792e46527a32ad94a9c51e1a9488f7152cc838032e4fb19a9c63"
     },
     {
       "path": "research/headless/analyze_capture.py",
@@ -4085,8 +4140,8 @@
     },
     {
       "path": "research/headless/build-unlock.ps1",
-      "bytes": 2951,
-      "sha256": "26ffe39fdc4ee03684065e02877904dd4c63ecb2cfd07c0e973f2085ba7401ac"
+      "bytes": 3671,
+      "sha256": "b332c6b0b8c6a9283dd9c47ece0783ff132aa745d6730c1e7c2f072a7fdfaaa2"
     },
     {
       "path": "research/headless/register-observe.ps1",
@@ -4568,5 +4623,6 @@
       "bytes": 2397,
       "sha256": "012e0dbbf406818182a88828ae9be86ea09f55ee8091fe19ddc56e44cd65e328"
     }
-  ]
+  ],
+  "release": "v0.3.0"
 }

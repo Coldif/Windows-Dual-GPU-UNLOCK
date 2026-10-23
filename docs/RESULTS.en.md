@@ -26,4 +26,8 @@ The successful UEFI run, RUN06, records `SS0=88888888`, `SS1=00000008`, `FLR=1` 
 
 Loss of state after reset is a plausible explanation for the earlier result. There is no independently controlled untreated cold baseline or instrumentation across the full POST path. These results therefore do not establish a unique cause, identical behavior on every board or general driver compatibility.
 
-Long-term stability, real ComfyUI workflows, persistence after switching to RTX monitor output, other cards/boards and automatic internal-disk boot remain unverified.
+These are historical USB results. The later internal headless path returned to
+Windows with all monitors on the RTX and completed three Tensor benchmark
+trials on the same system; see the [2026-10-24 evidence](../evidence/headless-handoff/README.md).
+Long-term stability, real ComfyUI workflows, other cards/boards and repeated
+automatic cold boots remain unverified.

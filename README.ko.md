@@ -1,150 +1,135 @@
 # Windows GPU UNLOCK
 
-> **연구 브랜치 `research/single-gpu-headless`:** RTX 물리 GOP 하나만 활성화된
-> 상태에서 관찰용 EFI를 거쳐 Windows에 진입한 R1 결과를 확인했습니다.
-> R2 콘솔 소비자 분리 후 Windows 복귀를 실기에서 확인했습니다. 새 단일 RTX 언락
-> 연구판은 F8 선택 후 자동 진행하며, GOP 해제·언락·Windows 복귀의 실기 결과는 미확인입니다.
-> [실기 근거와 다음 단계](research/headless/README.ko.md#r1-실기-관찰-결과--2026-10-24).
-> 기존 기본 부팅 우선순위와 main 릴리스는 유지합니다.
-
 [English](README.md) | **한국어**
 
-## 처음 시작하기: USB 또는 내부 파티션 선택
+한 대의 **RTX 3090 Founders Edition / ASUS BIOS 3057** 시스템에서 검증한 실험용 UEFI
+언락과 Windows 직접 인계 구현입니다. **v0.3.0은 소스 전용 사전 릴리스**입니다.
+자신의 파티션 GUID로 내부 EFI를 빌드해야 하며, 펌웨어와 개인 파티션 설정이 들어간
+EFI 바이너리는 이번 릴리스에 포함하지 않습니다.
 
-이 프로젝트는 **지원 조건이 일치하는 RTX 3090 / ASUS BIOS 3057 / AMD 내장그래픽**
-환경을 위한 실험입니다. 먼저 [지원 조건](docs/COMPATIBILITY.ko.md)을 확인하세요.
-소스 `.c` 파일만 USB에 복사해서 실행하는 방식이 아닙니다. **실행용 `.EFI`와
-펌웨어 5개**가 필요합니다. 기존 파일은 먼저 백업합니다.
+2026-10-24에는 모든 모니터를 RTX에 연결한 내부 **headless 언락**을 완료했습니다.
+해제 전 RTX 물리 GOP 1개, 해제 후 물리 GOP 0개를 확인하고, 자동 언락 1회와 Windows
+화면 복귀를 거쳤습니다. 이후 Windows 3회 측정 중앙값은 **FP16 124.97 / BF16 128.93
+TFLOPS**였습니다. [근거와 한계](evidence/headless-handoff/README.md).
 
-| 원하는 방식 | 저장 위치 | 부팅 흐름 | 안내 |
-|---|---|---|---|
-| USB로 먼저 수동 시험 | FAT32 USB | USB 부팅 → U → BIOS Boot Override → Windows | [USB 가이드](docs/GUIDE.ko.md) |
-| USB 없이 사용·자동 연결 | 별도 FAT32 EFI 파티션 | 내부 EFI → 언락 → Windows 직접 진입 | [파티션·자동 부팅 가이드](docs/INTERNAL-BOOT.ko.md) |
+한 시스템·한 부팅의 결과이며 모든 3090의 지원을 의미하지 않습니다.
+CPU는 **iGPU가 있는 Ryzen 7 7800X3D**입니다. 활성 AMD GOP 없이 성공했지만,
+iGPU 없는 CPU·Intel 호스트·다른 카드·다른 BIOS는 미검증입니다.
+먼저 [호환성](docs/COMPATIBILITY.ko.md)을 확인하세요.
 
-### A. USB에 저장하고 수동으로 실행
+## 부팅 경로 선택
 
-1. **준비** — [릴리스](https://github.com/impacifist/Windows-GPU-UNLOCK/releases)에서
-   소스를 받거나 저장소를 clone합니다. [펌웨어 준비 안내](docs/ASSETS.ko.md)에 따라
-   필요한 5개 파일을 로컬 `assets/` 폴더에 둡니다.
-2. **USB용 폴더 생성** — 저장소 폴더에서 아래 명령을 실행합니다. USB를 직접
-   포맷하거나 쓰지는 않으며, 기존 `usb-package`가 있으면 새 경로를 지정합니다.
+| 경로 | 화면·입력 조건 | 안내 |
+|---|---|---|
+| **내부 headless** | 모니터는 RTX, 도중 화면 제거, T/U/Enter 불필요 | [Headless 안내](docs/HEADLESS.ko.md): 실제 언락·Windows 인계 1회 검증 |
+| 기존 내부 AMD 화면 manual / Auto | 메인보드/iGPU 화면 유지, manual은 U 필요 | [기존 내부 부팅 안내](docs/INTERNAL-BOOT.ko.md) |
+| 기존 USB manual | AMD/iGPU 화면, U 한 번, 리셋 없이 Boot Override로 Windows | [USB 안내](docs/GUIDE.ko.md) |
+
+**Headless USB 부팅은 시험하지 않았습니다.** 기존 USB EFI에는 AMD 출력 조건이 있습니다.
+BIOS를 `USB → Windows`로 설정하는 것만으로 직접 인계가 구현되지는 않습니다.
+
+## 내부 headless 빠른 시작
+
+부팅 설정을 바꾸기 전에 [상세 절차와 복구 방법](docs/HEADLESS.ko.md)을 읽으세요.
+정확한 지원 하드웨어, Secure Boot 꺼짐, 완전히 복호화되고 BitLocker 보호가 꺼진
+Windows C:, 연결된 키보드가 필요합니다. 도구는 암호화 설정을 해제하지 않습니다.
+
+**기존 Windows ESP와 복구 파티션은 보존**하세요. U: 같은 문자를 가진 별도 GPT FAT32
+**EFI 시스템 파티션 1 GiB 이상**을 준비합니다. 도구는 파티션을 생성·축소·삭제·포맷하지
+않습니다. 일반 FAT32 데이터 파티션만으로는 ESP 조건을 충족하지 않습니다.
+
+Python 3.9+, clang/lld-link **20.1.8**, 저장소의 고정 의존성과 직접 준비한
+[펌웨어 파일 5개](docs/ASSETS.ko.md)가 필요합니다. Host 통합 시험에는 추가로
+MSVC/Windows SDK와 개인 fixture가 필요합니다.
+
+저장소 루트의 관리자 PowerShell에서 실행합니다.
+
+```powershell
+# GUID와 도구 경로를 자신의 값으로 바꾸세요.
+.\internal-boot\Configure.ps1 -UnlockDriveLetter U `
+  -WindowsEspGuid 'YOUR-WINDOWS-ESP-GUID'
+.\research\headless\build-unlock.ps1 `
+  -Clang 'C:\TOOLS\LLVM20\bin\clang.exe' `
+  -LldLink 'C:\TOOLS\LLVM20\bin\lld-link.exe'
+
+# 파일 배치와 별도 F8 시험 항목 추가. 기존 기본 우선순위는 유지합니다.
+.\internal-boot\Headless.ps1 -Assets '.\assets' -Register
+```
+
+동작 스위치 없이 `Headless.ps1 -Assets '.\assets'`만 실행하면 파일만 배치합니다.
+설정·빌드는 부팅 항목을 등록하지 않습니다.
+
+1. 작업을 저장하고 완전히 전원을 끕니다. 시험한 ASUS에서는
+   **F8 → GPU Headless UNLOCK - EXPERIMENTAL**을 선택합니다.
+2. **T·U·Enter를 누르지 말고 기다립니다.** 최초 5초 안의 Esc는 해제·언락을 생략하고
+   Windows로 직접 들어갑니다.
+3. RTX GOP를 제거하면 화면이 검게 변합니다. Child가 한 번 시도하고 wrapper가
+   Windows를 직접 시작합니다. 언락과 Windows 사이에 리셋하지 마세요.
+   화면 복귀를 확인하고 [성능을 측정](docs/BENCHMARK.ko.md)합니다.
+4. 그 F8 시험에 성공한 뒤에만 기본 자동 부팅을 활성화합니다.
 
    ```powershell
-   python .\tools\prepare_usb.py --assets .\assets --output .\usb-package
+   .\internal-boot\Headless.ps1 -EnableAutomatic -ConfirmedSuccess
    ```
 
-3. **USB로 복사** — `usb-package` **안의 내용**을 FAT32 USB 최상위에 복사합니다.
-   `USB:/EFI/BOOT/BOOTX64.EFI`와 `USB:/RTX3090-UNLOCK/ASSETS/`가 있어야 합니다.
-4. **언락 실행** — 작업 저장 → 완전 종료 후 켜기 → ASUS F8 → UEFI USB 선택 →
-   사전 검사 통과 후 **U 한 번**.
-5. **Windows로 연결** — 성공·정리 완료 후 ASUS BIOS의 **Boot Override → Windows
-   Boot Manager**를 선택합니다. 중간에 `Save Changes & Reset`이나 재부팅을 하지 않습니다.
-6. **성능 확인** — Windows에서 [FP16/BF16 벤치마크](docs/BENCHMARK.ko.md)를 실행합니다.
+이 명령은 headless를 첫 번째, Windows Boot Manager를 두 번째로 배치하고 Windows
+빠른 시작을 끕니다. 시험 항목 등록만으로는 바뀌지 않습니다. 릴리스 공개 작업 자체는
+연구 PC의 현재 기본 부팅 선택을 변경하지 않습니다.
 
-**이 USB판은 수동판입니다.** BIOS 순서를 `USB → Windows`로 바꾸는 것만으로
-리셋 없는 자동 인계가 구현되지는 않습니다. 자동 연결을 원하면 아래 B를 사용하세요.
+**Esc 구간은 두 개이며 효과가 다릅니다.** 최초 wrapper Esc는 해제 없이 Windows로
+갑니다. 나중에 나오는 child의 3초 Esc 구간은 이미 해제한 뒤이므로 취소하고 정지합니다.
+화면을 복구하거나 Windows로 계속 진행하지 않습니다. 실패하거나 Windows가 돌아오지
+않으면 완전히 전원을 끈 다음 **F8 → Windows Boot Manager**를 선택하세요.
 
-### B. 내부 파티션에 저장하고 언락 → Windows로 설정
+```powershell
+.\internal-boot\Headless.ps1 -RestoreWindowsFirst
+```
 
-1. **별도 저장 공간 준비** — 기존 Windows EFI·복구 파티션을 보존하고, **별도 1GiB
-   이상 FAT32 EFI 파티션**을 준비합니다. 예: U:. [파티션 준비 절차](docs/INTERNAL-BOOT.ko.md#2-별도-파티션-준비)를 먼저 따릅니다.
-2. **내 PC에 맞게 빌드** — 기존 Windows ESP의 GUID와 새 파티션 문자를 지정해
-   `Configure.ps1`을 실행한 뒤 `Build.ps1`로 실행 파일을 만듭니다.
-   [설정·빌드 명령](docs/INTERNAL-BOOT.ko.md#3-소스-받기와-로컬-설정)을 그대로 따라가세요.
-3. **파일 배치·수동 항목 등록** — `Install.ps1 -Assets <펌웨어폴더>`로 EFI와 자산을
-   배치하고, `-RegisterManual`로 시험 항목을 만듭니다. Windows는 계속 첫 번째입니다.
-   [정확한 명령과 파일 위치](docs/INTERNAL-BOOT.ko.md#5-파일-설치와-수동-항목-등록).
-4. **먼저 한 번 수동 시험** — 완전 종료 후 F8 → **Windows GPU UNLOCK Manual** →
-   원본 앱이 나오면 U 한 번. **재부팅 없이 Windows 진입과 FP16/BF16 성능**을 확인합니다.
-5. **자동 부팅으로 전환** — 수동 시험에 성공한 뒤 다음 명령을 실행합니다.
+Windows 우선순위 복구는 실험 EFI·빌드 산출물·저장된 상태 없이도 진행합니다.
+이전 빠른 시작 값 복원에는 로컬 상태가 필요하므로 상태와 백업을 보존하세요.
+[자세한 복구 설명](docs/HEADLESS.ko.md#recovery)을 참고하세요.
 
-   ```powershell
-   .\internal-boot\Install.ps1 -Assets 'C:\LOCAL-FIRMWARE\assets' `
-     -EnableAutomaticBoot -ConfirmedManualSuccess
-   ```
+## 결과와 한계
 
-6. **다음부터 키 입력 없이 부팅** — 순서가 **Windows GPU UNLOCK Auto → Windows
-   Boot Manager**로 설정됩니다. 완전 종료 후 켜고 기다리면 자동 실행 경로를 탑니다.
-   처음 5초 안에 Esc를 누르면 언락 없이 Windows만 부팅합니다.
+성공한 child는 SS0 `0x88888888`, SS1 `0x8`, BME 꺼짐, 남은 mapping 없음,
+정리 완료와 FLR 1회를 기록했습니다. Wrapper가 Windows 시작 전 해제 토폴로지를
+검증했고, 운영자가 Windows 화면 복귀를 확인했습니다.
 
-자동판은 **첫 실제 자동 부팅이 아직 미검증인 실험 기능**입니다. 첫 자동 부팅의 Windows
-진입과 성능을 직접 확인해야 합니다. 수동 직접 인계는 실제 성공을 확인했습니다.
-문제가 생기면 전원을 완전히 끈 뒤 **F8 → Windows Boot Manager**로 복귀합니다.
-Windows에서 [자동 부팅 원복 명령](docs/INTERNAL-BOOT.ko.md#8-자동-부팅-원복)을 실행하면
-Windows를 다시 첫 번째로 돌릴 수 있습니다. 절전·최대 절전 복귀는 검증 범위가 아닙니다.
+| CUDA 12.6 / cuBLAS 12.6, 4096 × 4096 행렬 | 3회 중앙값 |
+|---|---:|
+| FP32 pedantic | 22.85 TFLOPS |
+| FP16 Tensor / FP32 누산 | 124.97 TFLOPS |
+| BF16 Tensor / FP32 누산 | 128.93 TFLOPS |
 
-## 내부 디스크 방식의 구현·검증 현황
+이번 headless 부팅에는 **동시대의 통제된 잠금 상태 기준 측정이 없습니다.** 언락 증가율을
+계산하지 않습니다. 게임·ComfyUI 향상, 장기 안정성, 절전·최대 절전 복귀, 반복 자동 콜드
+부팅의 신뢰성을 입증하지도 않습니다. [공개 측정 요약](evidence/headless-handoff/summary.json)과
+[이전 결과](docs/RESULTS.ko.md)는 서로 다른 실험입니다.
 
-**[단계별 내부 디스크 설치·자동 부팅·복구 가이드](docs/INTERNAL-BOOT.ko.md)**
+## 구현과 경계
 
-2026-10-23, 같은 ASUS BIOS 3057 / RTX 3090 환경에서 내부 EFI가 드라이버를 정리하고
-U 한 번 뒤 Windows로 직접 이어지는 경로를 확인했습니다. 3회 중앙값은 FP16
-**125.91**, BF16 **128.93 TFLOPS**입니다. [원자료](evidence/internal-handoff/summary.json).
+Headless는 별도 컴파일 프로필입니다. 정확한 GPU·PROM·PCI 상태·펌웨어 드라이버 코드·
+소유권·cold 상태·불변 selector와 정리 검사를 유지합니다. Child는 파일에만 기록하고
+물리 GOP 재등장이나 콘솔·입력 인터페이스 변경을 거부합니다. 일반 빌드의 AMD 화면
+검사는 그대로입니다. 다른 PC에서 실행하려고 guard를 삭제하거나 PROM 해시만 바꾸지 마세요.
 
-`internal-boot/`에는 출력 경로 자동 식별, 제한된 PCI 상태 비교, 자세한 인계 오류,
-**U 없는 자동 부팅용 별도 소스**와 설치·원복 도구가 있습니다. 자동판은 host 검사와
-로컬 설치까지 검증했으며 **첫 실제 자동 부팅은 아직 미검증**입니다. 다른 보드/BIOS
-지원은 추가하지 않았습니다. 자신의 파티션 설정으로 빌드하고 수동 시험부터 진행하세요.
-아래 USB 절차와 기존 `release/` EFI는 계속 수동판입니다.
+| 경로 | 내용 |
+|---|---|
+| `internal-boot/`, `research/headless/` | 내부·headless 소스, 로컬 빌드·설치·host 시험 |
+| `unlock/`, `release/` | 보존한 기존 USB 수동 구현과 과거 산출물 |
+| `benchmark/`, `evidence/` | 측정 도구와 선택한 공개 근거 |
+| `docs/` | 호환성·assets·부팅 안내와 한계 |
 
-RTX 3090의 Windows Tensor 연산 성능 향상을 확인한 UEFI 실험 코드와 재현 가이드입니다. [rough2515-hub/rtx3080-unlock-public](https://github.com/rough2515-hub/rtx3080-unlock-public/tree/a08254d269af30ace9e57237abd3d8e6c261e8f5)의 RTX 3080 포트를 바탕으로 RTX 3090 24GiB / AMD 내장그래픽 환경에 맞췄습니다. 원천 코어는 [Zagitta/gpu-unlock](https://github.com/Zagitta/gpu-unlock/tree/0ebdb1c6308b6a2072be5bf04513472942541956)입니다.
-
-**핵심: 언락 성공 후 재부팅하지 않고 Windows Boot Manager로 이어서 부팅합니다.** ASUS에서 `Save Changes & Reset`을 누르면 다시 초기화될 수 있습니다. 이번 성공 사례는 `Boot Override → Windows Boot Manager`를 사용했습니다.
-
-## 실제 측정 결과
-
-2026-10-20, 동일한 CUDA 12.6 / cuBLAS 12.6 실행 파일로 각각 3회 실행한 중앙값입니다. NVIDIA Windows 드라이버 **617.14를 교체하지 않았습니다**.
-
-| 항목 | 이전 경로 TFLOPS | 리셋 없이 Windows 진입 TFLOPS | 변화 |
-|---|---:|---:|---:|
-| FP32 pedantic | 24.505702 | 24.890281 | +1.57% |
-| FP16 Tensor / FP32 누산 | 70.548081 | 125.907816 | +78.47% |
-| BF16 Tensor / FP32 누산 | 70.529545 | 128.699728 | +82.48% |
-
-이전 측정도 UEFI에서 언락 성공을 보고한 뒤의 값입니다. 미적용 콜드부팅 기준을 별도로 통제한 실험은 아닙니다. 사용자가 이전에는 BIOS에서 Reset했고 이번에는 Boot Override로 리셋 없이 진입했다고 확인했습니다. 결과는 부팅 인계 문제가 원인이었다는 가설을 강하게 뒷받침하지만, 다른 모든 원인을 배제하는 실험은 아닙니다. ComfyUI·게임 향상률과 장시간 안정성은 별도 검증이 필요합니다. [측정 원자료와 한계](docs/RESULTS.ko.md).
-
-## 먼저 지원 조건 확인
-
-**현재 실행 코드는 특정 PC에 고정된 실험 포트입니다. 모든 RTX 3090이나 RTX 30 시리즈에서 그대로 실행되는 범용 프로그램이 아닙니다.** 다른 시스템에서는 검사가 거부되는 것이 정상일 수 있습니다. 검사를 삭제하거나 숫자만 자신의 GPU 값으로 바꿔 실행하지 마세요.
-
-검증 환경:
-
-- NVIDIA RTX 3090 24GiB: PCI `10de:2204`, subsystem `10de:1454`, BDF `0000:01:00.0`.
-- ASUS TUF GAMING B650M-PLUS WIFI, AMD Ryzen 7 7800X3D.
-- AMD 내장그래픽 PCI `1002:164e`, subsystem `1043:8877`. 모니터는 메인보드 출력에 연결.
-- Windows 11 Home build 26200, NVIDIA 617.14.
-- x64 UEFI, Secure Boot 꺼짐, FAT32 USB.
-- 프로필 `entryLatchedSs1Full`: SS0 `0x88888888`, SS1 `0x8`.
-- PROM 해시·BAR·GOP 경로 등 추가 고정 조건: [지원 범위](docs/COMPATIBILITY.ko.md).
-
-## 따라 하기
-
-1. [USB 준비 가이드](docs/GUIDE.ko.md)에서 환경과 파일 구성을 확인합니다. 기존 USB 파일을 먼저 백업합니다.
-2. 공개된 EFI 또는 [직접 빌드한 EFI](docs/BUILD.ko.md)를 FAT32 USB의 `EFI/BOOT/BOOTX64.EFI`에 둡니다.
-3. 별도 준비한 펌웨어 5개를 `RTX3090-UNLOCK/ASSETS/`에 둡니다. [펌웨어 준비](docs/ASSETS.ko.md). 펌웨어는 이 저장소와 릴리스에 포함하지 않습니다.
-4. Windows 작업을 저장하고 완전히 종료한 뒤, 모니터를 메인보드에 연결한 상태로 전원을 켭니다.
-5. ASUS F8 → UEFI USB → 사전 검사 통과 → **U 한 번**.
-6. 성공과 정리 완료를 확인하고 펌웨어로 돌아오면 **F7 → Advanced Mode → Boot → Boot Override → Windows Boot Manager**.
-7. **이 사이에 F10 / Save Changes & Reset / 재부팅을 하지 않습니다.**
-8. Windows에서 GPU를 사용하는 다른 프로그램을 종료한 상태로 [동일 벤치마크](docs/BENCHMARK.ko.md)를 실행해 비교합니다.
-
-`STOP / POWER OFF` 또는 실패가 나오면 Windows로 이어서 진행하지 말고 전원을 완전히 끈 뒤 로그를 확인합니다. 같은 부팅에서 U를 반복하지 않습니다. Windows 진입까지 내장그래픽 출력을 유지하는 것이 검증된 조건입니다. 진입 후 RTX 출력으로 바꾸는 경우는 미검증입니다.
-
-## 공개 내용과 현재 한계
-
-- `unlock/`, `deps/`: 실제 포트 소스, 헤더, host mock 테스트, 빌드 도구.
-- `release/`: 성공 사례 EFI와 해당 소스 연결 해시. 펌웨어는 제외.
-- `benchmark/`: 동일 측정 소스와 로컬 CUDA 12.6 준비·빌드·실행 스크립트.
-- `evidence/`: 개인정보와 원본 PROM을 제외한 측정 자료·실행 로그 발췌·해시.
-- `internal-boot/`: 새 내부 디스크 수동 인계 성공 경로와 실기 미검증 자동 부팅판. 기존 루트 앱은 계속 펌웨어로 반환하는 USB 수동판입니다.
-- 이 저장소는 GPU VBIOS 플래싱이나 Windows 드라이버 교체를 안내하지 않습니다. 현재 실험은 사전 부팅 상태를 바꿉니다. 재시작·전원 차단 뒤에는 다시 적용하는 절차를 전제로 합니다.
+VBIOS 플래싱이나 Windows 드라이버 교체는 절차에 포함하지 않습니다. 기록된 실행에서
+617.14 드라이버는 그대로였습니다. Host mock 시험이 지원 하드웨어를 추가하지는 않습니다.
+새 시스템은 [호환성 보고](docs/CONTRIBUTING.ko.md)와
+[포팅 기준](docs/PORTABILITY.en.md)을 참고하세요.
 
 ## 라이선스와 출처
 
-포트·재사용 코어는 **GPL-2.0-only**이며, EDK2 및 별도 고지는 각 라이선스를 따릅니다. [LICENSE](LICENSE), [외부 코드 고지](THIRD_PARTY_NOTICES.md), [변경 기록](CHANGES.md)을 보존하세요. NVIDIA 펌웨어·드라이버·CUDA DLL은 재배포하지 않습니다.
-
-## 다른 환경으로의 확장
-
-ASUS 외 보드·Intel CPU/내장그래픽으로 확장하려면 PCI/BAR 자동 탐색, GPU와 별도인 화면 출력 검증, 카드별 검증 프로필이 필요합니다. AMD CPU 사용은 AMD Radeon GPU 지원을 의미하지 않습니다. 현재 EFI의 지원 범위는 그대로입니다.
-
-[호환성 제보 안내](docs/CONTRIBUTING.ko.md)로 환경 정보를 수집할 수 있습니다. 수집 결과는 실행 허가가 아닙니다. [지원 확대 설계와 검증 단계](docs/PORTABILITY.en.md)를 참고하세요.
+포트와 재사용 코어는 **GPL-2.0-only**이며 EDK2 등 별도 구성 요소의 라이선스는 유지합니다.
+[rough2515-hub/rtx3080-unlock-public](https://github.com/rough2515-hub/rtx3080-unlock-public/tree/a08254d269af30ace9e57237abd3d8e6c261e8f5)와
+[Zagitta/gpu-unlock](https://github.com/Zagitta/gpu-unlock/tree/0ebdb1c6308b6a2072be5bf04513472942541956)에 기반합니다.
+[LICENSE](LICENSE), [외부 코드 고지](THIRD_PARTY_NOTICES.md), [변경 이력](CHANGES.md)을
+보존하세요. NVIDIA 펌웨어·PROM/BIOS 이미지·드라이버·CUDA DLL은 이번 소스 릴리스에
+재배포하지 않습니다.

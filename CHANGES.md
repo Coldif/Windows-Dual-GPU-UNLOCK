@@ -1,5 +1,26 @@
 # Changes
 
+## 2026-10-24 — v0.3.0 headless internal handoff, public setup and recovery
+
+- Verified one internal headless boot on the exact ASUS BIOS 3057 / RTX 3090 FE
+  system: RTX GOP 1 → 0, one successful unlock transaction, direct Windows
+  return and three Tensor benchmark trials. FP16/BF16 medians were
+  124.969948/128.931534 TFLOPS. No active AMD display was required; the CPU
+  still has an iGPU, and other boards/CPUs/headless USB are not validated.
+- Added a separate headless compile profile: two reviewed EDID children, exact
+  NVIDIA ownership release, zero-physical-GOP policy, file-only child logging,
+  TPL-protected observations and original PROM/cold/containment/cleanup gates.
+- Added public configuration/build provenance, stage/register/confirmed automatic
+  promotion and Windows-first recovery. Registration preserves default priority;
+  promotion explicitly orders Headless then Windows and saves Fast Startup
+  recovery data before mutation. Source/include/config/asset contracts are rechecked.
+- Rewrote English/Korean README and setup guides, retained distinct legacy USB
+  and AMD-display paths, and published sanitized headless evidence. Firmware,
+  PROM/BIOS, private partition configuration and generated EFI images stay local.
+- Original manual child, automatic child and automatic wrapper EFI hashes remain
+  identical. Public installer mutation paths are mock-tested; cross-machine
+  registration, repeated cold-boot reliability and sleep/resume remain unverified.
+
 ## 2026-10-23 — v0.2.0 internal handoff and experimental automatic boot
 
 - Added a separate `internal-boot/` source tree; original USB release source and EFI remain unchanged.

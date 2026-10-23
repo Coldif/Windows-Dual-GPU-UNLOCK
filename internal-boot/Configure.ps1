@@ -17,5 +17,5 @@ function GuidC([guid]$Value){
 $header=@('/* Local partition configuration; never distribute this file. */',('#define GU_INTERNAL_PARTITION_INITIALIZER '+(GuidC ([guid]$unlock.Guid))),('#define GU_WINDOWS_PARTITION_INITIALIZER '+(GuidC $WindowsEspGuid)))
 $header | Set-Content (Join-Path $PSScriptRoot 'boot/platform-config.h') -Encoding ascii
 $disk=Get-Disk -Number $unlock.DiskNumber
-[ordered]@{UnlockDriveLetter=$UnlockDriveLetter.ToUpperInvariant();UnlockPartitionGuid=[string]$unlock.Guid;WindowsPartitionGuid=[string]$windows[0].Guid;UnlockDiskUniqueId=$disk.UniqueId;UnlockOffset=$unlock.Offset;UnlockSize=$unlock.Size;ConfiguredUtc=[DateTime]::UtcNow.ToString('o')} | ConvertTo-Json | Set-Content (Join-Path $PSScriptRoot 'local-config.json') -Encoding utf8
+[ordered]@{UnlockDriveLetter=$UnlockDriveLetter.ToUpperInvariant();UnlockPartitionGuid=[string]$unlock.Guid;WindowsPartitionGuid=[string]$windows[0].Guid;UnlockDiskUniqueId=$disk.UniqueId;UnlockOffset=$unlock.Offset;UnlockSize=$unlock.Size;GeneratedHeaderSha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'boot/platform-config.h')).Hash;ConfiguredUtc=[DateTime]::UtcNow.ToString('o')} | ConvertTo-Json | Set-Content (Join-Path $PSScriptRoot 'local-config.json') -Encoding utf8
 Write-Output 'Local profile configured. No disk layout, EFI files or boot settings changed.'

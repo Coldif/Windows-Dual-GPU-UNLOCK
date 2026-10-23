@@ -1,34 +1,60 @@
-# Verified hardware and exact checks
+# Verified hardware and route-specific requirements
 
 **English** | [한국어](COMPATIBILITY.ko.md)
 
-The current EFI checks much more than a GPU model name. Its main constraints are:
+The current implementation checks more than a model name. v0.3.0 records one
+successful internal headless boot on the same machine used for the earlier
+AMD-display trials. It does not make other RTX 3090s or platforms supported.
 
-| Item | Required value |
+| Common GPU/platform item | Validated value |
 |---|---|
-| GPU PCI | vendor `10de`, device `2204` |
-| GPU subsystem | vendor `10de`, device `1454` |
+| Card | NVIDIA RTX 3090 Founders Edition, 24 GiB |
+| PCI identity | `10de:2204`, subsystem `10de:1454` |
 | GPU BDF | `0000:01:00.0` |
-| Chip | `0xb72000a1` |
-| VRAM | `0x6000` MiB = 24 GiB |
+| Chip / VRAM register | `0xb72000a1` / `0x6000` MiB |
 | BAR0 | `0xf5000000`, 16 MiB |
-| PROM SHA-256 | `8ea297373e9e5d3600ff41ad9fae88f2d14c98c017d100669f7333981da673b4` |
-| iGPU PCI | `1002:164e`, subsystem `1043:8877` |
-| iGPU BDF/GOP | `0000:0c:00.0` and the captured AMD display path |
-| Secure Boot | Disabled |
-| Successful profile | `entryLatchedSs1Full` |
+| PROM SHA256 | `8ea297373e9e5d3600ff41ad9fae88f2d14c98c017d100669f7333981da673b4` |
+| Motherboard / BIOS | ASUS TUF GAMING B650M-PLUS WIFI / 3057 |
+| CPU | AMD Ryzen 7 7800X3D |
+| Recorded Windows / driver | Windows 11 Home 26200 / NVIDIA 617.14 |
+| UEFI / Secure Boot | x64 / disabled |
+| Selector profile | `entryLatchedSs1Full`; targets SS0 `0x88888888`, SS1 `0x8` |
 
-Verified machine: ASUS TUF GAMING B650M-PLUS WIFI / Ryzen 7 7800X3D / Windows 11 Home 26200 / NVIDIA 617.14.
+These are documented successful values, not an authorization list. Code also
+checks configuration/capabilities, PROM, cold state, driver code, ownership,
+DMA cleanup and failure containment. Internal EFI builds additionally contain
+the user's own Windows/dedicated ESP GUID configuration.
 
-The executable checks are in [`unlock/port.h`](../unlock/port.h), [`port.c`](../unlock/port.c), [`checks.c`](../unlock/checks.c) and [`app.c`](../unlock/app.c). Additional checks cover the original PCI configuration, PROM and display path. This table does not independently authorize execution.
-
-| Environment | Current status |
+| Route | Display policy and validation |
 |---|---|
-| Exact published machine and boot path | One documented successful case; long-term stability unverified |
-| Another RTX 3090, including the same model in a different PC | Unverified; exact-machine checks can reject it |
-| Intel CPU/iGPU or another AMD/ASUS platform | Unverified; current AMD display checks are restrictive |
-| No iGPU, multiple discrete GPUs, laptop/hybrid graphics | Unverified; a separate display/ownership design is required |
-| Other NVIDIA models or architectures | Separate GPU port and validation required |
-| AMD Radeon or Intel discrete GPU as the unlock target | No unlock implementation in this repository |
+| Legacy USB / ordinary internal builds | Preserve AMD physical GOP, PCI `1002:164e`, subsystem `1043:8877`, BDF `0000:0c:00.0` and validated display ancestry |
+| Internal headless profile | One RTX physical GOP before release, zero physical GOP afterward; stable console/input interfaces, protected ownership graph, file-only child logging |
+| Headless USB | Not tested; the ordinary USB EFI retains AMD requirements |
 
-Replacing a PROM hash or removing checks is not a safe port. A new port needs validated memory/WPR layout, firmware compatibility, PCI ownership, DMA cleanup and failure containment. See the [portability plan](PORTABILITY.en.md) and [reporting guide](CONTRIBUTING.en.md).
+The headless test had all monitors on RTX and no active AMD GOP. The 7800X3D
+still contains an iGPU; BIOS disablement is not established by a missing GOP.
+**A CPU without an iGPU was not tested.** Neither Intel-host support nor
+independence from every firmware's iGPU implementation is established.
+
+| Other configuration | Status |
+|---|---|
+| Same exact machine, F8-selected headless automatic child | One unlock + Windows display recovery + Tensor measurement verified on 2026-10-24 |
+| Default automatic startup across repeated cold boots | Not established by that one F8 trial |
+| Another RTX 3090, even a Founders Edition in another PC | Unverified; exact checks may reject |
+| Another ASUS BIOS, AMD board/CPU or Intel host | Unverified; separate profile and validation required |
+| CPU without iGPU, multiple discrete GPUs, laptop/hybrid setup | Unverified |
+| Other NVIDIA models/architectures | Separate GPU port and validation required |
+| AMD Radeon / Intel discrete unlock target | No unlock implementation here |
+| Games, ComfyUI, sleep/hibernate resume, long-term stability | Not established by GEMM/boot evidence |
+
+See [headless instructions](HEADLESS.en.md), [legacy USB instructions](GUIDE.en.md)
+and [sanitized evidence](../evidence/headless-handoff/README.md).
+The ordinary source guards remain in [root unlock](../unlock/app.c); the separate
+headless implementation is in [internal unlock](../internal-boot/unlock/app.c),
+[headless policy](../internal-boot/unlock/headless-policy.h) and
+[wrapper release policy](../internal-boot/boot/full-release.c).
+
+Changing constants, replacing a PROM hash or deleting a display check is not a
+validated port. New support requires memory/WPR layout, firmware compatibility,
+ownership, DMA cleanup and failure-path evidence.
+[Portability criteria](PORTABILITY.en.md) / [compatibility reporting](CONTRIBUTING.en.md).

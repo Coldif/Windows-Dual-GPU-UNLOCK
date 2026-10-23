@@ -2,8 +2,10 @@
 
 브랜치: `research/single-gpu-headless` / 기준: `e26bccf`.
 목표는 **3090으로 부팅 화면 조작 → 출력 해제 → 화면 없이 언락 → Windows에서 출력
-복귀**라는 가설을 검증하는 것이다. 현재 상태는 **R2 실기 성공 / 단일 GPU 언락 연구판 준비**다.
-R2는 콘솔 소비자 해제만 시험했고, 새 headless 언락판의 실제 GPU 성공은 미확인이다.
+복귀**라는 가설을 검증하는 것이다. 현재 상태는 **해당 PC의 headless 언락·Windows
+복귀·FP16/BF16 측정 1회 부팅 검증 완료**다. [실제 근거](../../evidence/headless-handoff/README.md).
+배포 설치 절차는 [새 가이드](../../docs/HEADLESS.ko.md)와 `internal-boot/Headless.ps1`을
+사용한다. 이 문서의 초기 관찰·미검증 설명과 해시 고정 연구 등록 도구는 당시 기록이다.
 검증된 main의 GPU·입력·정리 검사를
 지워 통과시키지 않으며 기존 설치 EFI·기본 부팅 우선순위·main 릴리스를 보존한다.
 
@@ -259,7 +261,7 @@ TextOut/GraphicsConsole 해제·검증과 무입력 protocol probe, 최종 prepa
 Windows LastBootUpTime은 같은 날 02:43:40 KST였고 사용자가 재부팅 복귀를 보고했다.
 이는 **콘솔 소비자 분리와 Windows 복귀**의 근거이며 NVIDIA GOP 제거·언락의 근거는 아니다.
 
-## 단일 RTX 언락 연구판 — 실기 미검증
+## 단일 RTX 언락 연구판 — 최초 시험 전 준비 기록
 
 사용자의 언락 실행 요청에 따라 R3/R4/R5를 별도 연구 빌드로 연결했다. 단계별 실기
 검증이 모두 끝났다는 뜻은 아니다. 마지막 물리 GOP 해제 후 Windows Boot Manager가
@@ -328,7 +330,7 @@ Auto/UNLOCK-AUTO/R2-AUTO 파일 해시와 필수 ASSETS 5개의 크기·해시�
 | 실제 child app + 원본 transaction | 호스트 통과 | 16개 모드; zero-GOP/virtual-only 성공, 늦은 GOP/입력/owner/config/SS0 변화 및 파일 오류/경고 차단, 화면 호출 0 |
 | 기존 경로 보존 | 통과 | 일반 release 9,842 checks, 기존 AUTO/manual 통합 검사, 재빌드 EFI 해시 동일 |
 | 설치 실패 복구 | 호스트 통과 | 부분 mutation/최종 검증 실패 rollback 및 boot-copy 귀속 검사 |
-| 실제 단일 RTX 언락 + 화면 복구 + 성능 | 미검증 | 다음 F8 시험과 새 로그, Windows FP16/BF16 측정 필요 |
+| 실제 단일 RTX 언락 + 화면 복구 + 성능 | 후속 시험에서 확인 | HLS000000 / AUTO000001 및 FP16 124.969948, BF16 128.931534 TFLOPS 3회 중앙값; 해당 PC 한 부팅 |
 
 - HEADLESS.EFI SHA256: `6839bbc9987fa26b794dc6e2ffe98791642ac6e21ef01c388da9fffef3a878a3`.
 - UNLOCK-HEADLESS.EFI SHA256: `4dce4c2d06e4950af39cd20bdb267f888df8e3563cbc7011be5aeffcfd3ca469`.

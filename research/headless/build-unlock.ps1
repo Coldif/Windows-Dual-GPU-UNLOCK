@@ -2,6 +2,9 @@
 param([string]$Clang='clang',[string]$LldLink='lld-link')
 $ErrorActionPreference='Stop'
 $repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
+. (Join-Path $repo 'internal-boot/install/headless-package.ps1')
+$null=Assert-HeadlessLocalConfig $repo
+$beforeInputs=Get-HeadlessInputInventory $repo
 $unlock=Join-Path $repo 'internal-boot/unlock'
 & (Join-Path $unlock 'build.ps1') -ExperimentalUnlock -StockProfile entryLatchedSs1Full -InternalBoot -AutomaticBoot -HeadlessResearch -Clang $Clang -LldLink $LldLink
 if(!$?){throw 'Headless child build failed'}
@@ -24,5 +27,8 @@ try {
  if($LASTEXITCODE -ne 0){throw 'Headless wrapper link failed'}
  & python ../unlock/verify_pe.py build/headless/HEADLESS.EFI build/headless/HEADLESS.map --output build/headless/pe-verification.json
  if($LASTEXITCODE -ne 0){throw 'Headless wrapper PE verification failed'}
- [ordered]@{Mode='single-rtx-headless-unlock-then-windows';CanUnlock=$true;RequiresHumanKey=$false;HardwareTested=$false;ChildSha256=$hash;ChildBytes=(Get-Item $child).Length;EfiSha256=(Get-FileHash -LiteralPath build/headless/HEADLESS.EFI).Hash;BuiltUtc=[DateTime]::UtcNow.ToString('o')} | ConvertTo-Json | Set-Content build/headless/manifest.json -Encoding utf8
+ $afterInputs=Get-HeadlessInputInventory $repo
+ if(($beforeInputs | ConvertTo-Json -Depth 4 -Compress) -cne ($afterInputs | ConvertTo-Json -Depth 4 -Compress)){throw 'Inputs changed while building; no package manifest will be published'}
+ [ordered]@{Format=2;HardwareProfile='ASUS-TUF-B650M-PLUS-WIFI-3057-RTX3090-FE';Mode='single-rtx-headless-unlock-then-windows';CanUnlock=$true;RequiresHumanKey=$false;HardwareTested=$false;ChildSha256=$hash;ChildBytes=(Get-Item $child).Length;ChildManifestSha256=(Get-FileHash -LiteralPath (Join-Path (Split-Path $child) 'build-manifest.json')).Hash;EfiSha256=(Get-FileHash -LiteralPath build/headless/HEADLESS.EFI).Hash;EfiBytes=(Get-Item build/headless/HEADLESS.EFI).Length;Inputs=(Get-HeadlessInputInventory $repo -WithContract);BuiltUtc=[DateTime]::UtcNow.ToString('o')} | ConvertTo-Json -Depth 6 | Set-Content build/headless/manifest.json -Encoding utf8
+ $null=Assert-HeadlessPackage $repo
 } finally {Pop-Location}
