@@ -10,6 +10,7 @@
 #include <Protocol/GraphicsOutput.h>
 #include <Protocol/PciIo.h>
 #include <Guid/GlobalVariable.h>
+#include "../unlock/machine-profile.h"
 #ifdef GU_DIAGNOSTIC_PROBE
 #include "probe.h"
 #endif
