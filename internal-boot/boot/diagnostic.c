@@ -10,7 +10,9 @@
 #include <Protocol/GraphicsOutput.h>
 #include <Protocol/PciIo.h>
 #include <Guid/GlobalVariable.h>
+#ifdef GU_DIAGNOSTIC_PROBE
 #include "probe.h"
+#endif
 
 #define MAX_HANDLES 4096
 #define MAX_PROTOCOLS 256

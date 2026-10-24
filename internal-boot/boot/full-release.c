@@ -321,6 +321,12 @@ static EFI_STATUS AmdOnly(VOID) {
   s=Interface(bs,handles[0],&GopGuid,(VOID **)&gop);
   if(s==EFI_SUCCESS && (!gop->Mode || gop->Mode->FrameBufferBase || gop->Mode->FrameBufferSize))s=EFI_UNSUPPORTED;
   if(s==EFI_SUCCESS){EFI_STATUS ps=Interface(bs,handles[0],&PathGuid,(VOID **)&path);if(!((ps==EFI_UNSUPPORTED || ps==EFI_NOT_FOUND) && !path))s=EFI_UNSUPPORTED;}
+  if(s==EFI_SUCCESS) {
+    EFI_HANDLE agent=NULL;
+    if(handles[0]!=p->Agg){s=EFI_UNSUPPORTED;}
+    else{s=AggGopAgent(bs,handles[0],&agent);}
+    if(s==EFI_SUCCESS && agent && agent!=p->GfxAgent)s=EFI_UNSUPPORTED;
+  }
 #else
   if(s!=EFI_SUCCESS || !handles || count!=1){if(handles)bs->FreePool(handles);return EFI_UNSUPPORTED;}
   EFI_GRAPHICS_OUTPUT_PROTOCOL *gop=NULL;EFI_DEVICE_PATH_PROTOCOL *path=NULL;

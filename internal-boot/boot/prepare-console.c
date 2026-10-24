@@ -36,6 +36,7 @@ typedef struct {
   EFI_HANDLE Amd,Rtx,AmdPci,RtxPci,Console,Input,Error,OutAgent,GfxAgent;
 #if GU_CONSOLE_AGGREGATE
   EFI_HANDLE NvAgent,NvChildAgent,EdidAgent,ComboAgent,Agg;
+  EFI_HANDLE AggCandidate,AggDriver;
 #endif
   EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *AmdText,*ConsoleText,*ErrorText;
   EFI_SIMPLE_TEXT_INPUT_PROTOCOL *Keys;
@@ -128,6 +129,32 @@ static EFI_STATUS PciFor(EFI_BOOT_SERVICES *bs,EFI_DEVICE_PATH_PROTOCOL *path,UI
   if(s!=EFI_SUCCESS || config[0]!=id || config[11]!=subsystem || (config[2]>>24)!=3)return EFI_UNSUPPORTED;
   return EFI_SUCCESS;
 }
+static EFI_STATUS Driver(EFI_BOOT_SERVICES *bs,EFI_HANDLE agent,const EFI_GUID *file,UINTN size,UINTN stop,UINT32 version,UINT8 codetype);
+#if GU_CONSOLE_AGGREGATE
+/* The only pathless zero-FB GOP this topology accepts is the AMI combo
+ * splitter aggregate. Its single BY_DRIVER opener must be the fingerprinted
+ * GfxFile image; unknown virtual GOPs are refused. A detached survivor may
+ * legitimately have no BY_DRIVER opener left (agent==NULL). */
+static EFI_STATUS AggGopAgent(EFI_BOOT_SERVICES *bs,EFI_HANDLE h,EFI_HANDLE *agent) {
+  EFI_OPEN_PROTOCOL_INFORMATION_ENTRY *entries=NULL;UINTN n=0,active=0;
+  *agent=NULL;
+  EFI_STATUS s=bs->OpenProtocolInformation(h,&GopGuid,&entries,&n);
+  if(s!=EFI_SUCCESS)return s;
+  for(UINTN i=0;i<n;i++) {
+    const EFI_OPEN_PROTOCOL_INFORMATION_ENTRY *e=&entries[i];
+    if(Passive(e->Attributes))continue;
+    active++;
+    if(e->Attributes==EFI_OPEN_PROTOCOL_BY_DRIVER && e->ControllerHandle==h) {
+      if(*agent){s=EFI_ACCESS_DENIED;break;}
+      *agent=e->AgentHandle;
+    } else if(!(e->Attributes==EFI_OPEN_PROTOCOL_BY_CHILD_CONTROLLER && e->ControllerHandle)){s=EFI_ACCESS_DENIED;break;}
+    if(!e->AgentHandle || !e->OpenCount){s=EFI_ACCESS_DENIED;break;}
+  }
+  if(s==EFI_SUCCESS && active>2)s=EFI_ACCESS_DENIED;
+  if(entries && bs->FreePool(entries)!=EFI_SUCCESS)s=EFI_DEVICE_ERROR;
+  return s;
+}
+#endif
 static EFI_STATUS Displays(EFI_SYSTEM_TABLE *t,PLAN *p,BOOLEAN first) {
   EFI_BOOT_SERVICES *bs=t->BootServices;EFI_HANDLE *handles=NULL,amd=NULL,rtx=NULL;UINTN count=0;
   EFI_STATUS s=bs->LocateHandleBuffer(ByProtocol,&GopGuid,NULL,&count,&handles);
@@ -145,7 +172,16 @@ static EFI_STATUS Displays(EFI_SYSTEM_TABLE *t,PLAN *p,BOOLEAN first) {
     EFI_STATUS ps=Interface(bs,handles[i],&PathGuid,(VOID **)&path);
     /* A new pathless virtual GOP may appear after one physical console leaves. */
 #if GU_CONSOLE_AGGREGATE
-    if((ps==EFI_UNSUPPORTED || ps==EFI_NOT_FOUND) && !path && !gop->Mode->FrameBufferBase && !gop->Mode->FrameBufferSize)continue;
+    if((ps==EFI_UNSUPPORTED || ps==EFI_NOT_FOUND) && !path && !gop->Mode->FrameBufferBase && !gop->Mode->FrameBufferSize) {
+      EFI_HANDLE agent=NULL;
+      if(first){if(p->AggCandidate){s=EFI_UNSUPPORTED;break;}}
+      else if(handles[i]!=p->Agg){s=EFI_UNSUPPORTED;break;}
+      s=AggGopAgent(bs,handles[i],&agent);
+      if(s!=EFI_SUCCESS)break;
+      if(agent){s=Driver(bs,agent,&GfxFile,GU_CONSOLE_GFX_SIZE,GU_CONSOLE_GFX_STOP,GU_CONSOLE_GFX_VERSION,EfiBootServicesCode);if(s!=EFI_SUCCESS)break;}
+      if(first){p->AggCandidate=handles[i];p->AggDriver=agent;}
+      continue;
+    }
 #else
     if((ps==EFI_UNSUPPORTED || ps==EFI_NOT_FOUND) && !path && handles[i]==t->ConsoleOutHandle && !gop->Mode->FrameBufferBase && !gop->Mode->FrameBufferSize)continue;
 #endif
@@ -253,6 +289,7 @@ static EFI_STATUS Consumers(EFI_SYSTEM_TABLE *t,PLAN *p,const GRAPH *g) {
     else return EFI_ACCESS_DENIED;
   }
   if(edid!=1 || combo!=1 || !p->Agg || !p->ComboAgent || childGopAgent!=p->ComboAgent ||
+     p->Agg!=p->AggCandidate || !p->AggDriver ||
      p->Agg==p->Rtx || p->Agg==p->RtxPci || p->EdidAgent==nv || p->ComboAgent==nv || p->EdidAgent==p->ComboAgent)return EFI_ACCESS_DENIED;
   for(UINTN i=0;i<g->Count;i++) {
     const EDGE *e=&g->Edges[i];
@@ -265,7 +302,7 @@ static EFI_STATUS Consumers(EFI_SYSTEM_TABLE *t,PLAN *p,const GRAPH *g) {
   }
   if(gfx!=1 || out!=1 || conChild!=1 || !conOutAgent)return EFI_ACCESS_DENIED;
   p->OutAgent=conOutAgent;
-  if(p->OutAgent==p->GfxAgent || p->OutAgent==nv || p->GfxAgent==nv)return EFI_ACCESS_DENIED;
+  if(p->OutAgent==p->GfxAgent || p->OutAgent==nv || p->GfxAgent==nv || p->GfxAgent!=p->AggDriver)return EFI_ACCESS_DENIED;
   for(UINTN i=0;i<g->Count;i++) {
     const EDGE *e=&g->Edges[i];
     if((e->Agent==nv || e->Agent==p->ComboAgent) && e->Handle!=p->RtxPci && e->Handle!=p->Rtx && e->Handle!=p->Agg)return EFI_ACCESS_DENIED;
