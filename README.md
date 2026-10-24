@@ -3,7 +3,7 @@
 **English** | [한국어](README.ko.md)
 
 Experimental UEFI unlock and direct Windows handoff for one documented **RTX 3090
-Founders Edition / ASUS BIOS 3057** system. **v0.3.0 is a source-only pre-release**:
+Founders Edition / ASUS BIOS 3057** system. **v0.3.1 is a source-only pre-release**:
 build the internal EFI for your own partition GUIDs. Firmware assets and private,
 partition-specific EFI binaries are not bundled with this release.
 
@@ -12,6 +12,10 @@ monitors on the RTX: one active RTX GOP before release, zero physical GOPs after
 one automatic unlock transaction, and Windows display recovery. Subsequent Windows
 measurements reached **FP16 124.97 / BF16 128.93 TFLOPS** (three-run medians).
 [Evidence and limitations](evidence/headless-handoff/README.md).
+
+v0.3.1 fixes preflight rejection when firmware exposes more than two RTX display
+children. The rebuilt wrapper completed automatic unlock and Windows handoff on
+the same system; no new performance benchmark was run for this build.
 
 This is one machine and boot, not general RTX 3090 support. The Ryzen 7 7800X3D
 **has an iGPU**; the experiment used no active AMD GOP. CPUs without an iGPU,

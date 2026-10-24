@@ -3565,8 +3565,8 @@
     },
     {
       "path": "internal-boot/boot/full-release.c",
-      "bytes": 27113,
-      "sha256": "abc401b78103680a45a3dcb57a3bdcc65783252a272461ecd420dbefec67a9c4"
+      "bytes": 27580,
+      "sha256": "5201e6bd03c21a275b71b9b13f7a23912685f5410b52dad7611b1bbc5a7da43c"
     },
     {
       "path": "internal-boot/boot/full-release.h",

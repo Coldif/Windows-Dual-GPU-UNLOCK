@@ -2,7 +2,7 @@
 
 [English](HEADLESS.en.md) | **한국어** | [README](../README.ko.md)
 
-v0.3.0 소스 사전 릴리스는 2026-10-24 ASUS BIOS 3057 / RTX 3090 Founders Edition
+v0.3.1 소스 사전 릴리스는 2026-10-24 ASUS BIOS 3057 / RTX 3090 Founders Edition
 한 대의 성공을 기록합니다. 모든 모니터를 RTX에 연결했고, 해제 전 RTX 물리 GOP 1개,
 해제 후 0개를 확인했습니다. 자동 child가 한 번 시도해 정리했고 Windows 화면 복귀를
 관찰했습니다. [공개 근거](../evidence/headless-handoff/README.md).
@@ -44,11 +44,11 @@ Windows ESP GUID는 현재 시스템 EFI 파티션 중
 
 ## 설정과 빌드
 
-[v0.3.0 소스 ZIP](https://github.com/impacifist/Windows-GPU-UNLOCK/releases/tag/v0.3.0)을
+[v0.3.1 소스 ZIP](https://github.com/impacifist/Windows-GPU-UNLOCK/releases/tag/v0.3.1)을
 풀거나 다음 명령으로 고정 릴리스 소스를 받습니다.
 
 ```powershell
-git clone --branch v0.3.0 --depth 1 https://github.com/impacifist/Windows-GPU-UNLOCK.git
+git clone --branch v0.3.1 --depth 1 https://github.com/impacifist/Windows-GPU-UNLOCK.git
 cd Windows-GPU-UNLOCK
 ```
 
@@ -113,7 +113,7 @@ Windows 화면 복귀·로컬 로그·[benchmark](BENCHMARK.ko.md)를 확인한 
 이 명령은 headless 첫 번째·Windows Boot Manager 두 번째로 firmware 우선순위를
 설정하고 빠른 시작을 끕니다. 시험 항목 등록만으로는 바뀌지 않으며, 명령이 재부팅하지도
 않습니다. Host 시험 통과를 자신의 F8 성공으로 대신하지 마세요.
-v0.3.0 공개 작업은 연구 PC의 현재 기본 부팅 설정을 승격하지 않습니다.
+v0.3.1 공개 작업은 연구 PC의 현재 기본 부팅 설정을 승격하지 않습니다.
 
 <a id="recovery"></a>
 ## 복구

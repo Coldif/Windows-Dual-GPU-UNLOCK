@@ -32,6 +32,19 @@ Windows handoff therefore also includes the observed Windows boot time
 - Successful wrapper EFI SHA256: `6839bbc9987fa26b794dc6e2ffe98791642ac6e21ef01c388da9fffef3a878a3`.
 - Successful child EFI SHA256: `4dce4c2d06e4950af39cd20bdb267f888df8e3563cbc7011be5aeffcfd3ca469`.
 
+## v0.3.1 follow-up
+
+The v0.3.0 wrapper rejected the local firmware graph because it exposed three
+RTX display children while the preflight required exactly two. v0.3.1 discovers
+and validates up to four unique display children. On 2026-10-24, the rebuilt
+wrapper log recorded successful preparation, automatic child return, final
+verification and Windows start (`HLS000004.TXT`); the user observed the display
+turn off during release and return in Windows. The installed wrapper SHA256 was
+`bf8d7e52462e354a6258a4c2b1d76fc946e6310392c67725dc89ee1f8684623d`; the child
+was unchanged. This confirms the updated boot path on the same machine. No new
+performance benchmark or detailed child transaction report was collected for
+this follow-up, so the earlier TFLOPS table is not a measurement of v0.3.1.
+
 Raw boot captures, addresses, partition/boot-entry GUIDs, machine configuration,
 PROM, firmware and generated EFI images are not published. The JSON trial
 records contain only benchmark metadata and numerical results. The parser's

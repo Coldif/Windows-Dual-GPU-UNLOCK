@@ -1,5 +1,18 @@
 # Changes
 
+## 2026-10-24 — v0.3.1 variable headless display-child discovery
+
+- Fixed preflight rejection when ASUS firmware exposes three RTX display
+  children instead of exactly two. The wrapper now discovers and validates up
+  to four unique RTX display children, then releases each guarded EDID
+  connection before the NVIDIA GOP.
+- The rebuilt wrapper completed automatic unlock and Windows handoff on the
+  same system. The user observed the RTX display go dark during release and
+  return after Windows started. No new performance benchmark was run for this
+  build.
+- Release remains source-only. Do not publish local EFI binaries, firmware,
+  PROM captures, raw boot logs, partition identifiers or machine-local config.
+
 ## 2026-10-24 — v0.3.0 headless internal handoff, public setup and recovery
 
 - Verified one internal headless boot on the exact ASUS BIOS 3057 / RTX 3090 FE

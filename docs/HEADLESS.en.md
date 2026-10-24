@@ -2,7 +2,7 @@
 
 **English** | [한국어](HEADLESS.ko.md) | [README](../README.md)
 
-This v0.3.0 source pre-release documents one successful ASUS BIOS 3057 / RTX 3090
+This v0.3.1 source pre-release documents one successful ASUS BIOS 3057 / RTX 3090
 Founders Edition boot on 2026-10-24. All monitors were on RTX. The capture showed
 one RTX physical GOP before release and none afterward; the automatic child
 completed one guarded transaction and Windows display recovery was observed.
@@ -45,11 +45,11 @@ The Windows ESP GUID is the GUID of the current system EFI partition containing
 
 ## Configure and build
 
-Extract the [v0.3.0 source ZIP](https://github.com/impacifist/Windows-GPU-UNLOCK/releases/tag/v0.3.0)
+Extract the [v0.3.1 source ZIP](https://github.com/impacifist/Windows-GPU-UNLOCK/releases/tag/v0.3.1)
 or clone the fixed release:
 
 ```powershell
-git clone --branch v0.3.0 --depth 1 https://github.com/impacifist/Windows-GPU-UNLOCK.git
+git clone --branch v0.3.1 --depth 1 https://github.com/impacifist/Windows-GPU-UNLOCK.git
 cd Windows-GPU-UNLOCK
 ```
 
@@ -129,7 +129,7 @@ Only after personally confirming the F8 headless trial, run:
 This changes firmware priority to headless first and Windows Boot Manager second,
 and sets Fast Startup off. Registering the test entry alone does neither.
 It does not reboot. Do not treat host test success as confirmation of your F8 trial.
-Publishing v0.3.0 does not promote the research PC's current boot settings.
+Publishing v0.3.1 does not promote the research PC's current boot settings.
 
 ## Recovery
 

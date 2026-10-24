@@ -13,6 +13,8 @@ static BOOLEAN OwnRecord(EFI_HANDLE Handle,const EFI_OPEN_PROTOCOL_INFORMATION_E
 #include <Protocol/EdidDiscovered.h>
 #include <IndustryStandard/Acpi.h>
 
+#define GU_HEADLESS_MAX_DISPLAY_CHILDREN 4
+
 static EFI_GUID EdidGuid=EFI_EDID_DISCOVERED_PROTOCOL_GUID;
 static const EFI_GUID MouseFile={0xc7a7030c,0xc3d8,0x45ee,{0xbe,0xd9,0x5d,0x9e,0x76,0x76,0x29,0x53}};
 typedef struct {
@@ -25,8 +27,9 @@ typedef struct {
   UINT64 Attributes;
   BOOLEAN Captured,Released,Owned,Restored;
 #ifdef GU_HEADLESS_RESEARCH
-  EFI_HANDLE Children[2];
-  UINT8 ChildPaths[2][36];
+  EFI_HANDLE Children[GU_HEADLESS_MAX_DISPLAY_CHILDREN];
+  UINT8 ChildPaths[GU_HEADLESS_MAX_DISPLAY_CHILDREN][36];
+  UINTN ChildCount;
   UINTN EdidDetached;
 #endif
 } FULL;
@@ -136,12 +139,22 @@ static EFI_STATUS FullConsumers(const GRAPH *g) {
     const EDGE *e=&g->Edges[i];if(e->Handle!=PreparedPlan.RtxPci)continue;
     if(e->Count!=1)return EFI_ACCESS_DENIED;
     if(GuGuidEqual(&e->Protocol,&PciGuid) && e->Attributes==EFI_OPEN_PROTOCOL_BY_DRIVER && e->Controller==PreparedPlan.RtxPci){Full.NvAgent=e->Agent;owners++;}
-    else if(GuGuidEqual(&e->Protocol,&PathGuid) && e->Attributes==EFI_OPEN_PROTOCOL_BY_CHILD_CONTROLLER && children<2)Full.Children[children++]=e->Controller;
+    else if(GuGuidEqual(&e->Protocol,&PathGuid) && e->Attributes==EFI_OPEN_PROTOCOL_BY_CHILD_CONTROLLER) {
+      if(children>=GU_HEADLESS_MAX_DISPLAY_CHILDREN)return EFI_ACCESS_DENIED;
+      Full.Children[children++]=e->Controller;
+    }
     else return EFI_ACCESS_DENIED;
   }
-  if(owners!=1 || children!=2 || Full.Children[0]==Full.Children[1] || Full.NvAgent==Full.Image || (Full.Children[0]!=PreparedPlan.Rtx && Full.Children[1]!=PreparedPlan.Rtx))return EFI_ACCESS_DENIED;
-  if(Full.Children[1]==PreparedPlan.Rtx){EFI_HANDLE h=Full.Children[0];Full.Children[0]=Full.Children[1];Full.Children[1]=h;}
-  for(UINTN c=0;c<2;c++) {
+  if(owners!=1 || !children || Full.NvAgent==Full.Image)return EFI_ACCESS_DENIED;
+  Full.ChildCount=children;
+  UINTN consoleChild=children;
+  for(UINTN c=0;c<children;c++) {
+    for(UINTN prior=0;prior<c;prior++)if(Full.Children[prior]==Full.Children[c])return EFI_ACCESS_DENIED;
+    if(Full.Children[c]==PreparedPlan.Rtx)consoleChild=c;
+  }
+  if(consoleChild==children)return EFI_ACCESS_DENIED;
+  if(consoleChild){EFI_HANDLE h=Full.Children[0];Full.Children[0]=Full.Children[consoleChild];Full.Children[consoleChild]=h;}
+  for(UINTN c=0;c<Full.ChildCount;c++) {
     if(Full.Children[c]==PreparedPlan.Console || Full.Children[c]==PreparedPlan.Input || Full.Children[c]==PreparedPlan.Error || Full.Children[c]==PreparedPlan.RtxPci)return EFI_ACCESS_DENIED;
     EFI_DEVICE_PATH_PROTOCOL *path=NULL;VOID *edid=NULL,*other=NULL;
     EFI_STATUS s=Interface(bs,Full.Children[c],&PathGuid,(VOID **)&path);
@@ -150,7 +163,7 @@ static EFI_STATUS FullConsumers(const GRAPH *g) {
     s=PciFor(bs,path,1,0x220410de,0x145410de,&pci,&io,cfg);
     if(s!=EFI_SUCCESS || pci!=PreparedPlan.RtxPci || io!=PreparedPlan.RtxIo || !Bytes(cfg,PreparedPlan.RtxConfig,sizeof(cfg)))return EFI_NOT_READY;
     for(UINTN j=0;j<36;j++)Full.ChildPaths[c][j]=((UINT8 *)path)[j];
-    if(c && Bytes(Full.ChildPaths[0],path,36))return EFI_UNSUPPORTED;
+    for(UINTN prior=0;prior<c;prior++)if(Bytes(Full.ChildPaths[prior],path,36))return EFI_UNSUPPORTED;
     if(Interface(bs,Full.Children[c],&EdidGuid,&edid)!=EFI_SUCCESS)return EFI_UNSUPPORTED;
     if(c) {
       s=Interface(bs,Full.Children[c],&GopGuid,&other);
@@ -354,7 +367,7 @@ EFI_STATUS GuReleaseGop(EFI_SYSTEM_TABLE *t,EFI_HANDLE image,GU_PREPARE_LOG log,
   if(s==EFI_SUCCESS)s=Snapshot(bs,&g);
   if(s==EFI_SUCCESS)s=FullConsumers(&g);
 #ifdef GU_HEADLESS_RESEARCH
-  s=Note("headless-two-child-consumers-preflight",s);
+  s=Note("headless-display-child-consumers-preflight",s);
 #endif
   if(s==EFI_SUCCESS)s=Note("ami-runtime-code-profile",Profile(Full.EdidAgent,TRUE));
   if(s==EFI_SUCCESS)s=Note("nvidia-code-profile",Profile(Full.NvAgent,FALSE));
@@ -362,7 +375,7 @@ EFI_STATUS GuReleaseGop(EFI_SYSTEM_TABLE *t,EFI_HANDLE image,GU_PREPARE_LOG log,
   s=Note("full-release-preflight",s);if(s!=EFI_SUCCESS)return s;
   for(UINTN stage=3;stage<=4;stage++) {
 #ifdef GU_HEADLESS_RESEARCH
-    UINTN repeats=stage==3?2:1;
+    UINTN repeats=stage==3?Full.ChildCount:1;
     for(UINTN child=0;child<repeats;child++) {
 #endif
     s=Note(stage==3?"detach-rtx-edid-intent-shared-pointer-pauses":"detach-nvidia-gop-intent",EFI_SUCCESS);
