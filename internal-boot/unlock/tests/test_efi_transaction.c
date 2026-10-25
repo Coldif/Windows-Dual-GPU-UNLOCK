@@ -137,6 +137,8 @@ static VOID check_fwsec_image(void) {
   CHECK(fw.image_off==0x4239c && fw.image_size==0xde00 && fw.dmem_size==sizeof(gsp_dmem));
 #elif defined(GU_PROFILE_X870_3090TI)
   CHECK(fw.image_off==0x41758 && fw.image_size==0xea00 && fw.dmem_size==sizeof(gsp_dmem)); /* VBIOS 94.02.a0.00.2c */
+#elif defined(GU_PROFILE_B660PLUS_3060)
+  CHECK(fw.image_off==0x416b4 && fw.image_size==0xea00 && fw.dmem_size==sizeof(gsp_dmem)); /* VBIOS 94.04.71.00.87 */
 #else
 #error Pin this profile's FWSEC-FRTS image offset and size from its PROM
 #endif
@@ -402,7 +404,7 @@ static VOID setup(enum scenario mode) {
   *(UINT32 *)(config+0x68)=0x00807805;*(UINT32 *)(config+0x78)=0x0012b410;
   *(UINT32 *)(config+0x7c)=0x112c8de1;*(UINT32 *)(config+0x80)=0x00092930;
   *(UINT32 *)(config+0xc8)=0x00050011;
-  registers[0]=0xb72000a1;registers[0x118128/4]=0x8b8f;registers[0x118234/4]=0x03ff;
+  registers[0]=GU_CHIP_ID;registers[0x118128/4]=0x8b8f;registers[0x118234/4]=0x03ff;
   registers[GSP/4+0x100/4]=0x10;registers[0x1fa824/4]=0x1ffffe00;
   registers[PLM/4]=0xffffff8f;registers[SS0/4]=0x46254040;registers[SS1/4]=3;
   registers[0x1183a4/4]=0x2800;registers[0x625f04/4]=1;registers[0x1fa7c8/4]=0x45cb8f;

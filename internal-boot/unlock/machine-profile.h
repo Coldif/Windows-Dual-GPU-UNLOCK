@@ -10,10 +10,10 @@
  */
 #pragma once
 
-#if (defined(GU_PROFILE_B650M_3090FE) + defined(GU_PROFILE_B660M_3070TI) + defined(GU_PROFILE_X870_3090TI)) > 1
+#if (defined(GU_PROFILE_B650M_3090FE) + defined(GU_PROFILE_B660M_3070TI) + defined(GU_PROFILE_X870_3090TI) + defined(GU_PROFILE_B660PLUS_3060)) > 1
 #error Select exactly one machine profile
 #endif
-#if !defined(GU_PROFILE_B650M_3090FE) && !defined(GU_PROFILE_B660M_3070TI) && !defined(GU_PROFILE_X870_3090TI)
+#if !defined(GU_PROFILE_B650M_3090FE) && !defined(GU_PROFILE_B660M_3070TI) && !defined(GU_PROFILE_X870_3090TI) && !defined(GU_PROFILE_B660PLUS_3060)
 #define GU_PROFILE_B650M_3090FE 1
 #endif
 
@@ -21,10 +21,20 @@
  * (aggregate GOP + text-out driver chain; verified on AMI boards without a
  * second display GPU). 0 = nvgop owns the console GOP on the target directly
  * (original verified B650M headless topology). */
-#if defined(GU_PROFILE_B660M_3070TI)
+#if defined(GU_PROFILE_B660M_3070TI) || defined(GU_PROFILE_B660PLUS_3060)
 #define GU_CONSOLE_AGGREGATE 1
 #else
 #define GU_CONSOLE_AGGREGATE 0
+#endif
+
+/* Aggregate boards whose GPU drives more than one display child: one active
+ * console GOP child plus EDID-only siblings. GU_CONSOLE_CHILD_COUNT is the
+ * exact number of BY_CHILD display controllers nvgop produces; every child is
+ * pinned by path and must be released before the GPU can be reset. Single-child
+ * aggregate boards leave both unset (the release code then requires one child). */
+#if defined(GU_PROFILE_B660PLUS_3060)
+#define GU_CONSOLE_MULTI_CHILD 1
+#define GU_CONSOLE_CHILD_COUNT 2
 #endif
 
 #if defined(GU_PROFILE_X870_3090TI)
@@ -103,6 +113,55 @@
 #define GU_EDID_TEXT_BYTES 0x37daU
 #define GU_EDID_TEXT_SHA256 "a015d52f55fa6441414458e2b699ba2edcb53f03b001ac6367e45bcd908c418e"
 /* nvgop-ga1xx driver shipped for GA104 (binding 0x60010). */
+#define GU_NVGOP_VERSION 0x60010U
+#define GU_NVGOP_IMAGE_SIZE 0x26ae0U
+#define GU_NVGOP_STOP 0x678U
+#define GU_NVGOP_TEXT_BYTES 0x20d33U
+#define GU_NVGOP_TEXT_SHA256 "615b37a708b1894e18d7fa60cfcdacaa4d8b598863a10b8103d231a595847b2b"
+
+#elif defined(GU_PROFILE_B660PLUS_3060)
+
+/* ASUSTeK PRIME B660-PLUS D4 BIOS 3010 (CSM disabled), i5-12600KF (no iGPU),
+ * NVIDIA-subsystem RTX 3060 12GB (GA104, VBIOS 94.04.71.00.87). Same
+ * aggregate-console topology as the B660M/3070 Ti profile; console, combo,
+ * EDID and nvgop fingerprints are identical to it. The one difference is that
+ * nvgop drives two display children (GU_CONSOLE_MULTI_CHILD): the active
+ * console GOP at ADR 0x80010300 plus an EDID-only sibling at 0x80010330.
+ * Values come from two identical read-only probe captures. Not yet
+ * hardware-verified: first GA104 with 0x3000 MiB and first two-child aggregate
+ * console. With CSM enabled the BIOS INT10 driver owns the card and BAR0
+ * moves, so the exact checks below refuse that state. */
+#define GU_PROFILE_NAME "ASUS-PRIME-B660-PLUS-D4-3010-RTX3060"
+#define GU_BOARD_ID 0x248710deU
+#define GU_BOARD_SUBSYSTEM 0x153010deU
+#define GU_BAR0_BASE 0x82000000ULL
+#define GU_BAR0_END 0x82ffffffULL
+#define GU_DEVICE_MEMORY_SIZE 0x3000U
+#define GU_CHIP_ID 0xb74000a1U
+#define GU_PROM_SHA256 "7cc9018e80c63e4aec79c71cd4ed6bdeb5e147aeeb22b21b96efe90887ba8806"
+#define GU_ROOT_PORT_DEVICE 1U
+#define GU_ROOT_PORT_FUNCTION 0U
+/* 36-byte display device path: ACPI root, PciRoot(0), Pci(1,0), Pci(0,0), ADR 0x80010300. */
+#define GU_RTX_PATH_BYTES \
+  2,1,12,0,0xd0,0x41,3,10,0,0,0,0,1,1,6,0,0,1,1,1,6,0,0,0,2,3,8,0,0,3,1,128,127,255,4,0
+/* AMI console splitter text-out driver (BIOS 3010 image fingerprint). */
+#define GU_CONSOLE_TEXT_SIZE 0x6a40U
+#define GU_CONSOLE_TEXT_STOP 0x104cU
+#define GU_CONSOLE_TEXT_VERSION 0x10U
+/* AMI GOP combo splitter C1 GOP (BIOS 3010 image fingerprint). */
+#define GU_CONSOLE_GFX_SIZE 0x3bc0U
+#define GU_CONSOLE_GFX_STOP 0xb2cU
+#define GU_CONSOLE_GFX_VERSION 0x10U
+/* AMI GOP combo aggregate driver present only in this topology. */
+#define GU_COMBO_SIZE 0x2160U
+#define GU_COMBO_STOP 0x88cU
+#define GU_COMBO_VERSION 0x11U
+/* AMI EDID/mouse runtime driver (BIOS 3010 image fingerprint). */
+#define GU_EDID_IMAGE_SIZE 0x9000U
+#define GU_EDID_STOP 0x14d4U
+#define GU_EDID_TEXT_BYTES 0x37daU
+#define GU_EDID_TEXT_SHA256 "a015d52f55fa6441414458e2b699ba2edcb53f03b001ac6367e45bcd908c418e"
+/* nvgop-ga1xx 0x60010: byte-identical .text to the B660M/3070 Ti entry. */
 #define GU_NVGOP_VERSION 0x60010U
 #define GU_NVGOP_IMAGE_SIZE 0x26ae0U
 #define GU_NVGOP_STOP 0x678U
