@@ -1,5 +1,18 @@
 # Changes
 
+## Unreleased — harden the pre-release cold-state read
+
+- Validate memory decoding, disabled bus mastering, the exact raw BAR0 and the
+  existing BAR descriptor/end-tag/checksum policy before any cold-state MMIO.
+- Re-resolve the original handle and require the same PciIo, BDF and complete
+  configuration snapshot before and after the resource allocation/free calls.
+  No release/unlock authority is created by this read-only pre-check.
+- Expand fixture-free pre-check tests with zero-MMIO negative cases for invalid
+  decode/resources, failed services and service-return identity/config drift.
+  The wrapper skips release/unlock when prerequisites cannot be verified.
+- These are software guards, not an atomicity or hardware-safety proof. Existing
+  hardware reports predate this hardening and do not validate the changed build.
+
 ## 2026-10-25 — headless USB media and read-only cold pre-check
 
 - `-DGU_USB_MEDIA` (`internal-boot/unlock/build.ps1 -UsbMedia`, `research/headless/build-usb.ps1`):
@@ -13,8 +26,8 @@
   releasing the display and stopping at `VerifyCold`.
 - USB builds return `EFI_NOT_STARTED` to the firmware boot order when a failure occurs
   before driver release, so a default-boot stick falls through to Windows Boot Manager.
-- New fixture-free host tests: `internal-boot/boot/test-cold-precheck.ps1` (31 pre-check
-  cases incl. zero MMIO writes, plus full-flow gates) and a USB-media case in
+- New fixture-free host tests: `internal-boot/boot/test-cold-precheck.ps1` (pre-check
+  cases including zero-MMIO failure paths, plus full-flow gates) and a USB-media case in
   `test_headless.c` (internal-partition load refused before any hardware effect).
 - See [docs/HEADLESS-USB.en.md](docs/HEADLESS-USB.en.md).
 
