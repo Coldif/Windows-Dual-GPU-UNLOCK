@@ -14,6 +14,9 @@ NAMES = ('fp32_pedantic', 'fp16_tensor_fp32_accumulate',
          'bf16_tensor_fp32_accumulate')
 IDENTITY = ('gpu', 'pci', 'compute_capability', 'cuda_runtime',
             'cuda_driver_api', 'cublas')
+CARDS = {'NVIDIA GeForce RTX 3090': '3090',
+         'NVIDIA GeForce RTX 3090 Ti': '3090ti',
+         'NVIDIA GeForce RTX 3070 Ti': '3070ti'}
 
 
 def require(condition, message):
@@ -63,8 +66,6 @@ def context_key(context):
         require(isinstance(digest, str) and re.fullmatch('[0-9a-fA-F]{64}', digest),
                 'Invalid artifact SHA256')
         normalized[path] = digest.lower()
-    require('bin/compute-benchmark-3090.exe' in normalized,
-            'Missing benchmark executable hash')
     require(any(path.startswith('bin/') and path.endswith('.dll')
                 and 'cublas' in path for path in normalized),
             'Missing cuBLAS DLL hash')
@@ -72,6 +73,9 @@ def context_key(context):
     require(isinstance(settings, list) and len(settings) == 6
             and all(isinstance(value, str) and value.strip() for value in settings),
             'Incomplete GPU settings')
+    require(settings[0] in CARDS, 'Unsupported benchmark GPU model')
+    executable = f'bin/compute-benchmark-{CARDS[settings[0]]}.exe'
+    require(executable in normalized, 'Missing selected benchmark executable hash')
     # Match recorded power/clock limits, but never infer actual clocks from them.
     require(all(re.fullmatch(r'[0-9]+(?:\.[0-9]+)?', value)
                 and float(value) > 0 for value in settings[3:]),

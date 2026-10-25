@@ -135,6 +135,8 @@ static VOID check_fwsec_image(void) {
   /* FWSEC-FRTS location pinned per profile PROM. */
 #if defined(GU_PROFILE_B650M_3090FE)
   CHECK(fw.image_off==0x4239c && fw.image_size==0xde00 && fw.dmem_size==sizeof(gsp_dmem));
+#elif defined(GU_PROFILE_X870_3090TI)
+  CHECK(fw.image_off==0x41758 && fw.image_size==0xea00 && fw.dmem_size==sizeof(gsp_dmem)); /* VBIOS 94.02.a0.00.2c */
 #else
 #error Pin this profile's FWSEC-FRTS image offset and size from its PROM
 #endif
