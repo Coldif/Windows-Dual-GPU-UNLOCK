@@ -16,7 +16,19 @@ VOID Hex(CAPTURE *c,UINT64 v,UINTN digits);
 VOID End(CAPTURE *c);
 VOID Problem(CAPTURE *c,const char *where,EFI_STATUS s);
 
-#define GU_TARGET_VENDEV GU_BOARD_ID
+#ifdef GU_PROBE_GENERIC
+/* Profile-less probe for a new machine: every NVIDIA display controller
+ * (vendor 0x10de, class 0x03) is recorded. Read-only diagnostic builds only. */
+#if !defined(GU_DIAGNOSTIC_ONLY) || !defined(GU_DIAGNOSTIC_PROBE) || defined(GU_FULL_UNLOCK) || defined(GU_EXPERIMENTAL_3090)
+#error GU_PROBE_GENERIC is a read-only diagnostic build only
+#endif
+static BOOLEAN ProbeTarget(EFI_PCI_IO_PROTOCOL *io,UINT32 id) {
+  UINT32 cls=0;
+  return (id&0xffffU)==0x10deU && io->Pci.Read(io,EfiPciIoWidthUint32,8,1,&cls)==EFI_SUCCESS && (cls>>24)==3;
+}
+#else
+static BOOLEAN ProbeTarget(EFI_PCI_IO_PROTOCOL *io,UINT32 id) {(void)io;return id==GU_BOARD_ID;}
+#endif
 static EFI_GUID PciGuidL=EFI_PCI_IO_PROTOCOL_GUID;
 static EFI_GUID BindGuidL=EFI_DRIVER_BINDING_PROTOCOL_GUID;
 static EFI_GUID ImgGuidL=EFI_LOADED_IMAGE_PROTOCOL_GUID;
@@ -83,7 +95,18 @@ static VOID ProbeCaps(CAPTURE *c,EFI_PCI_IO_PROTOCOL *io) {
   }
 }
 
-static VOID ProbeBar(CAPTURE *c,EFI_PCI_IO_PROTOCOL *io,UINT32 bar) {
+/* Host-test fixture only: the same PROM bytes that were hashed, never parsed here. */
+static VOID DumpProm(CAPTURE *c,EFI_FILE_PROTOCOL *root,UINT8 *page) {
+  EFI_FILE_PROTOCOL *f=NULL;
+  EFI_STATUS s=root->Open(root,&f,L"\\RTX3090-UNLOCK\\PROM.BIN",EFI_FILE_MODE_READ|EFI_FILE_MODE_WRITE|EFI_FILE_MODE_CREATE,0);
+  if(s!=EFI_SUCCESS||!f){Problem(c,"prom-open",s);return;}
+  UINTN n=0x100000;s=f->Write(f,&n,page);
+  if(s!=EFI_SUCCESS||n!=0x100000)Problem(c,"prom-write",s==EFI_SUCCESS?EFI_END_OF_FILE:s);
+  else{Text(c,"prom dump=PROM.BIN");End(c);}
+  f->Close(f);
+}
+
+static VOID ProbeBar(CAPTURE *c,EFI_PCI_IO_PROTOCOL *io,UINT32 bar,EFI_FILE_PROTOCOL *root) {
   static const UINT32 offs[]={
     0x000000,0x108154,0x108170,0x108180,0x108354,
     0x118128,0x118234,0x110100,0x1183a4,0x1fa828,
@@ -104,6 +127,7 @@ static VOID ProbeBar(CAPTURE *c,EFI_PCI_IO_PROTOCOL *io,UINT32 bar) {
     if(s==EFI_SUCCESS) {
       GuSha256(page,0x100000,digest);
       Text(c,"prom sha256=");for(UINTN i=0;i<32;i++)Hex(c,digest[i],2);End(c);
+      if(root)DumpProm(c,root,page);else Problem(c,"prom-dump-volume",EFI_NOT_FOUND);
     } else { Problem(c,"prom-read",s); }
     c->Table->BootServices->FreePool(page);
   } else Problem(c,"prom-alloc",s==EFI_SUCCESS?EFI_OUT_OF_RESOURCES:s);
@@ -167,7 +191,7 @@ EFI_STATUS GuProbeGpu(EFI_SYSTEM_TABLE *t,CAPTURE *c) {
     EFI_PCI_IO_PROTOCOL *io=NULL;UINT32 id=0;
     if(bs->HandleProtocol(hs[i],&PciGuidL,(VOID **)&io)!=EFI_SUCCESS||!io)continue;
     if(io->Pci.Read(io,EfiPciIoWidthUint32,0,1,&id)!=EFI_SUCCESS)continue;
-    if(id!=GU_TARGET_VENDEV)continue;
+    if(!ProbeTarget(io,id))continue;
     found++;
     UINTN seg=0,bus=0,dev=0,fun=0;
     if(io->GetLocation(io,&seg,&bus,&dev,&fun)==EFI_SUCCESS) {
@@ -181,7 +205,7 @@ EFI_STATUS GuProbeGpu(EFI_SYSTEM_TABLE *t,CAPTURE *c) {
     UINT32 sub=0;io->Pci.Read(io,EfiPciIoWidthUint32,0x2c,1,&sub);PH(c,"subsystem=0x",sub);
     ProbeCaps(c,io);
     UINT32 bar=cfg[0x10/4]&~0xfU;
-    if(bar)ProbeBar(c,io,bar);else Problem(c,"bar0",EFI_UNSUPPORTED);
+    if(bar)ProbeBar(c,io,bar,root);else Problem(c,"bar0",EFI_UNSUPPORTED);
   }
   if(hs)bs->FreePool(hs);
   Text(c,"probe targets=");Hex(c,found,4);End(c);

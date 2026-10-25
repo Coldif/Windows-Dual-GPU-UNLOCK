@@ -36,6 +36,9 @@
 #error Full unlock and non-unlock experiments must remain separate builds
 #endif
 #endif
+#if defined(GU_USB_PROBE) && !defined(GU_DIAGNOSTIC_ONLY)
+#error GU_USB_PROBE is the read-only diagnostic probe only
+#endif
 
 static EFI_GUID LoadedGuid=EFI_LOADED_IMAGE_PROTOCOL_GUID,FsGuid=EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_GUID;
 static EFI_GUID PathGuid=EFI_DEVICE_PATH_PROTOCOL_GUID;
@@ -210,8 +213,8 @@ static EFI_STATUS LoadUnlock(VOID) {
 #endif
 static EFI_STATUS Prepare(VOID *Context) {
   (void)Context;EFI_HANDLE own=NULL,windows=NULL;
-#ifdef GU_USB_MEDIA
-  /* Unlock from an MBR USB stick: no partition GUID to pin, so the log/child
+#if defined(GU_USB_PROBE) || defined(GU_USB_MEDIA)
+  /* Probe or unlock from an MBR USB stick: no partition GUID to pin, so the log/child
      volume is the device this image was loaded from, and it must be USB. */
   EFI_DEVICE_PATH_PROTOCOL *ownPath=NULL;BOOLEAN usb=FALSE;
   EFI_STATUS s=PathFor(OwnDevice,&ownPath);

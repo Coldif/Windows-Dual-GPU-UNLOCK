@@ -14,6 +14,8 @@ VOID GuLogText(const char *);
 #define GU_TEST_COLD_LINE "cold state: chip=0xb72000a1 plm=0xffffff8f gfw=0x8b8f/0x3ff/0x10 WPR2_HI=0 SS0=0x3100062 SS1=0x6"
 #elif defined(GU_PROFILE_X870_3090TI)
 #define GU_TEST_COLD_LINE "cold state: chip=0xb72000a1 plm=0xffffff8f gfw=0x8b8f/0x3ff/0x10 WPR2_HI=0 SS0=0x40123070 SS1=0x7"
+#elif defined(GU_PROFILE_LOCAL)
+#define GU_TEST_COLD_LINE GU_LOCAL_TEST_COLD_LINE /* make-profile.py, from this machine's capture */
 #else
 #error Add this profile's captured cold-state line (app.c ColdCheck format)
 #endif
