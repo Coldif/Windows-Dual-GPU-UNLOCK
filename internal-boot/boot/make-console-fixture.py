@@ -11,6 +11,15 @@ from pathlib import Path
 
 source = Path(sys.argv[1])
 single = '--single-rtx' in sys.argv[2:]
+def option(name, default):
+    """--name=value override; defaults are the original B650M/3090 FE capture."""
+    for arg in sys.argv[2:]:
+        if arg.startswith(f'--{name}='):
+            return arg.split('=', 1)[1]
+    return default
+rtx_id = option('rtx-id', '220410de')
+amd_id = option('amd-id', '164e1002')
+rtx_fb = option('rtx-fb', '0x000000fcc0000000')
 raw = source.read_bytes()
 text = raw.decode().replace('\r\n', '\n')
 if 'capture-complete=1\n' not in text or 'diagnostic-result status=0x0000000000000000' not in text:
@@ -35,16 +44,19 @@ def one(predicate):
         raise ValueError('Expected exactly one role')
     return indices[values[0]]
 roles = {
-    'RtxPci': one(lambda b: 'pci config-dwords=220410de' in b),
-    'AmdPci': one(lambda b: 'pci config-dwords=164e1002' in b),
-    'Rtx': one(lambda b: 'gop framebuffer=0x000000fcc0000000' in b),
+    'RtxPci': one(lambda b: f'pci config-dwords={rtx_id}' in b),
+    'AmdPci': one(lambda b: f'pci config-dwords={amd_id}' in b),
+    'Rtx': one(lambda b: f'gop framebuffer={rtx_fb}' in b),
     'Amd': 0 if single else one(lambda b: 'gop framebuffer=0x000000fce0000000' in b),
 }
 if single:
     child_records = [e for e in edges if e[0] == roles['RtxPci'] and str(e[3]) == '09576e91-6d3f-11d2-8e39-00a0c969723b' and e[4] == 8 and e[2] != roles['Rtx']]
-    if len(child_records) != 1:
+    # The B650M capture had a second EDID-only RTX child; a one-monitor
+    # capture has none. More than one is still unreviewed.
+    if len(child_records) > 1 or ('--no-edid-child' not in sys.argv[2:] and len(child_records) != 1):
         raise ValueError('Expected one additional RTX EDID-only child')
-    roles['EdidChild'] = child_records[0][2]
+    if child_records:
+        roles['EdidChild'] = child_records[0][2]
 for role, protocol, controller in [
     ('OutAgent', '387477c2-69c7-11d2-8e39-00a0c969723b', roles['Rtx']),
     ('GfxAgent', '9042a9de-23dc-4a38-96fb-7aded080516a', roles['Rtx']),
