@@ -3,6 +3,7 @@
 #include "prepare-console.h"
 EFI_STATUS GuReleaseGop(EFI_SYSTEM_TABLE *Table,EFI_HANDLE Image,GU_PREPARE_LOG Log,VOID *Context);
 EFI_STATUS GuVerifyReleased(EFI_SYSTEM_TABLE *Table,BOOLEAN CheckCold);
+EFI_STATUS GuPeekCold(EFI_SYSTEM_TABLE *Table,UINT32 *Values);
 typedef struct {
   const char *Stage;
   EFI_STATUS Status;

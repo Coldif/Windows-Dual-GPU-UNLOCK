@@ -85,9 +85,8 @@ static EFI_STATUS CheckBar(BOOLEAN first) {
   if(raw && Full.Table->BootServices->FreePool(raw)!=EFI_SUCCESS)s=EFI_DEVICE_ERROR;
   return s;
 }
-static EFI_STATUS Cold(UINT32 *values) {
-  EFI_PCI_IO_PROTOCOL *io=PreparedPlan.RtxIo;
-  if(!io->Mem.Read)return EFI_UNSUPPORTED;
+static EFI_STATUS ColdRead(EFI_PCI_IO_PROTOCOL *io,UINT32 *values) {
+  if(!io || !io->Mem.Read)return EFI_UNSUPPORTED;
   for(UINTN i=0;i<9;i++) {
     EFI_STATUS s=io->Mem.Read(io,EfiPciIoWidthUint32,0,ColdOffsets[i],1,&values[i]);
     if(s!=EFI_SUCCESS)return s;
@@ -96,6 +95,29 @@ static EFI_STATUS Cold(UINT32 *values) {
      values[5]!=0xffffff8f || values[6]==0xffffffff || values[6]==0x88888888 || (values[6]&0xffff0000)==0xbadf0000 ||
      values[7]>15 || values[8]!=GU_DEVICE_MEMORY_SIZE)return EFI_NOT_READY;
   return EFI_SUCCESS;
+}
+static EFI_STATUS Cold(UINT32 *values) {return ColdRead(PreparedPlan.RtxIo,values);}
+/* Read-only check before any driver release: the exact RTX at 0000:01:00.0 is
+ * read through the PciIo its firmware driver still owns; nothing is opened,
+ * written or reconfigured. Any non-cold state (warm restart, already unlocked,
+ * initialized WPR2) returns EFI_NOT_READY so the caller can boot unchanged. */
+EFI_STATUS GuPeekCold(EFI_SYSTEM_TABLE *t,UINT32 *values) {
+  EFI_BOOT_SERVICES *bs=t->BootServices;EFI_HANDLE *handles=NULL;UINTN n=0,found=0;EFI_PCI_IO_PROTOCOL *target=NULL;
+  for(UINTN i=0;i<9;i++)values[i]=0;
+  EFI_STATUS s=bs->LocateHandleBuffer(ByProtocol,&PciGuid,NULL,&n,&handles);
+  if(s==EFI_SUCCESS && (!handles || !n))s=EFI_NOT_FOUND;
+  for(UINTN i=0;s==EFI_SUCCESS && i<n;i++) {
+    EFI_PCI_IO_PROTOCOL *io=NULL;UINTN seg=0,bus=0,dev=0,fun=0;UINT32 cfg[16];
+    if(Interface(bs,handles[i],&PciGuid,(VOID **)&io)!=EFI_SUCCESS || !io->GetLocation || !io->Pci.Read)continue;
+    if(io->GetLocation(io,&seg,&bus,&dev,&fun)!=EFI_SUCCESS || seg || bus!=1 || dev || fun)continue;
+    if(io->Pci.Read(io,EfiPciIoWidthUint32,0,16,cfg)!=EFI_SUCCESS)continue;
+    if(cfg[0]!=GU_BOARD_ID || cfg[11]!=GU_BOARD_SUBSYSTEM || (cfg[2]>>24)!=3)continue;
+    found++;target=io;
+  }
+  if(handles && bs->FreePool(handles)!=EFI_SUCCESS && s==EFI_SUCCESS)s=EFI_DEVICE_ERROR;
+  if(s!=EFI_SUCCESS)return s;
+  if(found!=1)return EFI_NOT_FOUND;
+  return ColdRead(target,values);
 }
 static EFI_STATUS Prom(VOID) {
   EFI_BOOT_SERVICES *bs=Full.Table->BootServices;EFI_PCI_IO_PROTOCOL *io=PreparedPlan.RtxIo;

@@ -59,9 +59,9 @@ BOOLEAN GuLogReady(VOID){return Report && !LogFault;}
 static BOOLEAN UsbPath(EFI_HANDLE Handle) {
   EFI_DEVICE_PATH_PROTOCOL *path=NULL;
   if(EFI_ERROR(Table->BootServices->HandleProtocol(Handle,&PathGuid,(VOID **)&path)) || !path)return FALSE;
-#if defined(GU_AUTOMATIC_BOOT)
+#if defined(GU_AUTOMATIC_BOOT) && !defined(GU_USB_MEDIA)
   return GuPathIsPartition(path,&GuInternalPartition);
-#elif defined(GU_INTERNAL_BOOT)
+#elif defined(GU_INTERNAL_BOOT) && !defined(GU_USB_MEDIA)
   return GuAllowedMediaPath(path,TRUE);
 #else
   UINTN total=0;BOOLEAN usb=FALSE;

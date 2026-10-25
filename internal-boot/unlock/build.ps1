@@ -7,6 +7,7 @@ param(
  [switch]$InternalBoot,
  [switch]$AutomaticBoot,
  [switch]$HeadlessResearch,
+ [switch]$UsbMedia,
  [ValidateSet('original03100062','observed03000062','entryLatchedSs1Preserve','entryLatchedSs1Full')][string]$StockProfile,
  [ValidateSet('b650m-3090fe','b660m-3070ti')][string]$HardwareProfile='b650m-3090fe'
 )
@@ -36,6 +37,8 @@ try {
  }
  if($AutomaticBoot){$out+='/automatic';$name+='-AUTO';$defines+='-DGU_AUTOMATIC_BOOT'}
  if($HeadlessResearch){$out+='/headless-research';$name+='-HEADLESS-RESEARCH';$defines+='-DGU_HEADLESS_RESEARCH'}
+ if($UsbMedia -and !$HeadlessResearch){throw 'USB media is only wired for the headless research child'}
+ if($UsbMedia){$out+='/usb';$name+='-USB';$defines+='-DGU_USB_MEDIA'}
   if($ExperimentalUnlock){$defines+= '-DGU_EXPERIMENTAL_3090';$defines+=$(switch($StockProfile){'original03100062'{'-DGU_STOCK_PROFILE_ORIGINAL_03100062'} 'observed03000062'{'-DGU_STOCK_PROFILE_OBSERVED_03000062'} 'entryLatchedSs1Preserve'{'-DGU_ENTRY_LATCHED_SS1_PRESERVE'} 'entryLatchedSs1Full'{'-DGU_ENTRY_LATCHED_SS1_FULL'}})}
  New-Item -ItemType Directory -Path $out -Force | Out-Null
  $sources=@('app','app_io','ownership','format','runtime','sha256','checks','port','compat',

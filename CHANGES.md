@@ -1,5 +1,23 @@
 # Changes
 
+## 2026-10-25 — headless USB media and read-only cold pre-check
+
+- `-DGU_USB_MEDIA` (`internal-boot/unlock/build.ps1 -UsbMedia`, `research/headless/build-usb.ps1`):
+  the headless wrapper and child run from a FAT32 USB stick and accept only the USB
+  device they were loaded from instead of a pinned internal ESP GUID. The Windows ESP
+  GUID, child SHA256 contract and every exact-profile check are unchanged.
+  `research/headless/stage-usb.ps1` copies the package with hash verification.
+- All full-unlock wrappers now run a read-only cold-state pre-check (`GuPeekCold`)
+  after the Esc window and before any driver release. A non-cold GPU (restart, already
+  unlocked, initialized WPR2) takes the existing skip path to Windows instead of
+  releasing the display and stopping at `VerifyCold`.
+- USB builds return `EFI_NOT_STARTED` to the firmware boot order when a failure occurs
+  before driver release, so a default-boot stick falls through to Windows Boot Manager.
+- New fixture-free host tests: `internal-boot/boot/test-cold-precheck.ps1` (31 pre-check
+  cases incl. zero MMIO writes, plus full-flow gates) and a USB-media case in
+  `test_headless.c` (internal-partition load refused before any hardware effect).
+- See [docs/HEADLESS-USB.en.md](docs/HEADLESS-USB.en.md).
+
 ## 2026-10-24 — v0.3.1 variable headless display-child discovery
 
 - Fixed preflight rejection when ASUS firmware exposes three RTX display

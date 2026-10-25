@@ -3,6 +3,9 @@
 #undef main
 #include "../../boot/media.h"
 static UINT8 Media[46];static int Case,Reads,Outputs;
+#ifdef GU_USB_MEDIA
+static BOOLEAN UseInternalMedia;
+#endif
 static BOOLEAN LatePending,LateDelivered,LatePhysical;
 static EFI_GUID TextGuid=EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_GUID,InputGuid=EFI_SIMPLE_TEXT_INPUT_PROTOCOL_GUID;
 static EFI_STATUS EFIAPI HeadOutput(EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *p,CHAR16 *s){(void)p;(void)s;Outputs++;return EFI_DEVICE_ERROR;}
@@ -66,6 +69,10 @@ static VOID HeadSetup(int mode) {
   LatePending=LateDelivered=LatePhysical=FALSE;
   memset(Media,0,sizeof(Media));Media[0]=4;Media[1]=1;Media[2]=42;Media[4]=1;Media[16]=1;
   memcpy(Media+24,&GuInternalPartition,16);Media[40]=2;Media[41]=2;memcpy(Media+42,(UINT8[]){127,255,4,0},4);
+#ifdef GU_USB_MEDIA
+  /* USB build: the child volume is a USB device path (UsbPath requires one USB node). */
+  if(!UseInternalMedia){memset(Media,0,sizeof(Media));memcpy(Media,(UINT8[]){3,5,6,0,1,0,127,255,4,0},10);}
+#endif
   st.ConsoleInHandle=st.StandardErrorHandle=st.ConsoleOutHandle=H(6);st.StdErr=&conout;conin.WaitForKey=(VOID *)43;
   conout.OutputString=HeadOutput;conin.ReadKeyStroke=HeadKey;
   bs.HandleProtocol=HeadHandle;bs.LocateHandleBuffer=HeadLocate;bs.OpenProtocolInformation=HeadOpens;
@@ -85,5 +92,11 @@ int main(int argc,char **argv) {
     CHECK(current_tpl==TPL_APPLICATION);
     CHECK(!Outputs && !disconnect_calls);dispose_host_fixture();
   }
+#ifdef GU_USB_MEDIA
+  /* A USB build loaded from an internal partition must refuse before any hardware effect. */
+  UseInternalMedia=TRUE;HeadSetup(0);EFI_STATUS internal=run_app();UseInternalMedia=FALSE;
+  CHECK(internal!=EFI_SUCCESS && !Gu.started && !fake.mmio_writes && !fake.master_enables && !fake.flrs);dispose_host_fixture();
+  puts("PASS USB media: USB child volume accepted; internal-partition child volume refused");
+#endif
   puts("PASS headless real app/core: zero-GOP and virtual-only success; physical/invalid GOP, late input/log mutation, Esc, file warning/failure and owner warning blocked; console calls zero");return 0;
 }
