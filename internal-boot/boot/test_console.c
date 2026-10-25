@@ -215,13 +215,14 @@ static EFI_STATUS Run(int scenario) {
 #endif
   AmdPci=(EFI_PCI_IO_PROTOCOL){0};AmdPci.GetLocation=Location;AmdPci.Pci.Read=Read;RtxPci=AmdPci;
   OutBinding=(EFI_DRIVER_BINDING_PROTOCOL){0};GfxBinding=OutBinding;
-  OutBinding.Version=GfxBinding.Version=0x10;
+  /* Fingerprints come from the selected machine profile (B650M: 0x7820/0x1494, 0x48a0/0xf04). */
+  OutBinding.Version=GU_CONSOLE_TEXT_VERSION;GfxBinding.Version=GU_CONSOLE_GFX_VERSION;
   OutBinding.DriverBindingHandle=FX_OutAgent;GfxBinding.DriverBindingHandle=FX_GfxAgent;
   OutBinding.ImageHandle=FX_OutImage;GfxBinding.ImageHandle=FX_GfxImage;
-  OutBinding.Stop=(EFI_DRIVER_BINDING_STOP)(UINTN)0x101494;GfxBinding.Stop=(EFI_DRIVER_BINDING_STOP)(UINTN)0x200f04;
+  OutBinding.Stop=(EFI_DRIVER_BINDING_STOP)(UINTN)(0x100000+GU_CONSOLE_TEXT_STOP);GfxBinding.Stop=(EFI_DRIVER_BINDING_STOP)(UINTN)(0x200000+GU_CONSOLE_GFX_STOP);
   OutImage=(EFI_LOADED_IMAGE_PROTOCOL){0};GfxImage=OutImage;
-  OutImage.ImageBase=(VOID *)0x100000;OutImage.ImageSize=0x7820;OutImage.ImageCodeType=EfiBootServicesCode;
-  GfxImage.ImageBase=(VOID *)0x200000;GfxImage.ImageSize=0x48a0;GfxImage.ImageCodeType=EfiBootServicesCode;
+  OutImage.ImageBase=(VOID *)0x100000;OutImage.ImageSize=GU_CONSOLE_TEXT_SIZE;OutImage.ImageCodeType=EfiBootServicesCode;
+  GfxImage.ImageBase=(VOID *)0x200000;GfxImage.ImageSize=GU_CONSOLE_GFX_SIZE;GfxImage.ImageCodeType=EfiBootServicesCode;
   memcpy(OutFilePath,(UINT8[]){4,6,20,0},4);memcpy(OutFilePath+4,&OutFile,16);memcpy(OutFilePath+20,(UINT8[]){127,255,4,0},4);
   memcpy(GfxFilePath,(UINT8[]){4,6,20,0},4);memcpy(GfxFilePath+4,&GfxFile,16);memcpy(GfxFilePath+20,(UINT8[]){127,255,4,0},4);
   OutImage.FilePath=(VOID *)OutFilePath;GfxImage.FilePath=(VOID *)GfxFilePath;

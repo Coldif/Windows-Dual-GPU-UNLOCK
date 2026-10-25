@@ -132,14 +132,20 @@ static VOID check_fwsec_image(void) {
 #ifdef GU_EXPERIMENTAL_3090
   struct gpu_unlock_fwsec fw;UINT32 sig_at;
   CHECK(!gpu_unlock_vbios_fwsec(prom,sizeof(prom),&fw));
+  /* FWSEC-FRTS location pinned per profile PROM. */
+#if defined(GU_PROFILE_B650M_3090FE)
   CHECK(fw.image_off==0x4239c && fw.image_size==0xde00 && fw.dmem_size==sizeof(gsp_dmem));
+#else
+#error Pin this profile's FWSEC-FRTS image offset and size from its PROM
+#endif
   CHECK(!gpu_unlock_fwsec_sig_offset(fw.sig_versions,2,384,&sig_at));
   UINT64 last_source=((UINT64)registers[(GSP+0x110)/4]<<8)|((UINT64)registers[(GSP+0x128)/4]<<40);
   UINT8 *image=dma_pointer(last_source-fw.data_off,fw.image_size);
   CHECK(!memcmp(gsp_dmem,image+fw.data_off,sizeof(gsp_dmem)));
   CHECK(!memcmp(gsp_dmem+fw.pkc_off,prom+fw.sig_off+sig_at,384));
-  UINT8 expected[0xde00];memcpy(expected,prom+fw.image_off,sizeof(expected));
-  CHECK(!gpu_unlock_fwsec_patch_frts(expected,&fw,0x5ffe00000ULL));
+  static UINT8 expected[0x10000];CHECK(fw.image_size<=sizeof(expected));memcpy(expected,prom+fw.image_off,fw.image_size);
+  /* With the mocked VGA/MMU registers FRTS sits 2 MiB below the reported FB top (B650M: 0x5ffe00000). */
+  CHECK(!gpu_unlock_fwsec_patch_frts(expected,&fw,((UINT64)GU_DEVICE_MEMORY_SIZE<<20)-0x200000ULL));
   memcpy(expected+fw.data_off+fw.pkc_off,prom+fw.sig_off+sig_at,384);
   CHECK(!memcmp(gsp_dmem,expected+fw.data_off,sizeof(gsp_dmem)));
 #else
@@ -158,7 +164,8 @@ static VOID check_booter_publication(void) {
   CHECK(le64(meta+24)==0x5053000 && le64(meta+80)==0xfa00);
   UINT64 delta=0;
 #ifdef GU_EXPERIMENTAL_3090
-  delta=0x380000000ULL;
+  /* Layout is FB-top relative: 10 GiB fixture top 0x280000000 -> profile top (B650M delta 0x380000000). */
+  delta=((UINT64)GU_DEVICE_MEMORY_SIZE<<20)-0x280000000ULL;
 #endif
   CHECK(le64(meta+112)==0x275400000ULL+delta && le64(meta+136)==0x27ada0000ULL+delta);
   CHECK(le64(meta+144)==0x27fdfa000ULL+delta && le64(meta+152)==0x27fe00000ULL+delta);
@@ -325,7 +332,9 @@ static EFI_STATUS EFIAPI write_memory(EFI_PCI_IO_PROTOCOL *p,EFI_PCI_IO_PROTOCOL
     if(fake.mode!=FWSEC_NO_WPR && fake.mode!=PIO_UNAVAILABLE_NO_WPR) {
       registers[0x1fa824/4]=0x27fe000;registers[0x1fa828/4]=0x27feff0;
 #ifdef GU_EXPERIMENTAL_3090
-      registers[0x1fa824/4]=0x5ffe000;registers[0x1fa828/4]=0x5ffeff0;
+      /* Simulated FWSEC-FRTS: WPR2 covers the 1 MiB FRTS region (B650M: 0x5ffe000/0x5ffeff0). */
+      registers[0x1fa824/4]=(UINT32)(((((UINT64)GU_DEVICE_MEMORY_SIZE<<20)-0x200000ULL)>>12)<<4);
+      registers[0x1fa828/4]=registers[0x1fa824/4]+0xff0;
 #endif
     }
     if(fake.mode==FWSEC_ERROR_CODE)registers[0x1438/4]=0x10000;
@@ -396,7 +405,7 @@ static VOID setup(enum scenario mode) {
   registers[PLM/4]=0xffffff8f;registers[SS0/4]=0x46254040;registers[SS1/4]=3;
   registers[0x1183a4/4]=0x2800;registers[0x625f04/4]=1;registers[0x1fa7c8/4]=0x45cb8f;
 #ifdef GU_EXPERIMENTAL_3090
-  registers[SS0/4]=GU_STOCK_PROFILE_SS0;registers[SS1/4]=6;registers[0x1183a4/4]=0x6000;
+  registers[SS0/4]=GU_STOCK_PROFILE_SS0;registers[SS1/4]=6;registers[0x1183a4/4]=GU_DEVICE_MEMORY_SIZE;
 #endif
   registers[0x1fa82c/4]=0x100000;registers[0x1fa830/4]=0x26ffff0;
   registers[0x824148/4]=1;registers[0x8241e0/4]=3;
