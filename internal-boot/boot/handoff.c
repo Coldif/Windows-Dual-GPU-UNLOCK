@@ -287,7 +287,7 @@ static EFI_STATUS FullChoice(VOID *Context,BOOLEAN *Skip) {
   if(r==EFI_SUCCESS)r=Record(NULL,"pre-release-cold-ss0",cold[6]);
   if(r!=EFI_SUCCESS)return r;
   if(c!=EFI_SUCCESS) {
-    Say(L"GPU is not in its power-on state (restart or already unlocked).\r\nStarting Windows unchanged. Shut down fully to unlock on the next boot.\r\n");
+    Say(L"GPU cold-state prerequisites could not be verified.\r\nStarting Windows without driver release or unlock. Check the pre-release log before another attempt.\r\n");
     *Skip=TRUE;
   }
   return EFI_SUCCESS;

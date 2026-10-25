@@ -2,38 +2,50 @@
 
 **English** | [한국어](README.ko.md)
 
-Experimental UEFI unlock and direct Windows handoff for one documented **RTX 3090
-Founders Edition / ASUS BIOS 3057** system. **v0.3.1 is a source-only pre-release**:
-build the internal EFI for your own partition GUIDs. Firmware assets and private,
-partition-specific EFI binaries are not bundled with this release.
+Experimental UEFI GPU unlock and direct Windows handoff, expanded through
+community contributions. This source tree contains **three exact-machine
+profiles with recorded hardware results**: two internal headless configurations
+and one headless USB configuration. Read [compatibility](docs/COMPATIBILITY.en.md)
+before choosing a build; a GPU model name alone does not establish support.
 
-On October 24, 2026, the system completed an internal **headless unlock** with all
-monitors on the RTX: one active RTX GOP before release, zero physical GOPs afterward,
-one automatic unlock transaction, and Windows display recovery. Subsequent Windows
-measurements reached **FP16 124.97 / BF16 128.93 TFLOPS** (three-run medians).
-[Evidence and limitations](evidence/headless-handoff/README.md).
+| Build profile | Exact GPU / motherboard / BIOS / CPU | Recorded route and evidence |
+|---|---|---|
+| `b650m-3090fe` (default) | RTX 3090 FE / ASUS TUF GAMING B650M-PLUS WIFI / 3057 / Ryzen 7 7800X3D | Internal headless; [original maintainer's hardware evidence](evidence/headless-handoff/README.md) |
+| `b660m-3070ti` | MSI RTX 3070 Ti / ASUS TUF GAMING B660M-E D4 / 4003 / Core i7-12700F **without iGPU** | Internal headless, aggregate console; [contributor's report and implementation, PR #5](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/5) |
+| `x870-3090ti` | ASUS RTX 3090 Ti / Gigabyte X870 AORUS ELITE WIFI7 / F13d / Ryzen 7 9800X3D | **Headless USB only**; [contributor's PR #10](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/10), [sanitized evidence](evidence/x870-3090ti-usb/README.md) |
 
-v0.3.1 fixes preflight rejection when firmware exposes more than two RTX display
-children. The rebuilt wrapper completed automatic unlock and Windows handoff on
-the same system; no new performance benchmark was run for this build.
+These results concern the exact builds and systems in their reports. The current
+cold-precheck hardening has host/build verification, **not a new physical boot or
+recovery test** on those machines. Contributor reports are identified separately
+from the original maintainer's run; they do not establish support for every card
+of the same model or every BIOS. The Ryzen CPUs in the table have iGPUs, but their
+reported headless routes used no active AMD GOP.
 
-This is one machine and boot, not general RTX 3090 support. The Ryzen 7 7800X3D
-**has an iGPU**; the experiment used no active AMD GOP. CPUs without an iGPU,
-Intel hosts, other cards and other BIOS versions remain unverified.
-Read [compatibility](docs/COMPATIBILITY.en.md) first.
+The latest tagged release, **v0.3.1, is a source-only pre-release**. This source
+tree has changes beyond that tag, including the USB route and X870 profile; those
+are not a newly published release. Build locally with your own partition GUIDs.
+Firmware assets and private, partition-specific EFI binaries are not bundled.
 
 ## Choose the correct boot path
 
 | Path | Display and input | Instructions |
 |---|---|---|
-| **Internal headless** | Monitors on RTX; display temporarily removed; no T/U/Enter | [Headless guide](docs/HEADLESS.en.md): one actual unlock + Windows handoff verified |
-| Internal AMD-display manual / Auto | Motherboard/iGPU display preserved; manual variant requires U | [Existing internal guide](docs/INTERNAL-BOOT.en.md) |
-| Legacy USB manual | AMD/iGPU display; U once, then Boot Override to Windows without reset | [USB guide](docs/GUIDE.en.md) |
+| **Internal headless** | B650M/3090 FE or B660M/3070 Ti profile; monitors on RTX; display temporarily removed; no T/U/Enter | [Internal headless guide](docs/HEADLESS.en.md) |
+| **Headless USB** | X870/3090 Ti contributor-tested route; profile-specific wrapper and child on a FAT32 USB stick | [Headless USB guide](docs/HEADLESS-USB.en.md) |
+| Internal AMD-display manual / Auto | Original B650M profile, motherboard/iGPU display preserved; manual variant requires U | [Existing internal guide](docs/INTERNAL-BOOT.en.md) |
+| Legacy USB manual | Original AMD/iGPU display profile; U once, then Boot Override to Windows without reset | [Legacy USB guide](docs/GUIDE.en.md) |
 
-**Headless USB boot has not been tested.** The legacy USB EFI still requires its AMD
-display profile. BIOS priority `USB → Windows` alone does not implement direct handoff.
+X870 is not wired into `Configure.ps1` or `Headless.ps1`; use its USB guide.
+USB packages can also be built for the first two profiles, but their recorded
+internal boots do not validate those USB routes. The legacy USB EFI retains its
+AMD display requirement. BIOS priority `USB → Windows` alone does not implement
+direct handoff.
 
 ## Internal headless quick start
+
+**This example is for the default B650M / RTX 3090 FE profile.** For B660M,
+select `-HardwareProfile b660m-3070ti` in both configuration and build as described
+in [compatibility](docs/COMPATIBILITY.en.md). X870 uses the separate USB route.
 
 Read the [full guide and recovery procedure](docs/HEADLESS.en.md) before changing
 boot settings. Use the exact supported hardware, Secure Boot disabled, a fully
@@ -96,9 +108,9 @@ Windows-first recovery is independent of experimental EFI/build artifacts and
 still works without saved state. Restoring the prior Fast Startup setting needs
 that state; retain it and backups. [Recovery details](docs/HEADLESS.en.md#recovery).
 
-## Results and limits
+## Original B650M results and limits
 
-The successful child reported SS0 `0x88888888`, SS1 `0x8`, BME disabled, zero
+The original B650M hardware run's successful child reported SS0 `0x88888888`, SS1 `0x8`, BME disabled, zero
 remaining mappings, completed cleanup and one FLR. The wrapper verified the released
 topology before Windows entry. Windows display recovery was observed by the operator.
 
@@ -113,6 +125,11 @@ so these values do not establish an unlock percentage. They do not establish gam
 or ComfyUI gains, long-term stability, sleep/hibernate resume or repeated automatic
 cold-boot reliability. [Sanitized measurements](evidence/headless-handoff/summary.json)
 and [earlier results](docs/RESULTS.en.md) describe separate experiments.
+
+For the other machines' measurements, see [B660M Profile 2](docs/COMPATIBILITY.en.md)
+and [X870 USB evidence](evidence/x870-3090ti-usb/README.md). Those results are tied
+to their reported builds; a later successful build or host test does not extend
+the physical test record.
 
 ## Implementation and boundaries
 

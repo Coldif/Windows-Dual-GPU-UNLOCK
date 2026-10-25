@@ -29,7 +29,8 @@ if ($LASTEXITCODE -ne 0) { throw 'Metadata-only binary check failed' }
 $versions = $inspect | ConvertFrom-Json
 if ($versions.cuda_runtime -ne 12060 -or $versions.cublas_major -ne 12 -or $versions.cublas_minor -ne 6 -or $versions.cublas_patch -ne 0) { throw 'Unexpected CUDA/cuBLAS version' }
 $inspect | Set-Content -LiteralPath (Join-Path $root 'runtime-verification.json') -Encoding utf8
-$artifactPaths = @((Join-Path $root "compute-benchmark-$Card.cu"),(Join-Path $root 'upstream-compute-benchmark.cu')) + @(Get-ChildItem -LiteralPath $bin -File | Select-Object -ExpandProperty FullName)
+$selectedArtifactNames = @("compute-benchmark-$Card.exe","compute-benchmark-$Card.exp","compute-benchmark-$Card.lib")
+$artifactPaths = @((Join-Path $root "compute-benchmark-$Card.cu"),(Join-Path $root 'upstream-compute-benchmark.cu')) + @(Get-ChildItem -LiteralPath $bin -File | Where-Object { $_.Name -in $selectedArtifactNames -or $_.Extension -ieq '.dll' } | Select-Object -ExpandProperty FullName)
 $artifactPaths | ForEach-Object { $f = Get-Item -LiteralPath $_; [pscustomobject]@{Path=$f.FullName.Substring($root.Length+1);Bytes=$f.Length;SHA256=(Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256).Hash} } |
     ConvertTo-Json -Depth 3 | Set-Content -LiteralPath (Join-Path $root 'build-manifest.json') -Encoding utf8
 Write-Output $inspect

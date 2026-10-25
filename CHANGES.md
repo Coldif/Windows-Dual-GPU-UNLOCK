@@ -26,6 +26,18 @@
   profile (19 jobs incl. the production transaction against the card's real PROM), plus
   `test_make_profile.py` refusal cases built by mutating the machine's own captures.
 
+## Unreleased — integrate the third profile with matched benchmark evidence
+
+- Preserve the hardened pre-release checks while integrating the exact X870 /
+  RTX 3090 Ti USB profile. Historical contributor measurements retain their
+  original build provenance; the merged build has no new physical boot claim.
+- Match benchmark GPU selection, executable hashes and offline comparison across
+  3090 / 3090 Ti / 3070 Ti. Build manifests include only the selected model's
+  artifacts and shared DLLs; missing or duplicate selected executable hashes
+  reject before execution. The default 3090 protocol is unchanged.
+- Refresh English/Korean README and compatibility entries with all three exact
+  profiles, contributor evidence and the X870 USB-only installation boundary.
+
 ## 2026-10-25 — Gigabyte X870 / RTX 3090 Ti machine profile (headless USB)
 
 - Added `-DGU_PROFILE_X870_3090TI` (`-HardwareProfile x870-3090ti` in `unlock/build.ps1`,
@@ -33,14 +45,28 @@
   WIFI7 BIOS F13d, Ryzen 7 9800X3D, ASUS RTX 3090 Ti `10de:2203`/`1043:8870`. Non-aggregate
   single-RTX console. The card reports `0x5ff4` MiB, so the WPR layout sits 12 MiB lower than on
   the B650M (`frts=0x5ff200000`); FWSEC-FRTS is at PROM `0x41758` (`0xea00` bytes).
-- Hardware verified from a USB stick: three clean transactions (two full shutdowns, one Windows
+- Contributor-reported hardware verification from a USB stick: three clean transactions (two full shutdowns, one Windows
   restart), direct Windows start with display recovery, cuBLAS GEMM n=4096 medians BF16
-  81.0 → 150.2 / FP16 80.4 → 149.3 TFLOPS. The wrapper/child pair rebuilt from this tree is
-  byte-identical to the one measured (wrapper `19a145a2...`, child `6ffe6165...`).
+  81.0 → 150.2 / FP16 80.4 → 149.3 TFLOPS. The original `7b578247` contribution reports
+  byte-identical rebuilds of the measured pair (wrapper `19a145a2...`, child `6ffe6165...`).
+  These hashes do not identify the later hardened merged build.
 - Per-profile test pins for the X870 cold-state line and FWSEC-FRTS location.
 - `benchmark/compute-benchmark-3090ti.cu`; `build.ps1`/`run-benchmark.ps1` take
   `-Card 3090|3090ti|3070ti` (default `3090`) and `build.ps1 -AllowUnsupportedCompiler` for MSVC
   14.4x with CUDA 12.6.
+
+## Unreleased — harden the pre-release cold-state read
+
+- Validate memory decoding, disabled bus mastering, the exact raw BAR0 and the
+  existing BAR descriptor/end-tag/checksum policy before any cold-state MMIO.
+- Re-resolve the original handle and require the same PciIo, BDF and complete
+  configuration snapshot before and after the resource allocation/free calls.
+  No release/unlock authority is created by this read-only pre-check.
+- Expand fixture-free pre-check tests with zero-MMIO negative cases for invalid
+  decode/resources, failed services and service-return identity/config drift.
+  The wrapper skips release/unlock when prerequisites cannot be verified.
+- These are software guards, not an atomicity or hardware-safety proof. Existing
+  hardware reports predate this hardening and do not validate the changed build.
 
 ## 2026-10-25 — headless USB media and read-only cold pre-check
 
@@ -55,10 +81,23 @@
   releasing the display and stopping at `VerifyCold`.
 - USB builds return `EFI_NOT_STARTED` to the firmware boot order when a failure occurs
   before driver release, so a default-boot stick falls through to Windows Boot Manager.
-- New fixture-free host tests: `internal-boot/boot/test-cold-precheck.ps1` (31 pre-check
-  cases incl. zero MMIO writes, plus full-flow gates) and a USB-media case in
+- New fixture-free host tests: `internal-boot/boot/test-cold-precheck.ps1` (pre-check
+  cases including zero-MMIO failure paths, plus full-flow gates) and a USB-media case in
   `test_headless.c` (internal-partition load refused before any hardware effect).
 - See [docs/HEADLESS-USB.en.md](docs/HEADLESS-USB.en.md).
+
+## Unreleased — issue #21 handoff and controlled benchmark comparison
+
+- Inspired by Doug Sharp's same-machine before/after evidence in issue #21,
+  preserve build/runtime/GPU-setting provenance with each benchmark run and
+  hash the completed raw evidence. Check recorded GPU settings after each trial.
+- Add an offline comparison tool with explicit same-machine confirmation,
+  protocol/metadata checks, median-of-three ratios and the FP32 control change.
+  Partial, mismatched and modified evidence is refused. Existing GPU workload
+  and EFI/boot behavior are unchanged; no new hardware support is claimed.
+- Record attachment provenance, source-review findings and missing launcher/
+  firmware provenance in `docs/research/ISSUE21_HANDOFF.ko.md`. The contributed
+  EFI sources remain a local research input, not an integrated executable path.
 
 ## 2026-10-24 — v0.3.1 variable headless display-child discovery
 
