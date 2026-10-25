@@ -21,11 +21,27 @@ function Assert-GpuIdle {
     if ([int]$fields[5] -gt 65) { throw 'GPU is still hot. Let it cool before a comparable measurement.' }
     return $rows[0]
 }
+function Get-ComparisonSettings {
+    $rows = @(& nvidia-smi --query-gpu=name,pci.bus_id,driver_version,power.limit,clocks.max.sm,clocks.max.memory --format=csv,noheader,nounits)
+    if ($LASTEXITCODE -ne 0 -or $rows.Count -ne 1) { throw 'Could not capture comparison settings' }
+    $fields = @($rows[0] -split ',' | ForEach-Object { $_.Trim() })
+    if ($fields.Count -ne 6 -or $fields[0] -ne 'NVIDIA GeForce RTX 3090' -or $fields[1] -notmatch '^0+:01:00\.0$') { throw 'Unexpected comparison GPU identity' }
+    return $fields
+}
 $initialState = Assert-GpuIdle
+$settings = @(Get-ComparisonSettings)
 $resultRoot = Join-Path $root ('results\' + (Get-Date -Format 'yyyyMMdd-HHmmss-fff'))
 if (Test-Path -LiteralPath $resultRoot) { throw 'Result directory exists' }
 New-Item -ItemType Directory -Path $resultRoot | Out-Null
 $initialState | Set-Content -LiteralPath (Join-Path $resultRoot 'gpu-before.csv') -Encoding utf8
+# Snapshot provenance with the results, so a later rebuild cannot replace it.
+# These values do not prove physical machine identity or unchanged overclock settings.
+[pscustomobject]@{
+    schema_version = 1
+    artifacts = @($manifest)
+    runtime = ($inspect | ConvertFrom-Json)
+    gpu_settings = $settings
+} | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $resultRoot 'comparison-context.json') -Encoding utf8
 $measurements = @()
 for ($trial = 1; $trial -le 3; $trial++) {
     # The initial check protects existing workloads. Trials themselves may leave transient utilization/heat.
@@ -38,6 +54,8 @@ for ($trial = 1; $trial -le 3; $trial++) {
     & nvidia-smi --query-gpu=timestamp,driver_version,clocks.sm,power.draw,temperature.gpu,clocks_event_reasons.sw_thermal_slowdown --format=csv |
         Set-Content -LiteralPath (Join-Path $resultRoot "trial-$trial-gpu-after.csv") -Encoding utf8
     if ($LASTEXITCODE -ne 0) { throw 'GPU telemetry failed; preserve partial results' }
+    $currentSettings = @(Get-ComparisonSettings)
+    if (($settings -join "`n") -cne ($currentSettings -join "`n")) { throw 'GPU comparison settings changed; preserve partial results' }
 }
 $summary = @()
 foreach ($name in @('fp32_pedantic','fp16_tensor_fp32_accumulate','bf16_tensor_fp32_accumulate')) {
@@ -45,5 +63,11 @@ foreach ($name in @('fp32_pedantic','fp16_tensor_fp32_accumulate','bf16_tensor_f
     $summary += [pscustomobject]@{Name=$name;MedianTflops=$values[1];MinTflops=$values[0];MaxTflops=$values[2]}
 }
 $summary | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $resultRoot 'summary.json') -Encoding utf8
+# Written last: partial/failed runs must never qualify for offline comparison.
+$completedFiles = @('comparison-context.json','trial-1.json','trial-2.json','trial-3.json') | ForEach-Object {
+    [pscustomobject]@{Path=$_;SHA256=(Get-FileHash -LiteralPath (Join-Path $resultRoot $_) -Algorithm SHA256).Hash}
+}
+[pscustomobject]@{schema_version=1;files=@($completedFiles)} | ConvertTo-Json -Depth 4 |
+    Set-Content -LiteralPath (Join-Path $resultRoot 'comparison-complete.json') -Encoding utf8
 $summary | Format-Table -AutoSize
 Write-Output "Three trials saved to $resultRoot. These are current-state measurements; no pre-unlock baseline or speedup is implied."

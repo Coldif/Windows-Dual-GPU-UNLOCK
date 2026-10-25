@@ -18,6 +18,19 @@
   `test_headless.c` (internal-partition load refused before any hardware effect).
 - See [docs/HEADLESS-USB.en.md](docs/HEADLESS-USB.en.md).
 
+## Unreleased — issue #21 handoff and controlled benchmark comparison
+
+- Inspired by Doug Sharp's same-machine before/after evidence in issue #21,
+  preserve build/runtime/GPU-setting provenance with each benchmark run and
+  hash the completed raw evidence. Check recorded GPU settings after each trial.
+- Add an offline comparison tool with explicit same-machine confirmation,
+  protocol/metadata checks, median-of-three ratios and the FP32 control change.
+  Partial, mismatched and modified evidence is refused. Existing GPU workload
+  and EFI/boot behavior are unchanged; no new hardware support is claimed.
+- Record attachment provenance, source-review findings and missing launcher/
+  firmware provenance in `docs/research/ISSUE21_HANDOFF.ko.md`. The contributed
+  EFI sources remain a local research input, not an integrated executable path.
+
 ## 2026-10-24 — v0.3.1 variable headless display-child discovery
 
 - Fixed preflight rejection when ASUS firmware exposes three RTX display

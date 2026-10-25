@@ -9,9 +9,16 @@ VOID GuLogText(const char *);
    its checks or needing to weaken production asset authentication. */
 #include "../app.c"
 
+/* Authenticated cold line of each profile's own capture (app.c ColdCheck format). */
+#if defined(GU_PROFILE_B650M_3090FE)
+#define GU_TEST_COLD_LINE "cold state: chip=0xb72000a1 plm=0xffffff8f gfw=0x8b8f/0x3ff/0x10 WPR2_HI=0 SS0=0x3100062 SS1=0x6"
+#else
+#error Add this profile's captured cold-state line (app.c ColdCheck format)
+#endif
 static void exact_load(const char *prom_path,const char *capture_path) {
   size_t n;UINT8 *data=read_file(prom_path,&n);CHECK(n==sizeof(prom));
-  CHECK(GuHashMatches(data,n,"8ea297373e9e5d3600ff41ad9fae88f2d14c98c017d100669f7333981da673b4"));
+  CHECK(GuHashMatches(data,n,GU_PROM_SHA256));
+  char memory_text[32];snprintf(memory_text,sizeof(memory_text),"memory=%#x",GU_DEVICE_MEMORY_SIZE);
   memcpy(prom,data,n);free(data);
   FILE *file=fopen(capture_path,"r");CHECK(file);char line[512];unsigned count=0,offset,a,b,c,d;
   BOOLEAN cold=FALSE,memory=FALSE;
@@ -22,8 +29,8 @@ static void exact_load(const char *prom_path,const char *capture_path) {
     }
      /* Authenticate the original capture. The selected SS0 in exact_setup is
         simulated input, not a claim that this capture contains the other SS0. */
-     if(strstr(line,"cold state: chip=0xb72000a1 plm=0xffffff8f gfw=0x8b8f/0x3ff/0x10 WPR2_HI=0 SS0=0x3100062 SS1=0x6"))cold=TRUE;
-    if(strstr(line,"memory=0x6000"))memory=TRUE;
+     if(strstr(line,GU_TEST_COLD_LINE))cold=TRUE;
+    if(strstr(line,memory_text))memory=TRUE;
   }
   fclose(file);CHECK(count==64 && cold && memory);
 }
@@ -33,7 +40,7 @@ static void exact_setup(enum app_case mode) {
   infos[0].HorizontalResolution=infos[0].PixelsPerScanLine=2560;infos[0].VerticalResolution=1440;
   modes[0].Mode=0;modes[0].MaxMode=13;modes[0].FrameBufferBase=0xfce0000000ULL;modes[0].FrameBufferSize=0xe10000;
   registers[0]=0xb72000a1;registers[SS0/4]=GU_STOCK_PROFILE_SS0;registers[SS1/4]=6;
-  registers[0x1183a4/4]=0x6000;
+  registers[0x1183a4/4]=GU_DEVICE_MEMORY_SIZE;
 }
 static EFI_STATUS EFIAPI changed_cold_disconnect(EFI_HANDLE h,EFI_HANDLE a,EFI_HANDLE c) {
   EFI_STATUS result=disconnect(h,a,c);registers[SS0/4]^=1;return result;

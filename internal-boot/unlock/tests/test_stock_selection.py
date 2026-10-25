@@ -6,7 +6,7 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 CLANG = sys.argv[1]
 BASE = [CLANG, '-std=c11', '-fsyntax-only', '-x', 'c', '-',
-        '-I../deps/edk2/MdePkg/Include', '-I../deps/edk2/MdePkg/Include/X64']
+        '-I../../deps/edk2/MdePkg/Include', '-I../../deps/edk2/MdePkg/Include/X64']
 EXP = '-DGU_EXPERIMENTAL_3090'
 ORIGINAL = '-DGU_STOCK_PROFILE_ORIGINAL_03100062'
 OBSERVED = '-DGU_STOCK_PROFILE_OBSERVED_03000062'
