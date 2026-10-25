@@ -2,11 +2,26 @@
 
 **English** | [한국어](COMPATIBILITY.ko.md)
 
-The current implementation checks more than a model name. Two machines have
-recorded successful internal headless boots. Builds compile for exactly one
-reviewed profile selected at build time in
+The current source contains three exact-machine profiles with recorded hardware
+results: two internal headless configurations and one headless USB configuration.
+The original B650M run was performed by the maintainer; B660M and X870 evidence
+comes from contributors ([PR #5](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/5),
+[PR #10](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/10)). Builds compile
+for exactly one reviewed profile selected at build time in
 [internal-boot/unlock/machine-profile.h](../internal-boot/unlock/machine-profile.h);
 other GPUs or platforms remain unsupported.
+
+| Build profile | Exact platform / CPU | Recorded headless route |
+|---|---|---|
+| `b650m-3090fe` | ASUS TUF GAMING B650M-PLUS WIFI BIOS 3057 / Ryzen 7 7800X3D / RTX 3090 FE | Internal; original maintainer's run |
+| `b660m-3070ti` | ASUS TUF GAMING B660M-E D4 BIOS 4003 / i7-12700F (no iGPU) / MSI RTX 3070 Ti | Internal; contributor report |
+| `x870-3090ti` | Gigabyte X870 AORUS ELITE WIFI7 BIOS F13d / Ryzen 7 9800X3D / ASUS RTX 3090 Ti | USB only; contributor report |
+
+The latest tag is the source-only pre-release v0.3.1; this source tree includes
+later work, including the USB route and X870 profile. Hardware reports describe
+their recorded builds. Current cold-precheck hardening has host/build validation
+but no new physical boot/recovery result; compiling a profile is not a new
+hardware verification. See each report's provenance and limitations below.
 
 ## Profile 1: ASUS TUF B650M / RTX 3090 FE (original)
 
@@ -33,7 +48,7 @@ the user's own Windows/dedicated ESP GUID configuration.
 |---|---|
 | Legacy USB / ordinary internal builds | Preserve AMD physical GOP, PCI `1002:164e`, subsystem `1043:8877`, BDF `0000:0c:00.0` and validated display ancestry |
 | Internal headless profile | One RTX physical GOP before release, zero physical GOP afterward; stable console/input interfaces, protected ownership graph, file-only child logging |
-| Headless USB (`GU_USB_MEDIA`) | Profile 3 below; one RTX physical GOP, same release policy as the internal headless profile, wrapper/child accept only their own USB device |
+| Headless USB (`GU_USB_MEDIA`) | Buildable for this profile; its recorded B650M headless run used the internal route. The contributor's USB hardware evidence is for Profile 3 below |
 
 The headless test had all monitors on RTX and no active AMD GOP. The 7800X3D
 still contains an iGPU; BIOS disablement is not established by a missing GOP.
@@ -42,7 +57,8 @@ is preserved behind the same build-time checks.
 
 ## Profile 2: ASUS TUF B660M-E D4 / RTX 3070 Ti (aggregate console)
 
-A second hardware-verified headless profile: Intel host **without an iGPU**,
+A contributor-reported successful internal headless profile
+([PR #5](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/5)): Intel host **without an iGPU**,
 so the NVIDIA driver owns the console GOP and the AMI GOP combo splitter
 serves the system console on top of it. The wrapper releases the nvgop/EDID/
 splitter ownership chain, runs one unlock transaction and chain-loads Windows
@@ -72,7 +88,7 @@ and `internal-boot/Configure.ps1 -HardwareProfile b660m-3070ti`; the default
 
 ## Profile 3: Gigabyte X870 AORUS ELITE WIFI7 / RTX 3090 Ti (headless USB)
 
-A third hardware-verified headless profile and the first using the USB route
+A contributor-reported successful headless profile and the first using the USB route
 ([headless USB guide](HEADLESS-USB.en.md)). All monitors on the RTX; the Ryzen
 iGPU is present on PCI without an active GOP, like the B650M case. Console
 topology is the non-aggregate single-RTX one (`GU_CONSOLE_AGGREGATE 0`).
@@ -91,7 +107,7 @@ topology is the non-aggregate single-RTX one (`GU_CONSOLE_AGGREGATE 0`).
 | UEFI / Secure Boot | x64 / disabled |
 | Selector profile | `entryLatchedSs1Full`; targets SS0 `0x88888888`, SS1 `0x8` |
 
-Three clean transactions (two full shutdowns, one Windows restart; this board
+The contributor reports three clean transactions (two full shutdowns, one Windows restart; this board
 resets the GPU on restart). cuBLAS GEMM n=4096 medians: BF16 81.0 → 150.2 and
 FP16 80.4 → 149.3 TFLOPS. Entry selectors differ per power-on (`0x40123070/3`,
 `0x44123070/7`, `0/0`). [Evidence](../evidence/x870-3090ti-usb/README.md).
@@ -100,20 +116,29 @@ Build with `research/headless/build-usb.ps1 -HardwareProfile x870-3090ti`. The
 internal-ESP installer (`Configure.ps1`, `Headless.ps1`) is not wired for this
 profile.
 
+The X870 evidence and byte-identical build statement refer to original PR #10
+revision `7b578247a28ff66f2707bea5af0e3943aede7974`, before the current main's
+cold-precheck hardening. The old wrapper/child hashes are historical provenance,
+not expected hashes for a new build. The updated build has no new X870 physical
+boot report. [Evidence provenance](../evidence/x870-3090ti-usb/README.md).
+
+## Scope beyond the recorded configurations
+
 | Other configuration | Status |
 |---|---|
-| Same exact machine, F8-selected headless automatic child | One unlock + Windows display recovery + Tensor measurement verified on 2026-10-24 |
-| Default automatic startup across repeated cold boots | Not established by that one F8 trial |
+| Original B650M, F8-selected internal headless automatic child | One unlock + Windows display recovery + Tensor measurement verified on 2026-10-24 |
+| Default automatic startup across repeated cold boots | Not established by the limited supervised runs |
 | Another RTX 3090, even a Founders Edition in another PC | Unverified; exact checks may reject |
 | Another ASUS BIOS, AMD board/CPU or Intel host | Unverified; separate profile and validation required |
-| CPU without iGPU (Intel host, aggregate console) | One hardware-verified profile below; still not generalized |
+| CPU without iGPU (Intel host, aggregate console) | One contributor-reported profile above; still not generalized |
 | Multiple discrete GPUs, laptop/hybrid setup | Unverified |
 | Other NVIDIA models/architectures | Separate GPU port and validation required |
 | AMD Radeon / Intel discrete unlock target | No unlock implementation here |
 | Games, ComfyUI, sleep/hibernate resume, long-term stability | Not established by GEMM/boot evidence |
 
-See [headless instructions](HEADLESS.en.md), [legacy USB instructions](GUIDE.en.md)
-and [sanitized evidence](../evidence/headless-handoff/README.md).
+See [internal headless instructions](HEADLESS.en.md),
+[headless USB instructions](HEADLESS-USB.en.md), [legacy USB instructions](GUIDE.en.md)
+and the [original B650M evidence](../evidence/headless-handoff/README.md).
 The ordinary source guards remain in [root unlock](../unlock/app.c); the separate
 headless implementation is in [internal unlock](../internal-boot/unlock/app.c),
 [headless policy](../internal-boot/unlock/headless-policy.h) and

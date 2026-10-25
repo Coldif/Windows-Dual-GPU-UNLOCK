@@ -2,37 +2,47 @@
 
 [English](README.md) | **한국어**
 
-한 대의 **RTX 3090 Founders Edition / ASUS BIOS 3057** 시스템에서 검증한 실험용 UEFI
-언락과 Windows 직접 인계 구현입니다. **v0.3.1은 소스 전용 사전 릴리스**입니다.
-자신의 파티션 GUID로 내부 EFI를 빌드해야 하며, 펌웨어와 개인 파티션 설정이 들어간
-EFI 바이너리는 이번 릴리스에 포함하지 않습니다.
+커뮤니티 기여로 확장하는 실험용 UEFI GPU 언락과 Windows 직접 인계 구현입니다.
+현재 소스에는 **실기기 결과가 기록된 정확한 장비 프로필 세 개**가 있습니다.
+내부 headless 두 구성과 headless USB 한 구성입니다. GPU 모델명만으로 지원을
+판단하지 말고 빌드 전에 [호환성](docs/COMPATIBILITY.ko.md)을 확인하세요.
 
-2026-10-24에는 모든 모니터를 RTX에 연결한 내부 **headless 언락**을 완료했습니다.
-해제 전 RTX 물리 GOP 1개, 해제 후 물리 GOP 0개를 확인하고, 자동 언락 1회와 Windows
-화면 복귀를 거쳤습니다. 이후 Windows 3회 측정 중앙값은 **FP16 124.97 / BF16 128.93
-TFLOPS**였습니다. [근거와 한계](evidence/headless-handoff/README.md).
+| 빌드 프로필 | 정확한 GPU / 메인보드 / BIOS / CPU | 기록된 경로와 근거 |
+|---|---|---|
+| `b650m-3090fe` (기본값) | RTX 3090 FE / ASUS TUF GAMING B650M-PLUS WIFI / 3057 / Ryzen 7 7800X3D | 내부 headless; [최초 유지관리자의 실기기 근거](evidence/headless-handoff/README.md) |
+| `b660m-3070ti` | MSI RTX 3070 Ti / ASUS TUF GAMING B660M-E D4 / 4003 / **iGPU 없는** Core i7-12700F | 내부 headless, aggregate console; [기여자의 보고·구현 PR #5](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/5) |
+| `x870-3090ti` | ASUS RTX 3090 Ti / Gigabyte X870 AORUS ELITE WIFI7 / F13d / Ryzen 7 9800X3D | **Headless USB 전용**; [기여자 PR #10](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/10), [공개 근거](evidence/x870-3090ti-usb/README.md) |
 
-v0.3.1은 펌웨어가 RTX 디스플레이 자식 핸들을 2개보다 많이 노출할 때 사전 검사가
-거부하던 문제를 수정했습니다. 수정 빌드로 자동 언락 후 Windows 화면 복귀까지 다시
-확인했으며, 이 빌드의 새 성능 벤치마크는 아직 없습니다.
+실기기 결과는 각 보고서의 정확한 빌드와 장비에 해당합니다. 현재 cold 사전검사 보강은
+host·빌드 검증을 거쳤으며, **이 변경으로 새 실기기 부팅·복구 시험을 한 것은 아닙니다.**
+기여자의 보고와 최초 유지관리자의 시험을 구분합니다. 같은 GPU 모델의 모든 카드나
+다른 BIOS까지 지원한다는 뜻은 아닙니다. 표의 Ryzen CPU에는 iGPU가 있지만 기록된
+headless 경로에서는 활성 AMD GOP를 사용하지 않았습니다.
 
-한 시스템·한 부팅의 결과이며 모든 3090의 지원을 의미하지 않습니다.
-CPU는 **iGPU가 있는 Ryzen 7 7800X3D**입니다. 활성 AMD GOP 없이 성공했지만,
-iGPU 없는 CPU·Intel 호스트·다른 카드·다른 BIOS는 미검증입니다.
-먼저 [호환성](docs/COMPATIBILITY.ko.md)을 확인하세요.
+최신 태그 **v0.3.1은 소스 전용 사전 릴리스**입니다. 현재 소스는 그 태그 이후의
+USB 경로와 X870 프로필 등을 포함하며, 이를 새 릴리스가 발행됐다는 뜻으로 읽지 마세요.
+자신의 파티션 GUID로 로컬 빌드해야 합니다. 펌웨어와 개인 파티션 설정이 들어간
+EFI 바이너리는 포함하지 않습니다.
 
 ## 부팅 경로 선택
 
 | 경로 | 화면·입력 조건 | 안내 |
 |---|---|---|
-| **내부 headless** | 모니터는 RTX, 도중 화면 제거, T/U/Enter 불필요 | [Headless 안내](docs/HEADLESS.ko.md): 실제 언락·Windows 인계 1회 검증 |
-| 기존 내부 AMD 화면 manual / Auto | 메인보드/iGPU 화면 유지, manual은 U 필요 | [기존 내부 부팅 안내](docs/INTERNAL-BOOT.ko.md) |
-| 기존 USB manual | AMD/iGPU 화면, U 한 번, 리셋 없이 Boot Override로 Windows | [USB 안내](docs/GUIDE.ko.md) |
+| **내부 headless** | B650M/3090 FE 또는 B660M/3070 Ti 프로필; 모니터는 RTX, 도중 화면 제거, T/U/Enter 불필요 | [내부 headless 안내](docs/HEADLESS.ko.md) |
+| **Headless USB** | 기여자가 시험한 X870/3090 Ti 경로; FAT32 USB에 프로필별 wrapper·child 배치 | [Headless USB 안내 — 영어](docs/HEADLESS-USB.en.md) |
+| 기존 내부 AMD 화면 manual / Auto | 최초 B650M 프로필, 메인보드/iGPU 화면 유지, manual은 U 필요 | [기존 내부 부팅 안내](docs/INTERNAL-BOOT.ko.md) |
+| 기존 USB manual | 최초 AMD/iGPU 화면 프로필, U 한 번, 리셋 없이 Boot Override로 Windows | [기존 USB 안내](docs/GUIDE.ko.md) |
 
-**Headless USB 부팅은 시험하지 않았습니다.** 기존 USB EFI에는 AMD 출력 조건이 있습니다.
-BIOS를 `USB → Windows`로 설정하는 것만으로 직접 인계가 구현되지는 않습니다.
+X870은 `Configure.ps1`·`Headless.ps1`에 연결하지 않았으므로 USB 안내를 사용하세요.
+첫 두 프로필도 USB 패키지 빌드는 가능하지만, 기록된 내부 부팅이 USB 경로까지 검증하지는
+않습니다. 기존 USB EFI에는 AMD 출력 조건이 있습니다. BIOS를 `USB → Windows`로
+설정하는 것만으로 직접 인계가 구현되지는 않습니다.
 
 ## 내부 headless 빠른 시작
+
+**아래 예시는 기본 B650M / RTX 3090 FE 프로필용입니다.** B660M은
+[호환성 문서](docs/COMPATIBILITY.ko.md)에 따라 설정과 빌드 양쪽에
+`-HardwareProfile b660m-3070ti`를 지정하세요. X870은 별도 USB 경로를 사용합니다.
 
 부팅 설정을 바꾸기 전에 [상세 절차와 복구 방법](docs/HEADLESS.ko.md)을 읽으세요.
 정확한 지원 하드웨어, Secure Boot 꺼짐, 완전히 복호화되고 BitLocker 보호가 꺼진
@@ -93,9 +103,9 @@ Windows 우선순위 복구는 실험 EFI·빌드 산출물·저장된 상태 �
 이전 빠른 시작 값 복원에는 로컬 상태가 필요하므로 상태와 백업을 보존하세요.
 [자세한 복구 설명](docs/HEADLESS.ko.md#recovery)을 참고하세요.
 
-## 결과와 한계
+## 최초 B650M 결과와 한계
 
-성공한 child는 SS0 `0x88888888`, SS1 `0x8`, BME 꺼짐, 남은 mapping 없음,
+최초 B650M 실기기 시험에서 성공한 child는 SS0 `0x88888888`, SS1 `0x8`, BME 꺼짐, 남은 mapping 없음,
 정리 완료와 FLR 1회를 기록했습니다. Wrapper가 Windows 시작 전 해제 토폴로지를
 검증했고, 운영자가 Windows 화면 복귀를 확인했습니다.
 
@@ -109,6 +119,10 @@ Windows 우선순위 복구는 실험 EFI·빌드 산출물·저장된 상태 �
 계산하지 않습니다. 게임·ComfyUI 향상, 장기 안정성, 절전·최대 절전 복귀, 반복 자동 콜드
 부팅의 신뢰성을 입증하지도 않습니다. [공개 측정 요약](evidence/headless-handoff/summary.json)과
 [이전 결과](docs/RESULTS.ko.md)는 서로 다른 실험입니다.
+
+다른 장비의 측정값은 [호환성 문서의 프로필 2](docs/COMPATIBILITY.ko.md)와
+[X870 USB 근거](evidence/x870-3090ti-usb/README.md)를 참고하세요. 각 결과는 보고한
+빌드에 해당하며, 이후 빌드·host 시험 통과가 실기기 시험 기록을 확장하지는 않습니다.
 
 ## 구현과 경계
 

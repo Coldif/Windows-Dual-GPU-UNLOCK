@@ -6,9 +6,12 @@ $exe = Join-Path $root "bin\compute-benchmark-$Card.exe"
 $gpuName = @{'3090'='NVIDIA GeForce RTX 3090';'3090ti'='NVIDIA GeForce RTX 3090 Ti';'3070ti'='NVIDIA GeForce RTX 3070 Ti'}[$Card]
 if (-not (Test-Path -LiteralPath $exe)) { throw 'Build the benchmark first' }
 $manifest = Get-Content -LiteralPath (Join-Path $root 'build-manifest.json') -Raw | ConvertFrom-Json
+$selectedArtifacts = 0
 foreach ($artifact in $manifest) {
     if ((Get-FileHash -LiteralPath (Join-Path $root $artifact.Path) -Algorithm SHA256).Hash -ne $artifact.SHA256) { throw "Artifact changed: $($artifact.Path)" }
+    if (($artifact.Path -replace '\\','/') -ieq "bin/compute-benchmark-$Card.exe") { $selectedArtifacts++ }
 }
+if ($selectedArtifacts -ne 1) { throw 'Build manifest must identify the selected benchmark executable exactly once' }
 $inspect = & $exe --inspect-only
 if ($LASTEXITCODE -ne 0) { throw 'Runtime metadata check failed' }
 Write-Output $inspect
@@ -26,7 +29,7 @@ function Get-ComparisonSettings {
     $rows = @(& nvidia-smi --query-gpu=name,pci.bus_id,driver_version,power.limit,clocks.max.sm,clocks.max.memory --format=csv,noheader,nounits)
     if ($LASTEXITCODE -ne 0 -or $rows.Count -ne 1) { throw 'Could not capture comparison settings' }
     $fields = @($rows[0] -split ',' | ForEach-Object { $_.Trim() })
-    if ($fields.Count -ne 6 -or $fields[0] -ne 'NVIDIA GeForce RTX 3090' -or $fields[1] -notmatch '^0+:01:00\.0$') { throw 'Unexpected comparison GPU identity' }
+    if ($fields.Count -ne 6 -or $fields[0] -ne $gpuName -or $fields[1] -notmatch '^0+:01:00\.0$') { throw 'Unexpected comparison GPU identity' }
     return $fields
 }
 $initialState = Assert-GpuIdle

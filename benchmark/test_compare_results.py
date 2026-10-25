@@ -24,19 +24,19 @@ def seal(directory):
             for name in names]})
 
 
-def fixture(directory, ratios=(1, 1, 1)):
+def fixture(directory, ratios=(1, 1, 1), gpu='NVIDIA GeForce RTX 3090', card='3090'):
     directory.mkdir()
     context = {
         'schema_version': 1,
-        'artifacts': [{'Path': r'bin\compute-benchmark-3090.exe', 'SHA256': 'a' * 64},
+        'artifacts': [{'Path': f'bin\\compute-benchmark-{card}.exe', 'SHA256': 'a' * 64},
                       {'Path': r'bin\cublas64_12.dll', 'SHA256': 'b' * 64}],
         'runtime': {'cuda_runtime': 12060, 'cublas_major': 12, 'cublas_minor': 6,
                     'cublas_patch': 0, 'gpu_workload_run': False},
-        'gpu_settings': ['NVIDIA GeForce RTX 3090', '00000000:01:00.0',
+        'gpu_settings': [gpu, '00000000:01:00.0',
                          '617.14', '350.00', '2100', '9751']}
     write_json(directory / 'comparison-context.json', context)
     for trial_index in range(1, 4):
-        trial = {'gpu': 'NVIDIA GeForce RTX 3090', 'pci': '0000:01:00.0',
+        trial = {'gpu': gpu, 'pci': '0000:01:00.0',
                  'compute_capability': '8.6', 'cuda_runtime': 12060,
                  'cuda_driver_api': 13000, 'cublas': 120600, 'benchmarks': []}
         for name, base, ratio in zip(NAMES, (20000, 60000, 62000), ratios):
@@ -74,6 +74,36 @@ class ComparisonTests(unittest.TestCase):
         self.assertAlmostEqual(result['benchmarks'][1]['ratio'], 1.65)
         self.assertAlmostEqual(result['fp32_control_change_percent'], 1)
         self.assertEqual(len(result['benchmarks'][0]['before_trials_tflops']), 3)
+
+    def test_each_supported_card_uses_its_own_executable(self):
+        for card, gpu in [('3090', 'NVIDIA GeForce RTX 3090'),
+                          ('3090ti', 'NVIDIA GeForce RTX 3090 Ti'),
+                          ('3070ti', 'NVIDIA GeForce RTX 3070 Ti')]:
+            with self.subTest(card=card):
+                before = Path(self.temp.name) / f'{card}-before'
+                after = Path(self.temp.name) / f'{card}-after'
+                fixture(before, gpu=gpu, card=card)
+                fixture(after, (1, 1.5, 1.5), gpu=gpu, card=card)
+                result = compare(before, after, same_machine_confirmed=True)
+                self.assertAlmostEqual(result['benchmarks'][1]['ratio'], 1.5)
+
+    def test_different_gpu_models_cannot_be_compared(self):
+        after = Path(self.temp.name) / 'other-card'
+        fixture(after, gpu='NVIDIA GeForce RTX 3090 Ti', card='3090ti')
+        with self.assertRaisesRegex(ValueError, 'differ'):
+            compare(self.before, after, same_machine_confirmed=True)
+
+    def test_gpu_and_executable_mismatch_is_refused(self):
+        self.mutate('comparison-context.json',
+                    lambda c: c['gpu_settings'].__setitem__(0, 'NVIDIA GeForce RTX 3090 Ti'))
+        with self.assertRaisesRegex(ValueError, 'selected benchmark executable'):
+            self.compare()
+
+    def test_unknown_gpu_model_is_refused(self):
+        self.mutate('comparison-context.json',
+                    lambda c: c['gpu_settings'].__setitem__(0, 'NVIDIA GeForce RTX 4090'))
+        with self.assertRaisesRegex(ValueError, 'Unsupported benchmark GPU'):
+            self.compare()
 
     def test_confirmation_required(self):
         with self.assertRaisesRegex(ValueError, 'Confirm'):

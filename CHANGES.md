@@ -1,5 +1,17 @@
 # Changes
 
+## Unreleased — integrate the third profile with matched benchmark evidence
+
+- Preserve the hardened pre-release checks while integrating the exact X870 /
+  RTX 3090 Ti USB profile. Historical contributor measurements retain their
+  original build provenance; the merged build has no new physical boot claim.
+- Match benchmark GPU selection, executable hashes and offline comparison across
+  3090 / 3090 Ti / 3070 Ti. Build manifests include only the selected model's
+  artifacts and shared DLLs; missing or duplicate selected executable hashes
+  reject before execution. The default 3090 protocol is unchanged.
+- Refresh English/Korean README and compatibility entries with all three exact
+  profiles, contributor evidence and the X870 USB-only installation boundary.
+
 ## 2026-10-25 — Gigabyte X870 / RTX 3090 Ti machine profile (headless USB)
 
 - Added `-DGU_PROFILE_X870_3090TI` (`-HardwareProfile x870-3090ti` in `unlock/build.ps1`,
@@ -7,10 +19,11 @@
   WIFI7 BIOS F13d, Ryzen 7 9800X3D, ASUS RTX 3090 Ti `10de:2203`/`1043:8870`. Non-aggregate
   single-RTX console. The card reports `0x5ff4` MiB, so the WPR layout sits 12 MiB lower than on
   the B650M (`frts=0x5ff200000`); FWSEC-FRTS is at PROM `0x41758` (`0xea00` bytes).
-- Hardware verified from a USB stick: three clean transactions (two full shutdowns, one Windows
+- Contributor-reported hardware verification from a USB stick: three clean transactions (two full shutdowns, one Windows
   restart), direct Windows start with display recovery, cuBLAS GEMM n=4096 medians BF16
-  81.0 → 150.2 / FP16 80.4 → 149.3 TFLOPS. The wrapper/child pair rebuilt from this tree is
-  byte-identical to the one measured (wrapper `19a145a2...`, child `6ffe6165...`).
+  81.0 → 150.2 / FP16 80.4 → 149.3 TFLOPS. The original `7b578247` contribution reports
+  byte-identical rebuilds of the measured pair (wrapper `19a145a2...`, child `6ffe6165...`).
+  These hashes do not identify the later hardened merged build.
 - Per-profile test pins for the X870 cold-state line and FWSEC-FRTS location.
 - `benchmark/compute-benchmark-3090ti.cu`; `build.ps1`/`run-benchmark.ps1` take
   `-Card 3090|3090ti|3070ti` (default `3090`) and `build.ps1 -AllowUnsupportedCompiler` for MSVC

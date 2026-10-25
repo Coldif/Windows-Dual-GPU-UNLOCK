@@ -1,5 +1,21 @@
 # X870 / RTX 3090 Ti headless USB evidence
 
+## Provenance and build scope
+
+These are contributor-reported results from
+[PR #10](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/10), original revision
+`7b578247a28ff66f2707bea5af0e3943aede7974`. They are not a new maintainer-operated
+hardware test. The contributor's byte-identical rebuild claim and the EFI hashes
+in `summary.json` refer to that original revision and its recorded builds.
+
+The current source integrates later cold-precheck hardening from main. That
+updated code has host/build validation, but no new X870 physical boot or recovery
+report. Do not interpret the historical hashes, or the phrase "on this branch"
+preserved in `summary.json`, as expected hashes or hardware validation of current
+main. Raw excerpt and summary files remain the contributor's historical record.
+
+## Recorded hardware runs
+
 Sanitized results from one machine on 2026-10-25: Gigabyte X870 AORUS ELITE WIFI7 (BIOS F13d),
 Ryzen 7 9800X3D, ASUS RTX 3090 Ti 24 GiB (GA102, `10de:2203` / `1043:8870`, VBIOS 94.02.a0.00.2c),
 all monitors on the RTX. Route: headless wrapper/child from a FAT32 USB stick (`GU_USB_MEDIA`).
