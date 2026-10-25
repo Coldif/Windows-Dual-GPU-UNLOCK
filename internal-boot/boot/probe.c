@@ -159,7 +159,8 @@ EFI_STATUS GuProbeGpu(EFI_SYSTEM_TABLE *t,CAPTURE *c) {
       t->BootServices->FreePool(sh);
     }
   }
-  EFI_BOOT_SERVICES *bs=t->BootServices;EFI_HANDLE *hs=NULL;UINTN n=0,found=0;
+  EFI_BOOT_SERVICES *bs=t->BootServices;EFI_HANDLE *hs=NULL;UINTN n=0,found=0,cfgFailed=0;
+  EFI_STATUS cfgError=EFI_SUCCESS;
   EFI_STATUS s=bs->LocateHandleBuffer(ByProtocol,&PciGuidL,NULL,&n,&hs);
   if(s!=EFI_SUCCESS||!hs){Problem(c,"pci-enum",s);return s;}
   Text(c,"probe-pci-handles=");Hex(c,n,8);End(c);
@@ -177,15 +178,25 @@ EFI_STATUS GuProbeGpu(EFI_SYSTEM_TABLE *t,CAPTURE *c) {
     UINT32 cfg[64];
     s=io->Pci.Read(io,EfiPciIoWidthUint32,0,64,cfg);
     PH(c,"cfg256 status=0x",s);
-    if(s==EFI_SUCCESS){Text(c,"cfg dwords=");for(UINTN j=0;j<64;j++){Hex(c,cfg[j],8);Text(c," ");}End(c);}
+    if(s!=EFI_SUCCESS) {
+      /* The BAR base, subsystem id, capability walk and PROM hash all derive
+       * from this read. Firmware may return an error after writing part of the
+       * buffer, so cfg holds no trustworthy value: record the failure and skip
+       * every dependent capture for this device. */
+      Problem(c,"cfg256",s);cfgFailed++;
+      if(cfgError==EFI_SUCCESS)cfgError=s;
+      continue;
+    }
+    Text(c,"cfg dwords=");for(UINTN j=0;j<64;j++){Hex(c,cfg[j],8);Text(c," ");}End(c);
     UINT32 sub=0;io->Pci.Read(io,EfiPciIoWidthUint32,0x2c,1,&sub);PH(c,"subsystem=0x",sub);
     ProbeCaps(c,io);
     UINT32 bar=cfg[0x10/4]&~0xfU;
     if(bar)ProbeBar(c,io,bar);else Problem(c,"bar0",EFI_UNSUPPORTED);
   }
   if(hs)bs->FreePool(hs);
-  Text(c,"probe targets=");Hex(c,found,4);End(c);
+  Text(c,"probe targets=");Hex(c,found,4);Text(c," cfg-incomplete=");Hex(c,cfgFailed,4);End(c);
   ProbeGops(c);
   if(root)ProbeDrivers(c,root);else Problem(c,"dump-volume",EFI_NOT_FOUND);
-  return found?EFI_SUCCESS:EFI_NOT_FOUND;
+  /* Report a target that could not be captured rather than a clean success. */
+  return found?cfgError:EFI_NOT_FOUND;
 }
