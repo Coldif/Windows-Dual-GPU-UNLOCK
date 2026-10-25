@@ -10,10 +10,10 @@
  */
 #pragma once
 
-#if defined(GU_PROFILE_B650M_3090FE) && defined(GU_PROFILE_B660M_3070TI)
+#if (defined(GU_PROFILE_B650M_3090FE) + defined(GU_PROFILE_B660M_3070TI) + defined(GU_PROFILE_X870_3090TI)) > 1
 #error Select exactly one machine profile
 #endif
-#if !defined(GU_PROFILE_B650M_3090FE) && !defined(GU_PROFILE_B660M_3070TI)
+#if !defined(GU_PROFILE_B650M_3090FE) && !defined(GU_PROFILE_B660M_3070TI) && !defined(GU_PROFILE_X870_3090TI)
 #define GU_PROFILE_B650M_3090FE 1
 #endif
 
@@ -27,7 +27,48 @@
 #define GU_CONSOLE_AGGREGATE 0
 #endif
 
-#if defined(GU_PROFILE_B660M_3070TI)
+#if defined(GU_PROFILE_X870_3090TI)
+
+/* Gigabyte X870 AORUS ELITE WIFI7 BIOS F13d, Ryzen 7 9800X3D (Granite
+ * Ridge iGPU 1002:13c0 present, no GOP), ASUS RTX 3090 Ti 24GB (GA102,
+ * VBIOS 94.02.a0.00.2c): hardware-verified headless USB port. Single-RTX
+ * topology like the B650M one (non-aggregate console). Values come from
+ * three identical read-only probe captures. The card reports 0x5ff4 MiB
+ * usable, not the 3090 FE's 0x6000. */
+#define GU_PROFILE_NAME "GIGABYTE-X870-AORUS-ELITE-WIFI7-F13d-RTX3090TI"
+#define GU_BOARD_ID 0x220310deU
+#define GU_BOARD_SUBSYSTEM 0x88701043U
+#define GU_BAR0_BASE 0xdd000000ULL
+#define GU_BAR0_END 0xddffffffULL
+#define GU_DEVICE_MEMORY_SIZE 0x5ff4U
+#define GU_CHIP_ID 0xb72000a1U
+#define GU_PROM_SHA256 "943565975885ee71a7e861265984c785f564f35272c32395ee7410b353d9bbc4"
+#define GU_ROOT_PORT_DEVICE 1U
+#define GU_ROOT_PORT_FUNCTION 1U
+/* 36-byte display device path: ACPI root, PciRoot(0), Pci(1,1), Pci(0,0), ADR. */
+#define GU_RTX_PATH_BYTES \
+  2,1,12,0,0xd0,0x41,3,10,0,0,0,0,1,1,6,0,1,1,1,1,6,0,0,0,2,3,8,0,0,3,1,128,127,255,4,0
+/* AMI console splitter text-out driver (BIOS F13d image fingerprint). */
+#define GU_CONSOLE_TEXT_SIZE 0xb000U
+#define GU_CONSOLE_TEXT_STOP 0x20e0U
+#define GU_CONSOLE_TEXT_VERSION 0x10U
+/* AMI GOP splitter (BIOS F13d image fingerprint). */
+#define GU_CONSOLE_GFX_SIZE 0x9000U
+#define GU_CONSOLE_GFX_STOP 0x1cc0U
+#define GU_CONSOLE_GFX_VERSION 0x10U
+/* AMI EDID/mouse runtime driver (BIOS F13d image fingerprint). */
+#define GU_EDID_IMAGE_SIZE 0x9000U
+#define GU_EDID_STOP 0x14d0U
+#define GU_EDID_TEXT_BYTES 0x37beU
+#define GU_EDID_TEXT_SHA256 "9a08c48e3a09965d1dda48b05a400311d71160d727cc9250630976cf4057eca9"
+/* nvgop-ga1xx 0x60010: byte-identical .text to the B660M/3070 Ti entry. */
+#define GU_NVGOP_VERSION 0x60010U
+#define GU_NVGOP_IMAGE_SIZE 0x26ae0U
+#define GU_NVGOP_STOP 0x678U
+#define GU_NVGOP_TEXT_BYTES 0x20d33U
+#define GU_NVGOP_TEXT_SHA256 "615b37a708b1894e18d7fa60cfcdacaa4d8b598863a10b8103d231a595847b2b"
+
+#elif defined(GU_PROFILE_B660M_3070TI)
 
 /* ASUSTeK TUF GAMING B660M-E D4 BIOS 4003, i7-12700F (no iGPU),
  * MSI RTX 3070 Ti (GA104): hardware-verified headless port. */

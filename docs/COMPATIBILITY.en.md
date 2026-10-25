@@ -33,7 +33,7 @@ the user's own Windows/dedicated ESP GUID configuration.
 |---|---|
 | Legacy USB / ordinary internal builds | Preserve AMD physical GOP, PCI `1002:164e`, subsystem `1043:8877`, BDF `0000:0c:00.0` and validated display ancestry |
 | Internal headless profile | One RTX physical GOP before release, zero physical GOP afterward; stable console/input interfaces, protected ownership graph, file-only child logging |
-| Headless USB | Not tested; the ordinary USB EFI retains AMD requirements |
+| Headless USB (`GU_USB_MEDIA`) | Profile 3 below; one RTX physical GOP, same release policy as the internal headless profile, wrapper/child accept only their own USB device |
 
 The headless test had all monitors on RTX and no active AMD GOP. The 7800X3D
 still contains an iGPU; BIOS disablement is not established by a missing GOP.
@@ -69,6 +69,36 @@ unlock on this profile as well; there is no resume path.
 Select this profile with `research/headless/build-unlock.ps1 -HardwareProfile b660m-3070ti`
 and `internal-boot/Configure.ps1 -HardwareProfile b660m-3070ti`; the default
 `b650m-3090fe` profile is unchanged.
+
+## Profile 3: Gigabyte X870 AORUS ELITE WIFI7 / RTX 3090 Ti (headless USB)
+
+A third hardware-verified headless profile and the first using the USB route
+([headless USB guide](HEADLESS-USB.en.md)). All monitors on the RTX; the Ryzen
+iGPU is present on PCI without an active GOP, like the B650M case. Console
+topology is the non-aggregate single-RTX one (`GU_CONSOLE_AGGREGATE 0`).
+
+| Common GPU/platform item | Validated value |
+|---|---|
+| Card | ASUS RTX 3090 Ti, 24 GiB (GA102), VBIOS 94.02.a0.00.2c |
+| PCI identity | `10de:2203`, subsystem `1043:8870` |
+| GPU BDF | `0000:01:00.0` |
+| Chip / VRAM register | `0xb72000a1` / `0x5ff4` MiB |
+| BAR0 | `0xdd000000`, 16 MiB |
+| PROM SHA256 | `943565975885ee71a7e861265984c785f564f35272c32395ee7410b353d9bbc4` |
+| Motherboard / BIOS | Gigabyte X870 AORUS ELITE WIFI7 / F13d |
+| CPU | AMD Ryzen 7 9800X3D (iGPU `1002:13c0`, no GOP) |
+| Recorded Windows / driver | Windows 11 Pro 26300 / NVIDIA 621.01 |
+| UEFI / Secure Boot | x64 / disabled |
+| Selector profile | `entryLatchedSs1Full`; targets SS0 `0x88888888`, SS1 `0x8` |
+
+Three clean transactions (two full shutdowns, one Windows restart; this board
+resets the GPU on restart). cuBLAS GEMM n=4096 medians: BF16 81.0 → 150.2 and
+FP16 80.4 → 149.3 TFLOPS. Entry selectors differ per power-on (`0x40123070/3`,
+`0x44123070/7`, `0/0`). [Evidence](../evidence/x870-3090ti-usb/README.md).
+
+Build with `research/headless/build-usb.ps1 -HardwareProfile x870-3090ti`. The
+internal-ESP installer (`Configure.ps1`, `Headless.ps1`) is not wired for this
+profile.
 
 | Other configuration | Status |
 |---|---|

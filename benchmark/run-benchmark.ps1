@@ -1,8 +1,9 @@
 # Modified 2026-10-19/20 for Windows GPU UNLOCK; changes documented in CHANGES.md.
-param([switch]$PreflightOnly)
+param([switch]$PreflightOnly,[ValidateSet('3090','3090ti','3070ti')][string]$Card='3090')
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
-$exe = Join-Path $root 'bin\compute-benchmark-3090.exe'
+$exe = Join-Path $root "bin\compute-benchmark-$Card.exe"
+$gpuName = @{'3090'='NVIDIA GeForce RTX 3090';'3090ti'='NVIDIA GeForce RTX 3090 Ti';'3070ti'='NVIDIA GeForce RTX 3070 Ti'}[$Card]
 if (-not (Test-Path -LiteralPath $exe)) { throw 'Build the benchmark first' }
 $manifest = Get-Content -LiteralPath (Join-Path $root 'build-manifest.json') -Raw | ConvertFrom-Json
 foreach ($artifact in $manifest) {
@@ -16,7 +17,7 @@ function Assert-GpuIdle {
     $rows = @(& nvidia-smi --query-gpu=name,pci.bus_id,driver_version,utilization.gpu,memory.used,temperature.gpu --format=csv,noheader,nounits)
     if ($LASTEXITCODE -ne 0 -or $rows.Count -ne 1) { throw 'Expected exactly one NVIDIA GPU' }
     $fields = $rows[0] -split ',' | ForEach-Object { $_.Trim() }
-    if ($fields[0] -ne 'NVIDIA GeForce RTX 3090' -or $fields[1] -notmatch '^0+:01:00\.0$') { throw 'Unexpected GPU identity' }
+    if ($fields[0] -ne $gpuName -or $fields[1] -notmatch '^0+:01:00\.0$') { throw 'Unexpected GPU identity' }
     if ([int]$fields[3] -gt 5 -or [int]$fields[4] -gt 2048) { throw 'GPU is busy. Save and finish ComfyUI/other GPU jobs before benchmarking. Nothing was stopped.' }
     if ([int]$fields[5] -gt 65) { throw 'GPU is still hot. Let it cool before a comparable measurement.' }
     return $rows[0]
@@ -32,7 +33,7 @@ for ($trial = 1; $trial -le 3; $trial++) {
     $json = & $exe 2> (Join-Path $resultRoot "trial-$trial.stderr.txt")
     if ($LASTEXITCODE -ne 0) { throw "Benchmark failed in trial $trial; keep partial evidence in $resultRoot" }
     $parsed = $json | ConvertFrom-Json
-    if ($parsed.gpu -ne 'NVIDIA GeForce RTX 3090' -or $parsed.cuda_runtime -ne 12060 -or $parsed.cublas -ne 120600 -or $parsed.benchmarks.Count -ne 3) { throw 'Unexpected benchmark metadata' }
+    if ($parsed.gpu -ne $gpuName -or $parsed.cuda_runtime -ne 12060 -or $parsed.cublas -ne 120600 -or $parsed.benchmarks.Count -ne 3) { throw 'Unexpected benchmark metadata' }
     $json | Set-Content -LiteralPath (Join-Path $resultRoot "trial-$trial.json") -Encoding utf8
     $measurements += $parsed
     & nvidia-smi --query-gpu=timestamp,driver_version,clocks.sm,power.draw,temperature.gpu,clocks_event_reasons.sw_thermal_slowdown --format=csv |

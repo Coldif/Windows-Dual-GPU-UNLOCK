@@ -1,5 +1,21 @@
 # Changes
 
+## 2026-10-25 — Gigabyte X870 / RTX 3090 Ti machine profile (headless USB)
+
+- Added `-DGU_PROFILE_X870_3090TI` (`-HardwareProfile x870-3090ti` in `unlock/build.ps1`,
+  `research/headless/build-usb.ps1`, `boot/test-cold-precheck.ps1`): Gigabyte X870 AORUS ELITE
+  WIFI7 BIOS F13d, Ryzen 7 9800X3D, ASUS RTX 3090 Ti `10de:2203`/`1043:8870`. Non-aggregate
+  single-RTX console. The card reports `0x5ff4` MiB, so the WPR layout sits 12 MiB lower than on
+  the B650M (`frts=0x5ff200000`); FWSEC-FRTS is at PROM `0x41758` (`0xea00` bytes).
+- Hardware verified from a USB stick: three clean transactions (two full shutdowns, one Windows
+  restart), direct Windows start with display recovery, cuBLAS GEMM n=4096 medians BF16
+  81.0 → 150.2 / FP16 80.4 → 149.3 TFLOPS. The wrapper/child pair rebuilt from this tree is
+  byte-identical to the one measured (wrapper `19a145a2...`, child `6ffe6165...`).
+- Per-profile test pins for the X870 cold-state line and FWSEC-FRTS location.
+- `benchmark/compute-benchmark-3090ti.cu`; `build.ps1`/`run-benchmark.ps1` take
+  `-Card 3090|3090ti|3070ti` (default `3090`) and `build.ps1 -AllowUnsupportedCompiler` for MSVC
+  14.4x with CUDA 12.6.
+
 ## 2026-10-25 — headless USB media and read-only cold pre-check
 
 - `-DGU_USB_MEDIA` (`internal-boot/unlock/build.ps1 -UsbMedia`, `research/headless/build-usb.ps1`):
