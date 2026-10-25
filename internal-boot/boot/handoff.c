@@ -210,8 +210,17 @@ static EFI_STATUS LoadUnlock(VOID) {
 #endif
 static EFI_STATUS Prepare(VOID *Context) {
   (void)Context;EFI_HANDLE own=NULL,windows=NULL;
+#ifdef GU_USB_MEDIA
+  /* Unlock from an MBR USB stick: no partition GUID to pin, so the log/child
+     volume is the device this image was loaded from, and it must be USB. */
+  EFI_DEVICE_PATH_PROTOCOL *ownPath=NULL;BOOLEAN usb=FALSE;
+  EFI_STATUS s=PathFor(OwnDevice,&ownPath);
+  if(s!=EFI_SUCCESS || !GuInspectPath(ownPath,NULL,NULL,&usb,NULL) || !usb)return EFI_COMPROMISED_DATA;
+  own=OwnDevice;
+#else
   EFI_STATUS s=FindPartition(&GuInternalPartition,&own);
   if(s!=EFI_SUCCESS || own!=OwnDevice)return EFI_COMPROMISED_DATA;
+#endif
   s=FindPartition(&GuWindowsPartition,&windows);
   if(s!=EFI_SUCCESS || windows==own)return EFI_COMPROMISED_DATA;
   s=OpenLog();if(s!=EFI_SUCCESS)return s;
@@ -266,10 +275,24 @@ static EFI_STATUS FullChoice(VOID *Context,BOOLEAN *Skip) {
     if(s!=EFI_SUCCESS && s!=EFI_NOT_READY)return s;
     s=Table->BootServices->Stall(100000);if(s!=EFI_SUCCESS)return s;
   }
+  /* Before any release: a GPU that is not in its power-on state (warm restart,
+   * already unlocked) would only fail VerifyCold after the display is gone.
+   * Skip instead, so Windows starts with nothing changed. */
+  UINT32 cold[9];EFI_STATUS c=GuPeekCold(Table,cold);
+  EFI_STATUS r=Record(NULL,"pre-release-cold-check",c);
+  if(r==EFI_SUCCESS)r=Record(NULL,"pre-release-cold-wpr2-hi",cold[4]);
+  if(r==EFI_SUCCESS)r=Record(NULL,"pre-release-cold-ss0",cold[6]);
+  if(r!=EFI_SUCCESS)return r;
+  if(c!=EFI_SUCCESS) {
+    Say(L"GPU cold-state prerequisites could not be verified.\r\nStarting Windows without driver release or unlock. Check the pre-release log before another attempt.\r\n");
+    *Skip=TRUE;
+  }
   return EFI_SUCCESS;
 }
 static EFI_STATUS FullCapture(VOID *Context) {(void)Context;return GuCaptureGraph(Table,Log);}
+static BOOLEAN ReleaseStarted;
 static EFI_STATUS FullRelease(VOID *Context) {
+  ReleaseStarted=TRUE;
 #ifdef GU_HEADLESS_RESEARCH
   ResearchOutputDisabled=TRUE;
 #endif
@@ -394,6 +417,16 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE Image,EFI_SYSTEM_TABLE *St) {
   (void)Record(NULL,"handoff-stopped",s);
 #ifdef GU_FULL_UNLOCK
   ScreenStatus("full-flow-returned",s);
+#endif
+#if defined(GU_FULL_UNLOCK) && defined(GU_USB_MEDIA)
+  /* Default-boot USB stick: if no driver was released, the GPU and firmware are
+   * untouched, so hand back to the firmware BootOrder (next: Windows Boot Manager). */
+  if(!ReleaseStarted) {
+    if(Log){(void)Log->Close(Log);Log=NULL;}
+    if(Root){(void)Root->Close(Root);Root=NULL;}
+    Say(L"Nothing was changed. Returning to the firmware boot order.\r\n");
+    return s==EFI_SUCCESS || s==EFI_ABORTED?EFI_NOT_STARTED:s;
+  }
 #endif
   Stop();
   return EFI_ABORTED; /* unreachable: do not fall through firmware BootOrder */
