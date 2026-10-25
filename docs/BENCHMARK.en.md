@@ -18,3 +18,37 @@ The measured build used VS2019 BuildTools MSVC 14.29. For a different installati
 Save and close ComfyUI, video, recording and other GPU workloads before measuring. Start limits are GPU utilization at most 5%, VRAM at most 2048 MiB and temperature at most 65°C. The runner records three runs in a new timestamped `benchmark/results/` directory. It does not forcibly terminate other processes.
 
 Use the same executable, driver, power limit, overclock and temperature conditions before and after. This tool does not change GPU settings. FP16/BF16 Tensor throughput gains do not imply the same speedup in complete games, video tasks or ComfyUI workflows. See [the measured case and its limits](RESULTS.en.md).
+
+## Offline before/after comparison
+
+New runner results include `comparison-context.json`: hashes of the benchmark
+build artifacts, CUDA/cuBLAS inspection, GPU model/PCI location, driver version,
+power limit and maximum SM/memory clocks. The runner checks these GPU settings
+after every trial. `comparison-complete.json` is written only after successful
+completion and binds the context and all three raw trial files by SHA256.
+These hashes detect accidental edits; they are not signed hardware evidence.
+
+Compare two completed runs from this updated runner, using Python 3.9+:
+
+```powershell
+python .\benchmark\compare_results.py .\benchmark\results\BEFORE .\benchmark\results\AFTER --same-machine-confirmed
+```
+
+Use `--same-machine-confirmed` only after confirming the same physical machine,
+GPU and OS, unchanged manual tuning and comparable workload/temperature
+conditions. Model names and PCI locations alone do not establish machine identity.
+Recorded maximum clocks do not capture actual clocks or all overclock settings;
+review the saved telemetry as well. This command only reads saved files and
+prints JSON; it runs no GPU work and writes no files.
+
+The comparison requires matching artifacts/settings/library metadata, the exact
+4096/30-sample/two-second-warmup protocol, checked results and three complete
+trials. Missing provenance, partial runs, edited files, unavailable power/clock
+limits, non-finite values or protocol mismatches are refused with exit code 2.
+Old results without the new context/completion records cannot be compared by
+this tool; do not manufacture those records to upgrade historical evidence.
+
+Output reports median-of-three TFLOPS, each trial, ratios and the FP32 control
+change. It does not identify locked/unlocked state or prove that a throughput
+change was caused by unlock. Existing numerical checks still inspect only the
+first and last matrix elements. No stability or application-speed claim follows.

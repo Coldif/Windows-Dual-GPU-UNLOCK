@@ -66,19 +66,23 @@ static EFI_STATUS ReadConfigFull(UINT32 *cfg) {
   if(s==EFI_SUCCESS && (cfg[0]!=GU_BOARD_ID || cfg[11]!=GU_BOARD_SUBSYSTEM || cfg[2]!=0x030000a1 || cfg[4]!=(UINT32)GU_BAR0_BASE || (cfg[1]&4)))s=EFI_UNSUPPORTED;
   return s;
 }
+/* Shared descriptor policy for both pre-release reads and the later permit. */
+static EFI_STATUS BarDescription(const EFI_ACPI_ADDRESS_SPACE_DESCRIPTOR *d) {
+  if(!d || d->Desc!=ACPI_ADDRESS_SPACE_DESCRIPTOR || d->Len!=sizeof(*d)-3 || d->ResType || d->AddrSpaceGranularity!=32 ||
+     d->AddrRangeMin!=GU_BAR0_BASE || d->AddrLen!=0x1000000 || d->AddrTranslationOffset ||
+     (d->AddrRangeMax!=GU_BAR0_END && d->AddrRangeMax!=0x00ffffff) || ((const UINT8 *)(d+1))[0]!=ACPI_END_TAG_DESCRIPTOR)return EFI_UNSUPPORTED;
+  UINT8 sum=0;for(UINTN i=0;i<sizeof(*d)+2;i++)sum=(UINT8)(sum+((const UINT8 *)d)[i]);
+  return ((const UINT8 *)d)[sizeof(*d)+1] && sum?EFI_CRC_ERROR:EFI_SUCCESS;
+}
 static EFI_STATUS CheckBar(BOOLEAN first) {
   EFI_PCI_IO_PROTOCOL *io=PreparedPlan.RtxIo;VOID *raw=NULL;
   if(!io->GetBarAttributes)return EFI_UNSUPPORTED;
   EFI_STATUS s=io->GetBarAttributes(io,0,NULL,&raw);
   if(s==EFI_SUCCESS) {
     EFI_ACPI_ADDRESS_SPACE_DESCRIPTOR *d=raw;
-    if(!d || d->Desc!=ACPI_ADDRESS_SPACE_DESCRIPTOR || d->Len!=sizeof(*d)-3 || d->ResType || d->AddrSpaceGranularity!=32 ||
-       d->AddrRangeMin!=GU_BAR0_BASE || d->AddrLen!=0x1000000 || d->AddrTranslationOffset ||
-       (d->AddrRangeMax!=GU_BAR0_END && d->AddrRangeMax!=0x00ffffff) || ((UINT8 *)(d+1))[0]!=ACPI_END_TAG_DESCRIPTOR)s=EFI_UNSUPPORTED;
+    s=BarDescription(d);
     if(s==EFI_SUCCESS) {
-      UINT8 sum=0;for(UINTN i=0;i<sizeof(*d)+2;i++)sum=(UINT8)(sum+((UINT8 *)d)[i]);
-      if(((UINT8 *)d)[sizeof(*d)+1] && sum)s=EFI_CRC_ERROR;
-      else if(first)Full.Bar=*d;
+      if(first)Full.Bar=*d;
       else if(!Bytes(d,&Full.Bar,sizeof(*d)))s=EFI_NOT_READY;
     }
   }
@@ -97,13 +101,39 @@ static EFI_STATUS ColdRead(EFI_PCI_IO_PROTOCOL *io,UINT32 *values) {
   return EFI_SUCCESS;
 }
 static EFI_STATUS Cold(UINT32 *values) {return ColdRead(PreparedPlan.RtxIo,values);}
+/* No global Full/PreparedPlan authority is created by this read-only path. */
+static EFI_STATUS PeekConfig(EFI_BOOT_SERVICES *bs,EFI_HANDLE handle,EFI_PCI_IO_PROTOCOL *io,const UINT32 *expected) {
+  UINTN seg=0,bus=0,dev=0,fun=0;UINT32 cfg[16];
+  EFI_PCI_IO_PROTOCOL *current=NULL;
+  EFI_STATUS s=Interface(bs,handle,&PciGuid,(VOID **)&current);
+  if(s!=EFI_SUCCESS)return s;
+  if(current!=io)return EFI_NOT_READY;
+  if(!io->GetLocation || !io->Pci.Read)return EFI_UNSUPPORTED;
+  s=io->GetLocation(io,&seg,&bus,&dev,&fun);
+  if(s!=EFI_SUCCESS)return s;
+  if(seg || bus!=1 || dev || fun)return EFI_UNSUPPORTED;
+  s=io->Pci.Read(io,EfiPciIoWidthUint32,0,16,cfg);
+  if(s!=EFI_SUCCESS)return s;
+  if(!Bytes(cfg,expected,sizeof(cfg)))return EFI_NOT_READY;
+  return EFI_SUCCESS;
+}
+static EFI_STATUS PeekBar(EFI_BOOT_SERVICES *bs,EFI_PCI_IO_PROTOCOL *io) {
+  if(!io->GetBarAttributes)return EFI_UNSUPPORTED;
+  VOID *raw=NULL;EFI_STATUS s=io->GetBarAttributes(io,0,NULL,&raw);
+  if(s==EFI_SUCCESS)s=BarDescription(raw);
+  if(raw && bs->FreePool(raw)!=EFI_SUCCESS)s=EFI_DEVICE_ERROR;
+  return s;
+}
 /* Read-only check before any driver release: the exact RTX at 0000:01:00.0 is
  * read through the PciIo its firmware driver still owns; nothing is opened,
  * written or reconfigured. Any non-cold state (warm restart, already unlocked,
  * initialized WPR2) returns EFI_NOT_READY so the caller can boot unchanged. */
 EFI_STATUS GuPeekCold(EFI_SYSTEM_TABLE *t,UINT32 *values) {
-  EFI_BOOT_SERVICES *bs=t->BootServices;EFI_HANDLE *handles=NULL;UINTN n=0,found=0;EFI_PCI_IO_PROTOCOL *target=NULL;
+  if(!t || !t->BootServices || !values)return EFI_INVALID_PARAMETER;
+  EFI_BOOT_SERVICES *bs=t->BootServices;EFI_HANDLE *handles=NULL,targetHandle=NULL;UINTN n=0,found=0;EFI_PCI_IO_PROTOCOL *target=NULL;
+  UINT32 targetConfig[16];
   for(UINTN i=0;i<9;i++)values[i]=0;
+  if(!bs->LocateHandleBuffer || !bs->HandleProtocol || !bs->FreePool)return EFI_UNSUPPORTED;
   EFI_STATUS s=bs->LocateHandleBuffer(ByProtocol,&PciGuid,NULL,&n,&handles);
   if(s==EFI_SUCCESS && (!handles || !n))s=EFI_NOT_FOUND;
   for(UINTN i=0;s==EFI_SUCCESS && i<n;i++) {
@@ -112,11 +142,19 @@ EFI_STATUS GuPeekCold(EFI_SYSTEM_TABLE *t,UINT32 *values) {
     if(io->GetLocation(io,&seg,&bus,&dev,&fun)!=EFI_SUCCESS || seg || bus!=1 || dev || fun)continue;
     if(io->Pci.Read(io,EfiPciIoWidthUint32,0,16,cfg)!=EFI_SUCCESS)continue;
     if(cfg[0]!=GU_BOARD_ID || cfg[11]!=GU_BOARD_SUBSYSTEM || (cfg[2]>>24)!=3)continue;
-    found++;target=io;
+    found++;target=io;targetHandle=handles[i];for(UINTN j=0;j<16;j++)targetConfig[j]=cfg[j];
   }
   if(handles && bs->FreePool(handles)!=EFI_SUCCESS && s==EFI_SUCCESS)s=EFI_DEVICE_ERROR;
   if(s!=EFI_SUCCESS)return s;
   if(found!=1)return EFI_NOT_FOUND;
+  /* Require memory decode, no bus mastering and the exact 32-bit memory BAR
+   * before asking for its descriptor, then recheck after allocation/free calls.
+   * Firmware callbacks are not atomic; this guards service-return boundaries. */
+  if((targetConfig[1]&6U)!=2U || targetConfig[4]!=(UINT32)GU_BAR0_BASE)return EFI_UNSUPPORTED;
+  s=PeekConfig(bs,targetHandle,target,targetConfig);
+  if(s==EFI_SUCCESS)s=PeekBar(bs,target);
+  if(s==EFI_SUCCESS)s=PeekConfig(bs,targetHandle,target,targetConfig);
+  if(s!=EFI_SUCCESS)return s;
   return ColdRead(target,values);
 }
 static EFI_STATUS Prom(VOID) {
