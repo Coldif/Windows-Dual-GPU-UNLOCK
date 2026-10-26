@@ -163,6 +163,26 @@ class CaptureTests(unittest.TestCase):
             with self.subTest(row=row), self.assertRaisesRegex(ValueError, 'no protocol'):
                 analyze(fixture().replace(b'handle id=0x3\n', b'handle id=0x3\n' + row))
 
+    def test_same_agent_driver_and_shared_console_child_are_distinct_records(self):
+        # Abstract the #20 relationship, using only synthetic handles/identity:
+        # one agent opens a physical child as driver and names the shared
+        # console as its child controller. This is not two alternate agents.
+        snapshot = (('protocol guid=' + TEXT + '\n').encode() +
+                    b'opens status=0x0 count=0x2\n'
+                    b'open agent=0x4 controller=0x3 attributes=0x10 count=0x1\n'
+                    b'open agent=0x4 controller=0x1 attributes=0x8 count=0x1\n'
+                    b'handle id=0x4\n'
+                    b'protocol guid=18a031ab-b443-4d1a-a5c0-0c09261e9f71\n')
+        raw = fixture().replace(b'capture-complete=1\n', snapshot + b'capture-complete=1\n')
+        raw = raw.replace(b'handles status=0x0 count=0x3', b'handles status=0x0 count=0x4')
+        report = analyze(raw)
+        summary = report['ownership_observations']
+        self.assertEqual({row['attributes'] for row in summary['attributes']}, {'8', '10'})
+        self.assertEqual({row['protocol'] for row in summary['attributes']}, {TEXT})
+        self.assertEqual(sum(row['records'] for row in summary['attributes']), 2)
+        self.assertFalse(summary['role_interpretation_performed'])
+        self.assertFalse(report['authorizes_driver_detach'])
+
 
 if __name__ == '__main__':
     unittest.main()

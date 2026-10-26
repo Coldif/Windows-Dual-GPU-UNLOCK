@@ -40,7 +40,7 @@ TF32도 main에 이미 구현되어 있으며 실제 측정은 사용자의 다�
 | 작업 시작 상태 | origin/main f33a4c8에서 새 격리 작업트리, 시작 시 변경 없음 | 사용자의 다른 작업트리는 수정하지 않음 |
 | 이슈 양식 | `.github/ISSUE_TEMPLATE/compatibility.yml` | GitHub 게시 전 구조 검사 필요 |
 | 한영 기여 문서 | `docs/CONTRIBUTING.en.md`, `docs/CONTRIBUTING.ko.md` | 지원 프로필 추가 아님 |
-| Python 관측·거부 경계 | headless 33 + probe records 5 + PE bounds 7 + collector 9 tests, 모두 exit 0 | 합성 데이터; private captures 기반 generator suite 미실행 |
+| Python 관측·거부 경계 | headless 34 + probe records 5 + PE bounds 7 + collector 9 tests, 모두 exit 0 | 합성 데이터; private captures 기반 generator suite 미실행 |
 | C 진단 cleanup/flush | diagnostic 56 checks × 5 profiles, exit 0 | RAM mocks; EFI/GPU 실행 아님 |
 | C 파일 close/Windows 차단 | handoff 52 checks, exit 0; Log/Root 각 실패 및 동시 실패 | StartImage mock만 실행 |
 | 빌드 | synthetic compile/link/PE 16개 조합 exit 0 | 합성 GUID/contract, NEVER BOOT; 실기 빌드 산출물 아님 |
@@ -49,6 +49,9 @@ TF32도 main에 이미 구현되어 있으며 실제 측정은 사용자의 다�
 | 양식·경로·diff | YAML parse 및 field ID 중복 없음, compatibility 한영 링크 존재, git diff --check exit 0 | GitHub UI 렌더링 미확인 |
 | Literal ownership 관측 | 정상·owner 부재·0x8·multi-count·부분/중복/orphan 거부 fixture, 독립 headless33 재실행 exit 0 | role 해석/실제 해제 권한 부여 없음 |
 | #20 기존 자료 | 최신 parser로 449 handles/1015 open snapshots 관측, 독립 fresh parse exit 0 | 전체 handle 합계; target별 detach 판정 아님 |
+| #20 target 후속 분석 | PCI/GOP child별 BY_DRIVER agent와 binding 연결 독립 대조, 별도 EDID owner 및 실제 text Stop 100c 확인 | 코드 hash/실제 해제·복구 검증 아님 |
+| 공유 console 회귀 입력 | 동일 agent의 driver/child-controller open 두 개를 구분하는 합성 fixture | 관측만 수행; 새 detach 정책 없음 |
+| #28 설명 교차검증 | EDID GUID와 BY_CHILD_CONTROLLER=0x8을 pinned/공식 EDK2와 대조 | source/handle 관계 미확보; 제보의 비표준/private 설명을 정책으로 채택하지 않음 |
 | #23 최신 통합 | 별도 review/pr23-improvements의 ae4bc6f: 489+55 cases/564693 assertions, positive+17negative guards, timestamp만 정규화한 production object12쌍 동일 | Draft 유지; Linux sanitizer/VFS controls/물리 장비 미실행 |
 | #21 새 launcher | docs/research/ISSUE21_HANDOFF.ko.md에 archive/source hash와 정적 findings | EFI 미추출·미실행; 독립 바이너리 재현 미확인 |
 | 향후 검증 절차 | docs/VALIDATION.en.md / .ko.md, 상대 링크 존재 검사 exit 0 | 실제 TF32/수명주기 측정은 사용자 지시대로 보류 |
