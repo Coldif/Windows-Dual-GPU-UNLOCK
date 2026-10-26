@@ -1,5 +1,13 @@
 # Follow-up research: hardware, evidence and build readiness
 
+**Historical research snapshot:** the compiler/build-readiness discussion below
+predates the completed ordinary CUDA contribution in
+[PR #45](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/45).
+See its [native validation report](https://github.com/danhol86/Windows-GPU-UNLOCK/blob/a04471a8c2cec047c25383315d122f1d6513462c/benchmark/rtx3080/NATIVE-VALIDATION.md)
+for the later compiler installation, build and successful GPU measurement.
+The subsequent [Windows display query](display-topology/README.md) and
+[support review](SUPPORT-REVIEW.md) supplement the observations below.
+
 Research date: **2026-10-26 (UTC)**. Inspected upstream revision remains
 [`5c98f11eaafdcb7a2a06fb14fcdcde7297eb409e`](https://github.com/impacifist/Windows-GPU-UNLOCK/tree/5c98f11eaafdcb7a2a06fb14fcdcde7297eb409e).
 This supplements the original [inventory](inventory.json) and

@@ -1,6 +1,10 @@
 # Proposed ordinary RTX 3080 baseline
 
-**Design only: no benchmark support was added and no GPU workload was run.**
+**Historical design proposal:** the separate implementation and completed GPU
+measurement are now documented in
+[PR #45](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/45) and its
+[native validation report](https://github.com/danhol86/Windows-GPU-UNLOCK/blob/a04471a8c2cec047c25383315d122f1d6513462c/benchmark/rtx3080/NATIVE-VALIDATION.md).
+The text below records the design stage before that implementation and execution.
 This plan concerns normal CUDA computation on the configuration in
 [inventory.json](inventory.json). Its execution is a separate scope from this
 research contribution. Inspected upstream revision:
