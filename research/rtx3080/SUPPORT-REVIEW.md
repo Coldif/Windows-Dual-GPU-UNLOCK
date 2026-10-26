@@ -62,3 +62,42 @@ IDs alone cannot settle it.
 
 No driver or BIOS change is justified merely to resemble another report.
 The existing firmware sources and compatibility assessment remain unchanged.
+
+## Next decision and missing identification
+
+The next milestone is an explicit compatibility decision based on the exact
+card/platform and existing reviewed evidence. PR #39 contains research and
+display inventory; PR #45 contains ordinary CUDA measurement. Neither implements
+an RTX 3080 unlock. Merging these contributions alone would not enable it.
+
+The completed numerical baseline and Windows display observation are ready
+for review. The remaining identification and support questions are:
+
+| Item | Current state | Useful next information or decision |
+|---|---|---|
+| Retail card and board revision | Not established by the PCI IDs | Owner supplies the exact model/part number and revision from an existing label, box or purchase record. Serial numbers are not needed. |
+| Firmware history | Reported VBIOS string is recorded; history is unknown | Owner confirms whether the card is known to retain its original firmware or has a known prior cross-flash. Do not infer this from the version string. |
+| Physical display arrangement | Windows reports external DisplayPort on the RTX 3080 | Owner confirms any adapters/switches and whether another installed or spare display GPU is available. The CPU's lack of an iGPU is already established. |
+| Applicable existing support | No exact-machine support established | Maintainer identifies any already reviewed revision/report for this GPU, motherboard, BIOS, CPU and driver combination, or confirms that compatibility remains unverified. |
+| Contribution acceptance | Both PRs are ready for evidence review | Maintainer reviews the submitted inventory and ordinary benchmark within their documented scope and identifies any documentation/provenance corrections. |
+
+### Questions for maintainer review
+
+1. What additional non-invasive retail/board identification is needed to
+   distinguish this `10de:2216` / `1458:403f` card variant?
+2. Is there an existing reviewed revision or report covering this complete
+   RTX 3080 10 GiB / X570-F BIOS 5043 / Ryzen 7 3700X / driver 610.88
+   configuration? If so, which hardware boundaries and validation limitations
+   apply to that evidence?
+3. Have the separate PNY claim in issue #13 or the Maxsun result in issue #28
+   received maintainer review, and which conclusions are accepted beyond the
+   individual reports?
+4. Can PR #39's inventory/display evidence and PR #45's ordinary CUDA results
+   be accepted with unlock compatibility explicitly unverified? What corrections
+   are required before merge?
+
+These questions request review of existing evidence. They do not request a
+repeat hardware experiment. Card identification, a successful compilation,
+or acceptance of the research PR would not independently prove compatibility.
+Application-performance gains also remain unmeasured; the existing GEMM
+baseline should not be presented as a gaming or application speedup.

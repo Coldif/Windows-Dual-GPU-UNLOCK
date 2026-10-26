@@ -7,6 +7,10 @@ performed for this contribution. The separate ordinary CUDA baseline has now
 been measured and published in
 [PR #45](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/45).
 
+The [next decision and missing identification](SUPPORT-REVIEW.md#next-decision-and-missing-identification)
+are now explicit: these contributions provide evidence, and do not themselves
+implement or enable an RTX 3080 unlock.
+
 Collected on **2026-10-26 (UTC)** against upstream
 [`5c98f11eaafdcb7a2a06fb14fcdcde7297eb409e`](https://github.com/impacifist/Windows-GPU-UNLOCK/tree/5c98f11eaafdcb7a2a06fb14fcdcde7297eb409e).
 The evidence belongs to this configuration; related contributors' observations
