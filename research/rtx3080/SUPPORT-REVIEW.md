@@ -93,6 +93,13 @@ and `offline-run-verified` for the three saved trials, with no native process
 or GPU workload. Implementation and measurement JSON remain unchanged.
 This review concerns ordinary computation evidence, not unlock support.
 
+### Additional Windows configuration review (redacted)
+
+The additional local configuration observations are withheld from this public
+addition at the owner's request. This notice contains no observation results,
+provides no configuration or recovery validation, and does not establish
+exact-machine unlock support.
+
 Remaining identification questions are the physical card's exact part number
 and board revision, firmware cross-flash history, any intermediate display
 adapters or switches, and whether a separate spare display GPU is available.
