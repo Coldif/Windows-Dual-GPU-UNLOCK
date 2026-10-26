@@ -54,6 +54,45 @@ GPU IDs, with source and target on the same adapter. Windows display routing
 cannot establish the pre-boot firmware topology, physical socket/cable chain
 or recovery behavior.
 
+### Driver product identity follow-up
+
+At `2026-10-26T15:28:09.8509969Z`, a read-only NVIDIA SMI XML query for the
+recorded Windows PCI location returned exit code 0. Only selected product
+identity fields were retained; the full XML remained in memory and was not
+saved or published.
+
+| Driver-reported field | Observed value |
+|---|---|
+| Product name | NVIDIA GeForce RTX 3080 |
+| Product brand / architecture | GeForce / Ampere |
+| Board part number | `N/A` |
+| GPU part number | `2216-202-A1` |
+| VBIOS version | `94.02.71.40.c4` |
+
+The query reconfirmed the existing PCI device/subsystem identifiers and
+location. NVIDIA's [SMI reference](https://docs.nvidia.com/deploy/nvidia-smi/index.html)
+distinguishes the GPU part number from the board part number. The returned
+GPU identifier, including its `A1` suffix, does not establish this retail
+card's model or PCB revision. The unavailable board part number leaves the
+physical identification question open. No configuration was changed.
+
+### External review of the ordinary CUDA evidence
+
+A [review comment on PR #45](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/45#issuecomment-6419760856)
+reports independent offline verification of the saved run bundle, its
+build-manifest digest and all eight measured-source hashes. The reviewer
+reports 111 Python tests passed and one skipped, with no native CUDA rerun.
+Those are the reviewer's reported results; the original local validation
+records 112 passed.
+
+The review identified a duplicated directory prefix in the evidence README's
+verification example. [Commit `d0f36bd`](https://github.com/danhol86/Windows-GPU-UNLOCK/commit/d0f36bde38720061d3fb359245a8106d542eab6a)
+corrects the two README examples and explains path resolution. The exact
+corrected repository-root command was run locally and returned exit code 0
+and `offline-run-verified` for the three saved trials, with no native process
+or GPU workload. Implementation and measurement JSON remain unchanged.
+This review concerns ordinary computation evidence, not unlock support.
+
 Remaining identification questions are the physical card's exact part number
 and board revision, firmware cross-flash history, any intermediate display
 adapters or switches, and whether a separate spare display GPU is available.
@@ -75,7 +114,7 @@ for review. The remaining identification and support questions are:
 
 | Item | Current state | Useful next information or decision |
 |---|---|---|
-| Retail card and board revision | Not established by the PCI IDs | Owner supplies the exact model/part number and revision from an existing label, box or purchase record. Serial numbers are not needed. |
+| Retail card and board revision | Not established; the driver reports board part number `N/A` | Owner supplies the exact model/part number and revision from an existing label, box or purchase record. Serial numbers are not needed. |
 | Firmware history | Reported VBIOS string is recorded; history is unknown | Owner confirms whether the card is known to retain its original firmware or has a known prior cross-flash. Do not infer this from the version string. |
 | Physical display arrangement | Windows reports external DisplayPort on the RTX 3080 | Owner confirms any adapters/switches and whether another installed or spare display GPU is available. The CPU's lack of an iGPU is already established. |
 | Applicable existing support | No exact-machine support established | Maintainer identifies any already reviewed revision/report for this GPU, motherboard, BIOS, CPU and driver combination, or confirms that compatibility remains unverified. |
