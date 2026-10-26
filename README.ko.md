@@ -3,22 +3,23 @@
 [English](README.md) | **한국어**
 
 커뮤니티 기여로 확장하는 실험용 UEFI GPU 언락과 Windows 직접 인계 구현입니다.
-현재 소스에는 **실기기 결과가 기록된 정확한 장비 프로필 네 개**가 있습니다.
-내부 headless 두 구성과 headless USB 두 구성입니다. GPU 모델명만으로 지원을
-판단하지 말고 빌드 전에 [호환성](docs/COMPATIBILITY.ko.md)을 확인하세요.
 
-| 빌드 프로필 | 정확한 GPU / 메인보드 / BIOS / CPU | 기록된 경로와 근거 |
+## GPU별 지원 현황
+
+**성공 보고는 특정 카드와 장비 구성에 해당하며, 같은 GPU 모델 전체의 지원을 뜻하지 않습니다.**
+빌드 전에 상세 조건에서 메인보드·BIOS·카드 변형을 확인하세요.
+
+| GPU | 현재 상태 | 상세 조건 |
 |---|---|---|
-| `b650m-3090fe` (기본값) | RTX 3090 FE / ASUS TUF GAMING B650M-PLUS WIFI / 3057 / Ryzen 7 7800X3D | 내부 headless; [최초 유지관리자의 실기기 근거](evidence/headless-handoff/README.md) |
-| `b660m-3070ti` | MSI RTX 3070 Ti / ASUS TUF GAMING B660M-E D4 / 4003 / **iGPU 없는** Core i7-12700F | 내부 headless, aggregate console; [기여자의 보고·구현 PR #5](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/5) |
-| `x870-3090ti` | ASUS RTX 3090 Ti / Gigabyte X870 AORUS ELITE WIFI7 / F13d / Ryzen 7 9800X3D | **Headless USB 전용**; [기여자 PR #10](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/10), [공개 근거](evidence/x870-3090ti-usb/README.md) |
-| `b660plus-3060` | NVIDIA RTX 3060 12GB (GA104, `10de:2487`) / ASUS PRIME B660-PLUS D4 / 3010 / Core i5-12600KF **iGPU 없음**, CSM 끔 | **Headless USB 전용**, 디스플레이 child 두 개의 aggregate 콘솔; [공개 근거 — 영어](evidence/b660plus-3060-usb/README.md) |
+| **RTX 3060 12GB (GA104)** | 실기기 성공 보고 · headless USB 전용 | [지원 구성](docs/COMPATIBILITY.ko.md#프로필-4-asus-prime-b660-plus-d4--rtx-3060-12gbheadless-usb) |
+| **RTX 3070 Ti 8GB** | 실기기 성공 보고 · 내부 headless | [지원 구성](docs/COMPATIBILITY.ko.md#프로필-2-asus-tuf-b660m-e-d4--rtx-3070-tiaggregate-console) |
+| **RTX 3080** | 이 포트의 전용 프로필 없음 · 상위 프로젝트 대상 | [프로젝트 출처](THIRD_PARTY_NOTICES.md) |
+| **RTX 3090 FE 24GB** | 실기기 성공 기록 · 내부 headless · 기본 프로필 | [지원 구성](docs/COMPATIBILITY.ko.md#프로필-1-asus-tuf-b650m--rtx-3090-fe최초-검증) |
+| **RTX 3090 Ti 24GB** | 실기기 성공 보고 · headless USB 전용 | [지원 구성](docs/COMPATIBILITY.ko.md#프로필-3-gigabyte-x870-aorus-elite-wifi7--rtx-3090-tiheadless-usb) |
 
-실기기 결과는 각 보고서의 정확한 빌드와 장비에 해당합니다. 현재 cold 사전검사 보강은
-host·빌드 검증을 거쳤으며, **이 변경으로 새 실기기 부팅·복구 시험을 한 것은 아닙니다.**
-기여자의 보고와 최초 유지관리자의 시험을 구분합니다. 같은 GPU 모델의 모든 카드나
-다른 BIOS까지 지원한다는 뜻은 아닙니다. 표의 Ryzen CPU에는 iGPU가 있지만 기록된
-headless 경로에서는 활성 AMD GOP를 사용하지 않았습니다.
+정확한 빌드 프로필과 유지관리자·기여자의 시험 근거는 [호환성 문서](docs/COMPATIBILITY.ko.md)에
+정리했습니다. 실기기 결과는 보고 당시의 빌드에 해당합니다. 이후 main의 보강은
+host·빌드 검증을 거쳤으며, **새 실기기 부팅·복구 시험을 한 것은 아닙니다.**
 
 최신 태그 **v0.3.1은 소스 전용 사전 릴리스**입니다. 현재 소스는 그 태그 이후의
 USB 경로와 X870 프로필 등을 포함하며, 이를 새 릴리스가 발행됐다는 뜻으로 읽지 마세요.

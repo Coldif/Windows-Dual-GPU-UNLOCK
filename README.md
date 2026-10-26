@@ -3,24 +3,25 @@
 **English** | [한국어](README.ko.md)
 
 Experimental UEFI GPU unlock and direct Windows handoff, expanded through
-community contributions. This source tree contains **four exact-machine
-profiles with recorded hardware results**: two internal headless configurations
-and two headless USB configurations. Read [compatibility](docs/COMPATIBILITY.en.md)
-before choosing a build; a GPU model name alone does not establish support.
+community contributions.
 
-| Build profile | Exact GPU / motherboard / BIOS / CPU | Recorded route and evidence |
+## GPU support
+
+**Success reports apply to specific cards and systems, not every card of the same
+GPU model.** Check the linked motherboard, BIOS and card requirements before building.
+
+| GPU | Current status | Details |
 |---|---|---|
-| `b650m-3090fe` (default) | RTX 3090 FE / ASUS TUF GAMING B650M-PLUS WIFI / 3057 / Ryzen 7 7800X3D | Internal headless; [original maintainer's hardware evidence](evidence/headless-handoff/README.md) |
-| `b660m-3070ti` | MSI RTX 3070 Ti / ASUS TUF GAMING B660M-E D4 / 4003 / Core i7-12700F **without iGPU** | Internal headless, aggregate console; [contributor's report and implementation, PR #5](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/5) |
-| `x870-3090ti` | ASUS RTX 3090 Ti / Gigabyte X870 AORUS ELITE WIFI7 / F13d / Ryzen 7 9800X3D | **Headless USB only**; [contributor's PR #10](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/10), [sanitized evidence](evidence/x870-3090ti-usb/README.md) |
-| `b660plus-3060` | NVIDIA RTX 3060 12GB (GA104, `10de:2487`) / ASUS PRIME B660-PLUS D4 / 3010 / Core i5-12600KF **without iGPU**, CSM off | **Headless USB only**, aggregate console with two display children; [sanitized evidence](evidence/b660plus-3060-usb/README.md) |
+| **RTX 3060 12GB (GA104)** | Hardware success reported; headless USB only | [Supported configuration](docs/COMPATIBILITY.en.md#profile-4-asus-prime-b660-plus-d4--rtx-3060-12gb-headless-usb) |
+| **RTX 3070 Ti 8GB** | Hardware success reported; internal headless | [Supported configuration](docs/COMPATIBILITY.en.md#profile-2-asus-tuf-b660m-e-d4--rtx-3070-ti-aggregate-console) |
+| **RTX 3080** | No dedicated profile in this port; upstream project target | [Project origins](THIRD_PARTY_NOTICES.md) |
+| **RTX 3090 FE 24GB** | Hardware success recorded; internal headless; default profile | [Supported configuration](docs/COMPATIBILITY.en.md#profile-1-asus-tuf-b650m--rtx-3090-fe-original) |
+| **RTX 3090 Ti 24GB** | Hardware success reported; headless USB only | [Supported configuration](docs/COMPATIBILITY.en.md#profile-3-gigabyte-x870-aorus-elite-wifi7--rtx-3090-ti-headless-usb) |
 
-These results concern the exact builds and systems in their reports. The current
-cold-precheck hardening has host/build verification, **not a new physical boot or
-recovery test** on those machines. Contributor reports are identified separately
-from the original maintainer's run; they do not establish support for every card
-of the same model or every BIOS. The Ryzen CPUs in the table have iGPUs, but their
-reported headless routes used no active AMD GOP.
+The [compatibility guide](docs/COMPATIBILITY.en.md) lists exact build profiles and
+distinguishes maintainer tests from contributor reports. Results concern their
+recorded builds; later main-branch hardening has host/build checks, **not a new
+physical boot or recovery test**.
 
 The latest tagged release, **v0.3.1, is a source-only pre-release**. This source
 tree has changes beyond that tag, including the USB route and X870 profile; those
