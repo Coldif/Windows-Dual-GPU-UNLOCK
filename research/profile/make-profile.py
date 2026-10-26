@@ -39,6 +39,8 @@ GOP = '9042a9de-23dc-4a38-96fb-7aded080516a'
 EDID_DISCOVERED = '1c0c34f6-d380-41fa-a049-8ad06c1a66aa'
 PCI_IO = '4cf5b200-68b8-4ca5-9eec-b23e3f50029a'
 BY_DRIVER = 0x10
+# EFI_PCI_IO_ATTRIBUTE_IO / _MEMORY / _BUS_MASTER (PciIo.h)
+PCI_ATTRIBUTE_IO, PCI_ATTRIBUTE_MEMORY, PCI_ATTRIBUTE_BUS_MASTER = 0x100, 0x200, 0x400
 OUT_FILE = '628a497d-2bf6-4264-8741-069dbd3399d6'
 GFX_FILE = '43e7abdd-e352-4cfb-a230-4cdc1d350e5c'
 MOUSE_FILE = 'c7a7030c-c3d8-45ee-bed9-5d9e76762953'
@@ -301,6 +303,18 @@ def analyze(diag, image_dir, envelope):
     bar0 = cfg[4]
     if bar0 & 0xf or bar0 & 0xffffff or not bar0:
         fail(f'BAR0 {bar0:#x} is not a 16 MiB aligned 32-bit non-prefetchable window')
+    # full-release.c CapturePermit: the PciIo attribute cache must equal the raw IO/MEM command
+    # bits, with no bus mastering, or the release stops after the console was already detached.
+    rows = re.findall(r'^pci-attributes status=0x([0-9a-f]{16}) value=0x([0-9a-f]{16})$', text, re.M)
+    if len(rows) != 1:
+        fail(f'{diag.name}: no PciIo attribute record; capture again with the current probe')
+    attr_status, attributes = (int(v, 16) for v in rows[0])
+    if attr_status:
+        fail(f'{diag.name}: reading the PciIo attributes failed with status {attr_status:#x}')
+    expected_attributes = (PCI_ATTRIBUTE_IO if cfg[1] & 1 else 0) | (PCI_ATTRIBUTE_MEMORY if cfg[1] & 2 else 0)
+    if attributes & (PCI_ATTRIBUTE_IO | PCI_ATTRIBUTE_MEMORY | PCI_ATTRIBUTE_BUS_MASTER) != expected_attributes:
+        fail(f'{diag.name}: PciIo attributes {attributes:#x} disagree with the PCI command register '
+             f'(expected IO/MEM/BME bits {expected_attributes:#x}); full-release.c CapturePermit would stop the release')
 
     mmio, _ = probe_mmio(text)
     if any(o not in mmio for o in COLD):

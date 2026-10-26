@@ -1,11 +1,14 @@
 # Modified 2026-10-19/20 for Windows GPU UNLOCK; changes documented in CHANGES.md.
-param([switch]$PreflightOnly,[ValidateSet('3090','3090ti','3070ti')][string]$Card='3090')
+param([switch]$PreflightOnly,[ValidateSet('3090','3090ti','3070ti')][string]$Card='3090',
+ # PCI bus of the card in Windows, two hex digits; every reviewed profile is bus 01.
+ [ValidatePattern('^[0-9A-Fa-f]{2}$')][string]$PciBus='01')
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
 $benchmarkNames = @('fp32_pedantic','fp16_tensor_fp32_accumulate','bf16_tensor_fp32_accumulate','tf32_tensor_fp32_accumulate')
 # Reject overrides before executable/GPU queries; metadata inspection alone never runs GEMM.
 if (![string]::IsNullOrEmpty($env:NVIDIA_TF32_OVERRIDE)) { throw 'Unset NVIDIA_TF32_OVERRIDE before running the four-mode benchmark' }
 $exe = Join-Path $root "bin\compute-benchmark-$Card.exe"
+$busPattern = '^0+:' + $PciBus.ToUpperInvariant() + ':00\.0$'
 $gpuName = @{'3090'='NVIDIA GeForce RTX 3090';'3090ti'='NVIDIA GeForce RTX 3090 Ti';'3070ti'='NVIDIA GeForce RTX 3070 Ti'}[$Card]
 if (-not (Test-Path -LiteralPath $exe)) { throw 'Build the benchmark first' }
 $manifest = Get-Content -LiteralPath (Join-Path $root 'build-manifest.json') -Raw | ConvertFrom-Json
@@ -25,7 +28,7 @@ function Assert-GpuIdle {
     $rows = @(& nvidia-smi --query-gpu=name,pci.bus_id,driver_version,utilization.gpu,memory.used,temperature.gpu --format=csv,noheader,nounits)
     if ($LASTEXITCODE -ne 0 -or $rows.Count -ne 1) { throw 'Expected exactly one NVIDIA GPU' }
     $fields = $rows[0] -split ',' | ForEach-Object { $_.Trim() }
-    if ($fields[0] -ne $gpuName -or $fields[1] -notmatch '^0+:01:00\.0$') { throw 'Unexpected GPU identity' }
+    if ($fields[0] -ne $gpuName -or $fields[1] -notmatch $busPattern) { throw 'Unexpected GPU identity' }
     if ([int]$fields[3] -gt 5 -or [int]$fields[4] -gt 2048) { throw 'GPU is busy. Save and finish ComfyUI/other GPU jobs before benchmarking. Nothing was stopped.' }
     if ([int]$fields[5] -gt 65) { throw 'GPU is still hot. Let it cool before a comparable measurement.' }
     return $rows[0]
@@ -34,7 +37,7 @@ function Get-ComparisonSettings {
     $rows = @(& nvidia-smi --query-gpu=name,pci.bus_id,driver_version,power.limit,clocks.max.sm,clocks.max.memory --format=csv,noheader,nounits)
     if ($LASTEXITCODE -ne 0 -or $rows.Count -ne 1) { throw 'Could not capture comparison settings' }
     $fields = @($rows[0] -split ',' | ForEach-Object { $_.Trim() })
-    if ($fields.Count -ne 6 -or $fields[0] -ne $gpuName -or $fields[1] -notmatch '^0+:01:00\.0$') { throw 'Unexpected comparison GPU identity' }
+    if ($fields.Count -ne 6 -or $fields[0] -ne $gpuName -or $fields[1] -notmatch $busPattern) { throw 'Unexpected comparison GPU identity' }
     return $fields
 }
 $initialState = Assert-GpuIdle
