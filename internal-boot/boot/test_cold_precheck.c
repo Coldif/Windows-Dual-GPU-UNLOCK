@@ -46,7 +46,7 @@ static EFI_STATUS EFIAPI FreeP(VOID *p){
     if(DriftKind==2)Devs[0].cfg[1]|=4U;
     if(DriftKind==3)Devs[0].cfg[4]=0;
     if(DriftKind==4)Devs[0].cfg[0]^=1U;
-    if(DriftKind==5)Devs[0].bus=2;
+    if(DriftKind==5)Devs[0].bus=GU_TARGET_BUS+1U;
     if(DriftKind==6)SwapInterface=1;
     if(DriftKind==7)Devs[0].io.Pci.Read=NULL;
     if(DriftKind==8)Devs[0].failLocation=TRUE;
@@ -59,7 +59,7 @@ static EFI_STATUS EFIAPI FreeP(VOID *p){
 static void Card(FAKE *x){
   memset(x,0,sizeof(*x));x->io.GetLocation=Loc;x->io.Pci.Read=CfgRead;x->io.Mem.Read=MemRead;x->io.Mem.Write=MemWrite;
   x->io.GetBarAttributes=GetBar;
-  x->bus=1;x->cfg[0]=GU_BOARD_ID;x->cfg[1]=2;x->cfg[2]=0x030000a1;x->cfg[4]=(UINT32)GU_BAR0_BASE;x->cfg[11]=GU_BOARD_SUBSYSTEM;
+  x->bus=GU_TARGET_BUS;x->cfg[0]=GU_BOARD_ID;x->cfg[1]=2;x->cfg[2]=0x030000a1;x->cfg[4]=(UINT32)GU_BAR0_BASE;x->cfg[11]=GU_BOARD_SUBSYSTEM;
   x->bar.d.Desc=ACPI_ADDRESS_SPACE_DESCRIPTOR;x->bar.d.Len=sizeof(x->bar.d)-3;x->bar.d.AddrSpaceGranularity=32;
   x->bar.d.AddrRangeMin=GU_BAR0_BASE;x->bar.d.AddrRangeMax=GU_BAR0_END;x->bar.d.AddrLen=0x1000000;
   x->bar.end[0]=ACPI_END_TAG_DESCRIPTOR;
@@ -126,7 +126,7 @@ int main(void){
   Card(&Devs[0]);Devs[0].regs[0]=GU_CHIP_ID^0x00100000U;Check(Run()==EFI_NOT_READY,"other chip refused");
   Card(&Devs[0]);Devs[0].failRead=TRUE;Check(Run()==EFI_DEVICE_ERROR,"register read failure reported");
   Card(&Devs[0]);Devs[0].cfg[11]=GU_BOARD_SUBSYSTEM^1U;Check(Run()==EFI_NOT_FOUND,"other subsystem not a target");
-  Card(&Devs[0]);Devs[0].bus=2;Check(Run()==EFI_NOT_FOUND,"card at another slot not a target");
+  Card(&Devs[0]);Devs[0].bus=GU_TARGET_BUS+1U;Check(Run()==EFI_NOT_FOUND,"card at another slot not a target");
   DevCount=2;Card(&Devs[0]);Card(&Devs[1]);Devs[1].fun=1;Devs[1].cfg[0]=0x1aef10de;Check(Run()==EFI_SUCCESS,"HD audio function ignored");
   Card(&Devs[1]);Check(Run()==EFI_NOT_FOUND,"two identical targets refused");
   DevCount=0;Check(Run()==EFI_NOT_FOUND,"no PCI devices refused");

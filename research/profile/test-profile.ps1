@@ -72,7 +72,12 @@ $boot=Join-Path $repo 'internal-boot/boot'
 Push-Location -LiteralPath $boot
 try {
  $r=$report.Replay
- & $Python -I make-console-fixture.py (Join-Path $fx 'console/DIAG.TXT') --single-rtx "--rtx-id=$($r.RtxId)" "--amd-id=$($r.IgpuId)" "--rtx-fb=$($r.RtxFramebuffer)" --no-edid-child
+ $fixtureArgs=@('--single-rtx',"--rtx-id=$($r.RtxId)","--rtx-fb=$($r.RtxFramebuffer)",'--no-edid-child')
+ # A machine without an integrated GPU has no second display adapter to replay.
+ if($r.IgpuId){$fixtureArgs+="--amd-id=$($r.IgpuId)"}else{$fixtureArgs+='--no-igpu'}
+ # A firmware that binds no EDID driver (GU_NO_EDID_DRIVER) has no EDID consumer to replay.
+ if($r.NoEdidDriver){$fixtureArgs+='--no-edid-driver'}
+ & $Python -I make-console-fixture.py (Join-Path $fx 'console/DIAG.TXT') @fixtureArgs
  if($LASTEXITCODE -ne 0){throw 'Replay fixture failed'}
  $d=@('-std=c11','-O1','-Wall','-Wextra','-Werror','-D_CRT_SECURE_NO_WARNINGS','-DGU_SINGLE_RTX_CONSOLE','-DGU_DIAGNOSTIC_ONLY','-DGU_CONSOLE_PREPARE','-I','../../deps/edk2/MdePkg/Include','-I','../../deps/edk2/MdePkg/Include/X64')
  Run-Job 'r2 console replay (real graph)' ($d+$profile+@('test_r2.c','research-input.c','console-flow.c','-o','build/r2/test-r2-local.exe')) @('./build/r2/test-r2-local.exe')
@@ -82,6 +87,19 @@ try {
  $w=@('-std=c11','-O1','-Wall','-Wextra','-Werror','-D_CRT_SECURE_NO_WARNINGS','-I','build/cold/include','-I','../../deps/edk2/MdePkg/Include','-I','../../deps/edk2/MdePkg/Include/X64')
  Run-Job 'cold pre-check (read-only)' ($w+$profile+@('-DGU_HEADLESS_RESEARCH','-DGU_SINGLE_RTX_CONSOLE','-DGU_FULL_UNLOCK','-DGU_AUTOMATIC_BOOT','test_cold_precheck.c','console-flow.c','../unlock/checks.c','../unlock/sha256.c','-o','build/cold/test-cold-local.exe')) @('./build/cold/test-cold-local.exe')
  Run-Job 'full flow gates' ($w+@('test_full_flow.c','full-flow.c','-o','build/cold/test-full-flow.exe')) @('./build/cold/test-full-flow.exe')
+ if($r.NoEdidDriver) {
+  # No reviewed profile releases the GPU without an EDID stage, so replay the whole driver release
+  # on this machine's own graph, driver image, PROM and PCI config, and require it in the evidence.
+  $words=[regex]::Matches([IO.File]::ReadAllText($probe),'value=0x([0-9a-f]{8})') | ForEach-Object {[Convert]::ToUInt32($_.Groups[1].Value,16)}
+  if(@($words).Count -ne 64){throw 'The probe fixture does not hold 64 config dwords'}
+  $configImage=New-Object byte[] 256
+  for($k=0;$k -lt 64;$k++){[BitConverter]::GetBytes([uint32]@($words)[$k]).CopyTo($configImage,$k*4)}
+  [void][IO.Directory]::CreateDirectory((Join-Path $boot 'build/release'))
+  $configPath=Join-Path $boot 'build/release/config.bin';[IO.File]::WriteAllBytes($configPath,$configImage)
+  $driverImage=Join-Path $local ('capture/'+$report.Code.nvgop.dump)
+  if(!(Test-Path -LiteralPath $driverImage -PathType Leaf)){throw 'The captured nvgop image is missing from research/profile/local/capture'}
+  Run-Job 'release replay, no EDID driver (real graph)' ($w+$profile+@('-DGU_HEADLESS_RESEARCH','-DGU_SINGLE_RTX_CONSOLE','-DGU_FULL_UNLOCK','-DGU_AUTOMATIC_BOOT','test_headless_full.c','console-flow.c','../unlock/checks.c','../unlock/sha256.c','-o','build/release/test-release-local.exe')) @('./build/release/test-release-local.exe',$driverImage,$prom,$configPath)
+ }
 } finally {Pop-Location}
 
 # Transaction stage: production app + vendor unlock core against this card's real PROM and
@@ -104,7 +122,7 @@ try {
 if((Get-LocalTreeDigest $repo) -ne $tree -or (Get-LocalProfile $repo).HeaderSha256 -ne $hw.HeaderSha256){throw 'Sources or profile changed while the tests ran; rerun'}
 if((Get-GuSha256 (Join-Path $local 'profile.json')) -cne $reportSha){throw 'Profile report changed during tests'}
 Assert-LocalFixtures $repo $report.Fixtures
-$expectedJobs=Get-LocalExpectedJobs
+$expectedJobs=Get-LocalExpectedJobs ([bool]$report.Replay.NoEdidDriver)
 Assert-LocalKeys $results @($expectedJobs.Keys) 'Completed host jobs'
 foreach($jobName in $expectedJobs.Keys){if($results[$jobName].Exit -ne $expectedJobs[$jobName] -or $results[$jobName].Expected -ne $expectedJobs[$jobName]){throw 'Host result mismatch'}}
 [ordered]@{Format=2;AllPassed=$true;HardwareAccess=$false;ProfileName=$hw.Name;HeaderSha256=$hw.HeaderSha256;PromSha256=$hw.Prom;

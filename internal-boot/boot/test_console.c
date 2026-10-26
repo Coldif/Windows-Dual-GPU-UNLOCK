@@ -135,7 +135,7 @@ static EFI_STATUS EFIAPI FindPci(EFI_GUID *g,EFI_DEVICE_PATH_PROTOCOL **path,EFI
   *path=(VOID *)((UINT8 *)*path+24);return EFI_SUCCESS;
 }
 static EFI_STATUS EFIAPI Location(EFI_PCI_IO_PROTOCOL *io,UINTN *seg,UINTN *bus,UINTN *dev,UINTN *fun) {
-  *seg=*dev=*fun=0;*bus=io==&AmdPci?12:1;return EFI_SUCCESS;
+  *seg=*dev=*fun=0;*bus=io==&AmdPci?12:GU_TARGET_BUS;return EFI_SUCCESS;
 }
 static EFI_STATUS EFIAPI Read(EFI_PCI_IO_PROTOCOL *io,EFI_PCI_IO_PROTOCOL_WIDTH width,UINT32 at,UINTN n,VOID *data) {
 #ifdef GU_FULL_REPLAY_TEST

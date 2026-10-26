@@ -43,9 +43,22 @@ def one(predicate):
     if len(values) != 1:
         raise ValueError('Expected exactly one role')
     return indices[values[0]]
+no_igpu = '--no-igpu' in sys.argv[2:]
+if no_igpu and not single:
+    raise ValueError('--no-igpu is only for the single-RTX console replay')
+# This firmware binds no EDID/mouse driver to the RTX display handles (GU_NO_EDID_DRIVER).
+no_edid_driver = '--no-edid-driver' in sys.argv[2:]
+if no_edid_driver and not single:
+    raise ValueError('--no-edid-driver is only for the single-RTX console replay')
+EDID_DISCOVERED = '1c0c34f6-d380-41fa-a049-8ad06c1a66aa'
+if no_edid_driver and any(str(e[3]) == EDID_DISCOVERED for e in edges):
+    raise ValueError('--no-edid-driver was given but the graph has an active EdidDiscovered owner')
 roles = {
     'RtxPci': one(lambda b: f'pci config-dwords={rtx_id}' in b),
-    'AmdPci': one(lambda b: f'pci config-dwords={amd_id}' in b),
+    # Without an integrated GPU the replay has no second adapter. The legacy two-adapter test
+    # code that test_r2.c includes still names this handle, so give it an ordinal that exists in
+    # no graph block; the single-RTX scenarios never reach it.
+    'AmdPci': len(blocks) + 1 if no_igpu else one(lambda b: f'pci config-dwords={amd_id}' in b),
     'Rtx': one(lambda b: f'gop framebuffer={rtx_fb}' in b),
     'Amd': 0 if single else one(lambda b: 'gop framebuffer=0x000000fce0000000' in b),
 }
@@ -61,8 +74,10 @@ for role, protocol, controller in [
     ('OutAgent', '387477c2-69c7-11d2-8e39-00a0c969723b', roles['Rtx']),
     ('GfxAgent', '9042a9de-23dc-4a38-96fb-7aded080516a', roles['Rtx']),
     ('NvAgent', '4cf5b200-68b8-4ca5-9eec-b23e3f50029a', roles['RtxPci']),
-    ('EdidAgent', '1c0c34f6-d380-41fa-a049-8ad06c1a66aa', roles['Rtx']),
+    ('EdidAgent', EDID_DISCOVERED, roles['Rtx']),
 ]:
+    if no_edid_driver and role == 'EdidAgent':
+        continue
     records = [e for e in edges if e[0] == controller and str(e[3]) == protocol and e[4] == 16]
     if len(records) != 1:
         raise ValueError('Expected a unique consumer')
@@ -72,7 +87,8 @@ for role, protocol, controller in [
 console = re.search(r'console out=(0x[0-9a-f]+) error=(0x[0-9a-f]+) input=(0x[0-9a-f]+)', text)
 for role, value in zip(['Console', 'Error', 'Input'], console.groups()):
     roles[role] = indices[value]
-lines = [f'/* Local diagnostic sha256 {hashlib.sha256(raw).hexdigest()} */', f'#define FX_HANDLES {len(blocks)}']
+lines = [f'/* Local diagnostic sha256 {hashlib.sha256(raw).hexdigest()} */', f'#define FX_HANDLES {len(blocks)}',
+         f'#define FX_NO_EDID_DRIVER {1 if no_edid_driver else 0}']
 for role, value in roles.items():
     lines.append(f'#define FX_{role} ((EFI_HANDLE){value})')
 lines.append('static const EDGE FixtureEdges[]={')
@@ -82,6 +98,9 @@ for h, a, c, g, attrs, count in edges:
     lines.append(f'{{(EFI_HANDLE){h},(EFI_HANDLE){a},(EFI_HANDLE){c},{guid},{attrs},{count}}},')
 lines.append('};')
 for role in ['Rtx', 'Amd']:
+    if role == 'Amd' and no_igpu:
+        lines.append('static const UINT32 FixtureAmdConfig[16]={0};')
+        continue
     block = blocks[next(h for h, i in indices.items() if i == roles[role + 'Pci'])]
     cfg = re.search(r'pci config-dwords=([^\n]+)', block)[1].split()
     if len(cfg) != 16:

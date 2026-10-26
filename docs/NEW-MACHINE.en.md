@@ -20,19 +20,31 @@ reviewed profiles have proven on hardware. There is no override flag. Today that
 |---|---|
 | RTX 3090 / 3090 Ti PCI identity `220410de` / `220310de` | only these identities have the reviewed GA102 deep-capture envelope |
 | GA102 (`chip=0xb72000a1`, class/revision `030000a1`) with `0x6000` or `0x5ff4` MiB | the only chip/memory layouts that completed the transaction on hardware |
-| exactly one NVIDIA display controller, at `0000:01:00.0`, behind one root port | `GuCheckConfig` / `GuDisplayPath` |
-| one integrated (non-NVIDIA) display controller present | the single-RTX console replay has no design without one |
+| exactly one NVIDIA display controller, at segment 0, device 0, function 0 on a nonzero PCI bus (reviewed profiles: bus `01`), behind one root port | `GuCheckConfig` / `GuDisplayPath`; the bus is the per-machine constant `GU_TARGET_BUS` |
+| at most one integrated (non-NVIDIA) display controller; with none, the RTX owns the only GOP in the whole graph | the single-RTX console path never uses a second adapter and refuses any AMD GOP |
 | `ConOut` is exactly the RTX GOP (non-aggregate console) | aggregate splitter consoles are not generated |
-| AMI console text/GOP splitter and EDID drivers, `nvgop-ga1xx` | the release path in `full-release.c` |
+| AMI console text/GOP splitter drivers and `nvgop-ga1xx`; the AMI EDID driver is optional | the release path in `full-release.c` (see below) |
 | `nvgop-ga1xx` `.text` hash already released cleanly on hardware | another build has never been released |
 | GPU in its power-on state at every capture | the unlock never runs from anything else |
 | PciIo attribute cache recorded and equal to the PCI command register's IO/MEM bits, no bus mastering | `CapturePermit` stops the release otherwise, after the console was detached; captures from an older probe are refused |
 | at least two complete captures from separate full shutdowns, all agreeing | load-address- or boot-dependent values are refused |
 | PROM.BIN matches the captured hash; the production parser finds FWSEC-FRTS within tested bounds | FWSEC pin and transaction tests |
 
-A RTX 3090 or 3090 Ti on an AMD-iGPU board with an AMI BIOS is the likely fit. Anything else
-is refused with the reason. Widening the envelope needs a reviewed change that cites new
+A RTX 3090 or 3090 Ti on an AMI BIOS board, with or without an iGPU, is the likely fit. Anything
+else is refused with the reason. Widening the envelope needs a reviewed change that cites new
 hardware evidence, normally a new reviewed profile (PORTABILITY stage 4).
+
+**Bus, iGPU and EDID.** The generator accepts a card on another PCI bus, a machine without an
+iGPU and a firmware that binds no EDID driver. One machine covers all three on hardware
+([evidence/b550m-3090-usb](../evidence/b550m-3090-usb/README.md)); anything else about such a
+machine (chip, memory, nvgop build) must still be inside the envelope. When no handle in the
+capture has an active `EdidDiscovered` opener the profile sets `GU_NO_EDID_DRIVER`: the release
+skips the EDID stage and only stops the NVIDIA GOP driver after the console detach. Every display
+child of the RTX must still carry the `EdidDiscovered` interface, and any live driver holding a
+display child, or an EDID driver appearing later, stops the release before the NVIDIA stop. Such a
+profile must also pass a replay of the whole driver release on its own graph, driver image, PROM
+and PCI config (a 20th job). Only the non-aggregate headless build supports the flag; other builds
+refuse it at compile time. The probe needs `build-probe.ps1 -TargetBus` for a card off bus `01`.
 
 ## Steps
 
@@ -56,7 +68,7 @@ Run the same command repeatedly; each run does the next step.
    the reviewed class/revision, `0000:01:00.0`, a 32-bit aligned 16 MiB BAR resource
    and unchanged handle/interface/config after resource queries and allocation. A card on
    another bus can be captured with `build-probe.ps1 -TargetBus 0x2b` (diagnostic build only);
-   the profile generator still requires `0000:01:00.0`. The probe also records the PciIo
+   the generator then records that bus as `GU_TARGET_BUS`. The probe also records the PciIo
    attribute cache (Get only), which the generator compares with the PCI command register.
    Unknown devices and multiple NVIDIA displays receive inventory only; they cannot
    produce an eligible local profile. It writes
@@ -88,7 +100,8 @@ A write build of `-HardwareProfile local` (`internal-boot/unlock/build.ps1`, `bu
 and `stage-usb.ps1` again before copying) is refused unless `test-results.json`:
 
 - uses evidence format 2 with boolean pass/no-hardware flags and the exact 19
-  host results (including exit 1 for the two required rejection jobs),
+  host results (including exit 1 for the two required rejection jobs; 20 for a firmware
+  without an EDID driver, which adds the driver-release replay),
 - was made against exactly the current `profile-local.h` bytes and PROM hash,
 - matches exactly the four fixtures and the generated profile report byte for byte, and
 - matches an ordered path/hash manifest and digest of the sources, tests, generator,

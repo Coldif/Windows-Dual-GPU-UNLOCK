@@ -242,7 +242,7 @@ static EFI_STATUS EFIAPI close_protocol(EFI_HANDLE h,EFI_GUID *g,EFI_HANDLE agen
   CHECK(GuSafeToReturn() && !Gu.allocations);exclusive=FALSE;close_protocol_calls++;return EFI_SUCCESS;
 }
 static EFI_STATUS EFIAPI location(EFI_PCI_IO_PROTOCOL *p,UINTN *s,UINTN *b,UINTN *d,UINTN *f) {
-  CHECK(p==&pci || p==&replacement_pci);*s=*d=*f=0;*b=1;return EFI_SUCCESS;
+  CHECK(p==&pci || p==&replacement_pci);*s=*d=*f=0;*b=GU_TARGET_BUS;return EFI_SUCCESS;
 }
 static EFI_STATUS EFIAPI replacement_read(EFI_PCI_IO_PROTOCOL *p,EFI_PCI_IO_PROTOCOL_WIDTH w,UINT32 o,UINTN n,VOID *d) {
   CHECK(p==&replacement_pci);return read_config(&pci,w,o,n,d);

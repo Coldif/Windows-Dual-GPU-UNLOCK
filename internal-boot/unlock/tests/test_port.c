@@ -98,9 +98,9 @@ static VOID setup(VOID) {
 }
 int main(void) {
   setup();
-  assert(GuTargetConfig((UINT32 *)config,0,1,0,0));
-  assert(!GuTargetConfig((UINT32 *)config,0,2,0,0));
-  *(UINT32 *)(config+0x2c)^=1;assert(!GuTargetConfig((UINT32 *)config,0,1,0,0));
+  assert(GuTargetConfig((UINT32 *)config,0,GU_TARGET_BUS,0,0));
+  assert(!GuTargetConfig((UINT32 *)config,0,GU_TARGET_BUS+1U,0,0));
+  *(UINT32 *)(config+0x2c)^=1;assert(!GuTargetConfig((UINT32 *)config,0,GU_TARGET_BUS,0,0));
   setup(); VOID *cpu=NULL;UINT64 dma=0;
   assert(!EFI_ERROR(GuDmaAllocate(59136,&cpu,&dma)));
   assert(cpu && dma==0x12000000 && dma!=(UINTN)cpu && fake.maps==1);

@@ -1,5 +1,28 @@
 # Changes
 
+## Unreleased — local profiles: per-machine PCI bus, optional iGPU, optional EDID driver; MSI B550M / RTX 3090 evidence
+
+- `GU_TARGET_BUS` (default `1U`) replaces the literal bus `1` in `GuCheckConfig`, `GuTargetConfig`,
+  `full-release.c` and `prepare-console.c`. A non-default value compiles only with
+  `GU_PROFILE_LOCAL`. For all five reviewed profiles, headless and manual builds, the objects of
+  `full-release.c`, `prepare-console.c`, `checks.c`, `port.c` and `diagnostic.c` are byte-identical
+  to before.
+- `make-profile.py` accepts any nonzero bus at segment 0, device 0, function 0 and writes
+  `GU_TARGET_BUS`. It no longer requires an integrated GPU: none or one is accepted; with none the
+  RTX must own the only GOP in the graph, and a capture set that gains or loses an iGPU between
+  boots is refused. It accepts a graph in which no handle has an active `EdidDiscovered` opener and
+  then writes `GU_NO_EDID_DRIVER 1` and no `GU_EDID_*` constants.
+- `GU_NO_EDID_DRIVER` (local profiles on the non-aggregate headless build only; other builds refuse
+  it at compile time): the release skips the EDID stage and stops only the NVIDIA GOP driver after
+  the console detach. Any live driver on a display child stops the release before that stop. Such
+  a profile's evidence gains a 20th job, a replay of the whole `GuReleaseGop` on its own graph,
+  driver image, PROM and PCI config (`test_headless_full.c`). `make-console-fixture.py` takes
+  `--no-igpu` and `--no-edid-driver`.
+- `proven.json` admits nvgop `0x60009` (`.text` `d045cee2...`), released cleanly three times on
+  the machine in [evidence/b550m-3090-usb](evidence/b550m-3090-usb/README.md): MSI B550M PRO-VDH
+  WIFI, Ryzen 7 5700X (no iGPU), MSI RTX 3090 at `0000:2b:00.0`, no EDID driver, headless USB.
+  Locked to unlocked at n=4096: FP16 64.3 to 110.9, BF16 66.2 to 115.9 TFLOPS, FP32 unchanged.
+
 ## Unreleased — probe: non-01 PCI bus and PciIo attribute record
 
 - The generic probe takes its deep-read bus from `GU_PROBE_BUS` (`research/profile/build-probe.ps1

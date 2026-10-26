@@ -66,6 +66,23 @@ Check 'missing manifest row' {param($e) $e.Inputs=@($e.Inputs|Select-Object -Ski
 Check 'manifest hash' {param($e) $e.Inputs[0].Sha256='0'*64}
 Check 'manifest path' {param($e) $e.Inputs[0].Path='other.c'}
 Check 'digest' {param($e) $e.TreeSha256='0'*64}
+# A firmware without an EDID driver releases the GPU unlike every reviewed profile, so its evidence
+# must also hold the driver-release replay on its own graph, and that replay must have passed.
+$reportNoEdid=[ordered]@{Format=1;ProfileName=$hw.Name;HeaderSha256=$hw.HeaderSha256;PromSha256=$prom;HardwareTested=$false;Fixtures=$fixtures;Replay=[ordered]@{NoEdidDriver=$true}}
+Put 'research/profile/local/profile.json' ($reportNoEdid|ConvertTo-Json -Depth 8)
+$jobsNoEdid=[ordered]@{};$expectedNoEdid=Get-LocalExpectedJobs $true
+foreach($name in $expectedNoEdid.Keys){$jobsNoEdid[$name]=[ordered]@{Exit=[int]$expectedNoEdid[$name];Expected=[int]$expectedNoEdid[$name]}}
+$normalBaseline=$baseline
+$baseline=[ordered]@{Format=2;AllPassed=$true;HardwareAccess=$false;ProfileName=$hw.Name;
+ HeaderSha256=$hw.HeaderSha256;PromSha256=$prom;ProfileReportSha256=(Get-GuSha256 (Join-Path $sandbox 'research/profile/local/profile.json'));
+ Fixtures=$fixtures;Inputs=$inputs;TreeSha256=(Get-LocalInputDigest $inputs);Results=$jobsNoEdid}|ConvertTo-Json -Depth 10
+Check 'no-EDID-driver evidence with the release replay' {} $true
+Check 'no-EDID-driver evidence without the release replay' {param($e) $e.Results.PSObject.Properties.Remove('release replay, no EDID driver (real graph)')}
+Check 'no-EDID-driver release replay failed' {param($e) $e.Results.'release replay, no EDID driver (real graph)'.Exit=1}
+Check 'no-EDID-driver release replay expectation weakened' {param($e) $e.Results.'release replay, no EDID driver (real graph)'.Expected=1;$e.Results.'release replay, no EDID driver (real graph)'.Exit=1}
+$baseline=$normalBaseline
+Put 'research/profile/local/profile.json' ($report|ConvertTo-Json -Depth 8)
+Check 'release replay job on a profile that has an EDID driver' {param($e) $e.Results|Add-Member NoteProperty 'release replay, no EDID driver (real graph)' @{Exit=0;Expected=0}}
 Put 'research/profile/local/test-results.json' $baseline
 $package=[ordered]@{HardwareProfile=$hw.Name;LocalProfileHeaderSha256=$hw.HeaderSha256;
  LocalProfileTreeSha256=(Get-LocalInputDigest $inputs);

@@ -71,7 +71,12 @@ int main(void) {
     if(late==2)Keys.WaitForKey=NULL;
     if(late==3){int found=0;for(UINTN i=0;i<Live.Count;i++)if(Live.Edges[i].Handle==FX_RtxPci && Live.Edges[i].Agent==FX_NvAgent){Live.Edges[i].Count++;found=1;break;}Check(found,"real NV ownership edge exists");}
     if(late==4)Live.Edges[0].Count++;
+#if FX_NO_EDID_DRIVER
+    /* No EDID driver is bound on this firmware: one appearing after the console was prepared is drift. */
+    if(late==5){static EFI_GUID EdidTestGuid=EFI_EDID_DISCOVERED_PROTOCOL_GUID;Live.Edges[Live.Count++]=(EDGE){FX_Rtx,FX_OutAgent,FX_Rtx,EdidTestGuid,EFI_OPEN_PROTOCOL_BY_DRIVER,1};}
+#else
     if(late==5){int found=0;for(UINTN i=0;i<Live.Count;i++)if(Live.Edges[i].Agent==FX_EdidAgent){Live.Edges[i].Count++;found=1;break;}Check(found,"real shared EDID edge exists");}
+#endif
     if(late==6)Scenario=30;
     EFI_STATUS verified=GuVerifyPreparedConsole(LastTable);
     if(verified==EFI_SUCCESS)fprintf(stderr,"late drift case=%d\n",late);

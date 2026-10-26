@@ -52,6 +52,27 @@ def hexword(value):
     return lambda m: m[1] + f'{value:08x}'
 
 
+def rtx_gop(text):
+    """The RTX GOP handle block: the only handle block that carries a GOP framebuffer record."""
+    found = [m for m in re.finditer(r'^handle id=(0x[0-9a-f]+)\n(.*?)(?=^handle id=|^capture-complete=|\Z)', text, re.M | re.S)
+             if 'gop framebuffer=' in m[2]]
+    return found[0]
+
+
+def add_edid_open(path, attributes):
+    """Add an active EdidDiscovered opener on the RTX GOP, opened by the driver that owns its TextOut."""
+    text = path.read_bytes().decode('utf-8-sig').replace('\r\n', '\n')
+    block = rtx_gop(text)
+    handle = int(block[1], 16)
+    agents = [a for p, a, c, at, n in mp.parse_handles(text)[handle]['edges'] if p == mp.TEXT_OUT and at == mp.BY_DRIVER]
+    line = 'protocol guid=' + mp.EDID_DISCOVERED + '\n'
+    if len(agents) != 1 or line not in block[2]:
+        raise AssertionError(f'{path.name}: RTX GOP has no unique TextOut owner or no EdidDiscovered interface')
+    at = block.start(2) + block[2].index(line) + len(line)
+    new = text[:at] + f'open agent=0x{agents[0]:016x} controller=0x{handle:016x} attributes=0x{attributes:x} count=0x1\n' + text[at:]
+    path.write_bytes(new.encode())
+
+
 def main():
     global CAPTURES, LOCATOR
     CAPTURES, LOCATOR = Path(sys.argv[1]), Path(sys.argv[2])
@@ -68,10 +89,43 @@ def main():
     case('WPR2 already set', 'power-on state',
          lambda w, d: sub(d[-1], r'^(mmio off=0x001fa828 status=0x0+ value=0x)[0-9a-f]{8}', hexword(0x10)))
     case('second NVIDIA GPU', 'exactly one NVIDIA', lambda w, d: sub(d[-1], r'^probe targets=0001(?: cfg-incomplete=0000)?$', 'probe targets=0002 cfg-incomplete=0000'))
-    case('RTX not at 01:00.0', '0000:01:00.0',
-         lambda w, d: sub(d[-1], r'^(probe-target seg=0x0000 bus=0x)0001', lambda m: m[1] + '0002'))
-    case('no integrated GPU', 'non-NVIDIA display controller',
-         lambda w, d: sub(d[-1], r'^(pci config-dwords=(?!....10de)[0-9a-f]{8} [0-9a-f]{8} )03', lambda m: m[1] + '04'))
+    case('RTX on bus 0', 'nonzero bus',
+         lambda w, d: [sub(p, r'^(probe-target seg=0x[0-9a-f]+ bus=0x)[0-9a-f]+', lambda m: m[1] + '0') for p in d])
+    case('RTX on another segment', 'segment 0, device 0, function 0',
+         lambda w, d: [sub(p, r'^(probe-target seg=0x)[0-9a-f]+', lambda m: m[1] + '1') for p in d])
+    case('RTX at device 1', 'segment 0, device 0, function 0',
+         lambda w, d: [sub(p, r'^(probe-target seg=0x[0-9a-f]+ bus=0x[0-9a-f]+ dev=0x)[0-9a-f]+', lambda m: m[1] + '1') for p in d])
+    # The bus is a per-machine constant: moving it in every capture is a different, still valid
+    # machine; moving it in one capture only is a capture that does not describe the same boot.
+    shift_bus = lambda m: m[1] + f'{int(m[2], 16) + 1:x}'
+    case('captures disagree on bus', 'disagree on GU_TARGET_BUS',
+         lambda w, d: sub(d[-1], r'^(probe-target seg=0x[0-9a-f]+ bus=0x)([0-9a-f]+)', shift_bus))
+    case('RTX on another bus in every capture', None,
+         lambda w, d: [sub(p, r'^(probe-target seg=0x[0-9a-f]+ bus=0x)([0-9a-f]+)', shift_bus) for p in d])
+    try:
+        info = mp.analyze(sorted(CAPTURES.glob('DIAG[0-9][0-9].TXT'))[-1], None, ENVELOPE)
+    except (mp.Refused, IndexError):
+        info = None  # the first case already reports captures the generator cannot accept
+    # An installed iGPU is optional: the single-RTX console path never uses it. Taking it away, or
+    # adding one, in every capture must still yield a profile; changing it in one capture must not.
+    # Two or more non-NVIDIA display controllers are unreviewed.
+    if info and info['igpu_id']:
+        remove_igpu = lambda p: sub(p, r'^(pci config-dwords=(?!....10de)[0-9a-f]{8} [0-9a-f]{8} )03', lambda m: m[1] + '04')
+        case('no integrated GPU in any capture', None, lambda w, d: [remove_igpu(p) for p in d])
+        case('integrated GPU in only one capture', 'disagree on the integrated GPU', lambda w, d: remove_igpu(d[-1]))
+    elif info:
+        add_igpu = lambda p: sub(p, r'^(pci config-dwords=(?!....10de)[0-9a-f]{8} [0-9a-f]{8} )(?!03)[0-9a-f]{2}', lambda m: m[1] + '03')
+        case('an integrated GPU appears in every capture', None, lambda w, d: [add_igpu(p) for p in d])
+        case('integrated GPU in only one capture', 'disagree on the integrated GPU', lambda w, d: add_igpu(d[-1]))
+        case('two integrated GPUs', 'at most one non-NVIDIA display controller', lambda w, d: [(add_igpu(p), add_igpu(p)) for p in d])
+    # The EDID driver is optional, but a driver other than the reviewed AMI one may never own the
+    # EdidDiscovered interface of the RTX GOP, whether or not this machine has one.
+    case('unreviewed driver owns the EDID interface', 'edid:',
+         lambda w, d: [add_edid_open(p, mp.BY_DRIVER) for p in d])
+    if info and info['no_edid_driver']:
+        # No EDID driver here: any other live opener of EdidDiscovered is unreviewed too.
+        case('live EDID opener on a machine without an EDID driver', 'active EdidDiscovered opener',
+             lambda w, d: [add_edid_open(p, mp.BY_CHILD_CONTROLLER) for p in d])
     # full-release.c CapturePermit compares the PciIo attribute cache with the command register.
     attributes = r'^(pci-attributes status=0x)([0-9a-f]{16})( value=0x)([0-9a-f]{16})$'
     case('no PciIo attribute record', 'no PciIo attribute record',

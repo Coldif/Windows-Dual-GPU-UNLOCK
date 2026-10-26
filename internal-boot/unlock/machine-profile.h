@@ -278,3 +278,39 @@
 #define GU_NVGOP_TEXT_SHA256 "6aad26e6909c9791dd0caba92d6658e9dfd8009aee80676002bf24ce2ad24d08"
 
 #endif
+
+/* PCI bus of the RTX (segment 0, device 0, function 0). Every reviewed profile sits at
+ * 01:00.0. Only a generated local profile (profile-local.h defines it first) may differ,
+ * after its own captures and host tests pass; reviewed profiles keep 1. */
+#ifndef GU_TARGET_BUS
+#define GU_TARGET_BUS 1U
+#endif
+#if GU_TARGET_BUS != 1U && !defined(GU_PROFILE_LOCAL)
+#error A non-default GU_TARGET_BUS is only for a generated local profile
+#endif
+
+/* 1 when this firmware binds no EDID/mouse driver to the RTX display handles. Then there is no
+ * stage-3 EDID detach and no EDID driver to fingerprint: the release stops only the NVIDIA GOP
+ * driver, after the console drivers were detached. All reviewed profiles have the EDID driver (0).
+ * Only a generated local profile on the non-aggregate headless path may set it; the manual and
+ * aggregate paths were not adapted and refuse it at compile time. */
+#ifndef GU_NO_EDID_DRIVER
+#define GU_NO_EDID_DRIVER 0
+#endif
+#if GU_NO_EDID_DRIVER && !defined(GU_PROFILE_LOCAL)
+#error A firmware without an EDID driver is only for a generated local profile
+#endif
+#if GU_NO_EDID_DRIVER && GU_CONSOLE_AGGREGATE
+#error No-EDID-driver support exists only for the non-aggregate single-RTX path
+#endif
+#if GU_NO_EDID_DRIVER && defined(GU_FULL_UNLOCK) && !defined(GU_HEADLESS_RESEARCH)
+#error No-EDID-driver support exists only for the headless build
+#endif
+#if GU_NO_EDID_DRIVER
+/* Fail-closed placeholders so shared fingerprint code compiles. Every real use is compiled out or
+ * returns first, and a zero size or length can never validate a loaded image. */
+#define GU_EDID_IMAGE_SIZE 0U
+#define GU_EDID_STOP 0U
+#define GU_EDID_TEXT_BYTES 0U
+#define GU_EDID_TEXT_SHA256 ""
+#endif

@@ -13,7 +13,9 @@ prepare-console.c / full-release.c check at boot:
 
   OutAgent  opens SimpleTextOut BY_DRIVER on the RTX GOP handle
   GfxAgent  opens GOP           BY_DRIVER on the RTX GOP handle
-  EdidAgent opens EdidDiscovered BY_DRIVER on the RTX GOP handle (AMI mouse/EDID file)
+  EdidAgent opens EdidDiscovered BY_DRIVER on the RTX GOP handle (AMI mouse/EDID file);
+            optional: when no handle has an active EdidDiscovered opener the profile sets
+            GU_NO_EDID_DRIVER and the release skips the EDID stage
   NvAgent   opens PciIo         BY_DRIVER on the RTX PCI handle (nvgop-ga1xx)
 
 Anything outside research/profile/proven.json, or any disagreement between
@@ -38,9 +40,11 @@ TEXT_OUT = '387477c2-69c7-11d2-8e39-00a0c969723b'
 GOP = '9042a9de-23dc-4a38-96fb-7aded080516a'
 EDID_DISCOVERED = '1c0c34f6-d380-41fa-a049-8ad06c1a66aa'
 PCI_IO = '4cf5b200-68b8-4ca5-9eec-b23e3f50029a'
-BY_DRIVER = 0x10
+PATH = '09576e91-6d3f-11d2-8e39-00a0c969723b'
+BY_CHILD_CONTROLLER = 0x8
 # EFI_PCI_IO_ATTRIBUTE_IO / _MEMORY / _BUS_MASTER (PciIo.h)
 PCI_ATTRIBUTE_IO, PCI_ATTRIBUTE_MEMORY, PCI_ATTRIBUTE_BUS_MASTER = 0x100, 0x200, 0x400
+BY_DRIVER = 0x10
 OUT_FILE = '628a497d-2bf6-4264-8741-069dbd3399d6'
 GFX_FILE = '43e7abdd-e352-4cfb-a230-4cdc1d350e5c'
 MOUSE_FILE = 'c7a7030c-c3d8-45ee-bed9-5d9e76762953'
@@ -286,8 +290,15 @@ def analyze(diag, image_dir, envelope):
     if text.count('\nprobe-target ') != 1 or not single_probe_summary(text):
         fail(f'{diag.name}: need exactly one NVIDIA display controller (single-RTX topology only)')
     target = re.search(r'^probe-target seg=0x([0-9a-f]+) bus=0x([0-9a-f]+) dev=0x([0-9a-f]+) fun=0x([0-9a-f]+)$', text, re.M)
-    if not target or [int(x, 16) for x in target.groups()] != [0, 1, 0, 0]:
-        fail(f'{diag.name}: the RTX must be 0000:01:00.0 (checks.c GuCheckConfig)')
+    if not target:
+        fail(f'{diag.name}: no probe-target record')
+    segment, target_bus, device, function = (int(x, 16) for x in target.groups())
+    # The bus is a per-machine constant (GU_TARGET_BUS); segment, device and function stay fixed
+    # (checks.c GuCheckConfig). Bus 0 is the root complex itself and never a discrete slot.
+    if segment or device or function:
+        fail(f'{diag.name}: the RTX must be at segment 0, device 0, function 0 (checks.c GuCheckConfig)')
+    if not 1 <= target_bus <= 0xff:
+        fail(f'{diag.name}: bus {target_bus:#x} is not a discrete slot; the RTX must be on a nonzero bus')
     rows = re.findall(r'^cfg dwords=([0-9a-f ]+)$', text, re.M)
     words = rows[0].split() if len(rows) == 1 else []
     if len(words) != 64:
@@ -343,10 +354,17 @@ def analyze(diag, image_dir, envelope):
     if pci_config(blocks[rtx_pci]['raw'])[11] != subsystem:
         fail('graph and probe disagree on the RTX subsystem')
     other = [h for h, b in blocks.items() if (c := pci_config(b['raw'])) and c[0] & 0xffff != 0x10de and c[2] >> 24 == 3]
-    if len(other) != 1:
-        fail(f'expected one non-NVIDIA display controller (integrated GPU), found {len(other)}; '
-             'the reviewed single-RTX console replay has no design without one')
-    igpu = pci_config(blocks[other[0]]['raw'])[0]
+    # The single-RTX console path never uses a second display adapter: prepare-console.c refuses
+    # any AMD GOP in this topology, so an installed iGPU is optional. Two or more are unreviewed.
+    if len(other) > 1:
+        fail(f'expected at most one non-NVIDIA display controller (integrated GPU), found {len(other)}')
+    igpu = pci_config(blocks[other[0]]['raw'])[0] if other else None
+    if igpu is None:
+        # No other display adapter: the RTX GOP must be the only GOP in the whole graph, so no
+        # unreviewed virtual or foreign display handle can stand in for a console.
+        all_gops = [h for h, b in blocks.items() if GOP in b['protocols']]
+        if len(all_gops) != 1:
+            fail(f'without an integrated GPU the RTX must own the only GOP in the graph, found {len(all_gops)}')
     pci_path = path_of(blocks[rtx_pci]['raw'])
     if not pci_path:
         fail('RTX PCI handle has no device path')
@@ -371,21 +389,38 @@ def analyze(diag, image_dir, envelope):
     if b''.join(bytes.fromhex(r) for r in rows) != rtx_path:
         fail('ConOut is not exactly the RTX GOP path; aggregate or multi-device consoles are not generated')
 
+    # The AMI EDID/mouse driver is optional: some firmware (seen on MSI/AMI boards) binds none.
+    # Then no driver may own EdidDiscovered anywhere in the graph, and every display child of the
+    # RTX must still carry the interface itself, as full-release.c FullConsumers requires.
+    edid_owners = [a for p, a, c, attrs, n in blocks[rtx]['edges'] if p == EDID_DISCOVERED and attrs == BY_DRIVER and c == rtx]
+    if len(edid_owners) > 1:
+        fail(f'edid: expected at most one BY_DRIVER opener of {EDID_DISCOVERED} on {rtx:#x}, found {len(edid_owners)}')
+    no_edid_driver = not edid_owners
+    if no_edid_driver:
+        live_edid = [h for h, b in blocks.items()
+                     if any(p == EDID_DISCOVERED and attrs not in (1, 2, 4) for p, a, c, attrs, n in b['edges'])]
+        if live_edid:
+            fail(f'no BY_DRIVER EDID owner on the RTX GOP, yet {len(live_edid)} handle(s) have an active EdidDiscovered opener')
+        children = {c for p, a, c, attrs, n in blocks[rtx_pci]['edges'] if p == PATH and attrs == BY_CHILD_CONTROLLER}
+        if rtx not in children or any(EDID_DISCOVERED not in blocks[c]['protocols'] for c in children if c in blocks):
+            fail('without an EDID driver every RTX display child must carry the EdidDiscovered interface')
     roles = {
         'out': binding_for(bindings, sole_driver(blocks, rtx, TEXT_OUT)),
         'gfx': binding_for(bindings, sole_driver(blocks, rtx, GOP)),
-        'edid': binding_for(bindings, sole_driver(blocks, rtx, EDID_DISCOVERED)),
         'nvgop': binding_for(bindings, sole_driver(blocks, rtx_pci, PCI_IO)),
     }
-    expect = {'out': ('guid', OUT_FILE), 'gfx': ('guid', GFX_FILE), 'edid': ('guid', MOUSE_FILE), 'nvgop': ('name', NVGOP_NAME)}
+    expect = {'out': ('guid', OUT_FILE), 'gfx': ('guid', GFX_FILE), 'nvgop': ('name', NVGOP_NAME)}
+    if not no_edid_driver:
+        roles['edid'] = binding_for(bindings, sole_driver(blocks, rtx, EDID_DISCOVERED))
+        expect['edid'] = ('guid', MOUSE_FILE)
     for role, rec in roles.items():
         if rec['file'] != expect[role]:
             fail(f'{role}: image file {rec["file"]} is not the reviewed AMI/NVIDIA driver {expect[role]}')
     for role in ('out', 'gfx'):
         if roles[role]['code-type'] != EFI_BOOT_SERVICES_CODE:
             fail(f'{role}: not boot-services code')
-    edid, nv = roles['edid'], roles['nvgop']
-    if edid['image'] != edid['handle'] or edid['version'] != 1 or edid['code-type'] != EFI_RUNTIME_SERVICES_CODE:
+    edid, nv = roles.get('edid'), roles['nvgop']
+    if edid and (edid['image'] != edid['handle'] or edid['version'] != 1 or edid['code-type'] != EFI_RUNTIME_SERVICES_CODE):
         fail('EDID driver does not match full-release.c Profile(mouse) shape')
     if nv['image'] != nv['handle'] or nv['code-type'] != EFI_BOOT_SERVICES_CODE:
         fail('nvgop driver does not match full-release.c Profile() shape')
@@ -394,6 +429,8 @@ def analyze(diag, image_dir, envelope):
     defines = [
         ('GU_BOARD_ID', f'0x{board:08x}U'),
         ('GU_BOARD_SUBSYSTEM', f'0x{subsystem:08x}U'),
+        ('GU_TARGET_BUS', f'0x{target_bus:x}U'),
+    ] + ([('GU_NO_EDID_DRIVER', '1')] if no_edid_driver else []) + [
         ('GU_BAR0_BASE', f'0x{bar0:08x}ULL'),
         ('GU_BAR0_END', f'0x{bar0 + 0xffffff:08x}ULL'),
         ('GU_DEVICE_MEMORY_SIZE', f'0x{memory:x}U'),
@@ -408,30 +445,29 @@ def analyze(diag, image_dir, envelope):
         ('GU_CONSOLE_GFX_SIZE', f'0x{roles["gfx"]["size"]:x}U'),
         ('GU_CONSOLE_GFX_STOP', f'0x{off(roles["gfx"]):x}U'),
         ('GU_CONSOLE_GFX_VERSION', f'0x{roles["gfx"]["version"]:x}U'),
-        ('GU_EDID_IMAGE_SIZE', f'0x{edid["size"]:x}U'),
-        ('GU_EDID_STOP', f'0x{off(edid):x}U'),
+    ] + ([('GU_EDID_IMAGE_SIZE', f'0x{edid["size"]:x}U'), ('GU_EDID_STOP', f'0x{off(edid):x}U')] if edid else []) + [
         ('GU_NVGOP_VERSION', f'0x{nv["version"]:x}U'),
         ('GU_NVGOP_IMAGE_SIZE', f'0x{nv["size"]:x}U'),
         ('GU_NVGOP_STOP', f'0x{off(nv):x}U'),
     ]
     result = {
         'capture': diag.name, 'capture_sha256': hashlib.sha256(raw).hexdigest(),
-        'config': words, 'prom_sha256': prom[1], 'igpu_id': f'{igpu:08x}', 'rtx_fb': f'0x{fb[1]}',
+        'config': words, 'prom_sha256': prom[1], 'igpu_id': None if igpu is None else f'{igpu:08x}', 'rtx_fb': f'0x{fb[1]}',
+        'no_edid_driver': no_edid_driver,
         'cold_line': f'cold state: chip={gu_hex(chip)} plm={gu_hex(plm)} gfw={gu_hex(g1)}/{gu_hex(g2)}/{gu_hex(g3)} '
                      f'WPR2_HI={gu_hex(wpr2)} SS0={gu_hex(ss0)} SS1={gu_hex(ss1)}',
         'observed_line': f'cold observed: chip={gu_hex(chip)} memory={gu_hex(memory)} SS0={gu_hex(ss0)} SS1={gu_hex(ss1)}',
         'defines': defines,
     }
     if image_dir is not None:
-        edid_code = code_hash(image_dir, edid, EDID_TEXT_RVA)
+        edid_code = code_hash(image_dir, edid, EDID_TEXT_RVA) if edid else None
         nv_code = code_hash(image_dir, nv, NVGOP_TEXT_RVA)
         known = [g for g in envelope['nvgop'] if int(g['version'], 16) == nv['version'] and g['text_sha256'] == nv_code['sha256']]
         if len(known) != 1:
             fail(f'nvgop {nv["version"]:#x} with .text {nv_code["sha256"][:16]}... has not released cleanly on proven hardware')
         result['code'] = {'edid': edid_code, 'nvgop': nv_code}
-        defines += [
-            ('GU_EDID_TEXT_BYTES', f'0x{edid_code["bytes"]:x}U'),
-            ('GU_EDID_TEXT_SHA256', f'"{edid_code["sha256"]}"'),
+        defines += ([('GU_EDID_TEXT_BYTES', f'0x{edid_code["bytes"]:x}U'),
+                     ('GU_EDID_TEXT_SHA256', f'"{edid_code["sha256"]}"')] if edid_code else []) + [
             ('GU_NVGOP_TEXT_BYTES', f'0x{nv_code["bytes"]:x}U'),
             ('GU_NVGOP_TEXT_SHA256', f'"{nv_code["sha256"]}"'),
         ]
@@ -460,10 +496,14 @@ def generate(capture_dir, locator, envelope):
     latest = analyze(diags[-1], capture_dir, envelope)
     for earlier in diags[:-1]:
         other = analyze(earlier, None, envelope)
+        if other['no_edid_driver'] != latest['no_edid_driver']:
+            fail(f'{earlier.name} and {diags[-1].name} disagree on whether an EDID driver is bound; firmware drivers must not vary between boots')
         mine = dict(latest['defines'])
         for name, value in other['defines']:
             if mine[name] != value:
                 fail(f'{earlier.name} and {diags[-1].name} disagree on {name}; values must not vary between boots')
+        if other['igpu_id'] != latest['igpu_id']:
+            fail(f'{earlier.name} and {diags[-1].name} disagree on the integrated GPU; the display adapters must not vary between boots')
         if other['config'] != latest['config']:
             fail(f'{earlier.name} and {diags[-1].name} disagree on the RTX PCI config space')
     prom_path = capture_dir / 'PROM.BIN'
@@ -501,7 +541,8 @@ def generate(capture_dir, locator, envelope):
     report = {
         'Format': 1, 'GeneratorVersion': GENERATOR_VERSION, 'ProfileName': name,
         'HeaderSha256': hashlib.sha256(text.encode()).hexdigest(), 'PromSha256': latest['prom_sha256'],
-        'Captures': sources, 'Replay': {'Capture': latest['capture'], 'RtxId': board, 'IgpuId': latest['igpu_id'], 'RtxFramebuffer': latest['rtx_fb']},
+        'Captures': sources, 'Replay': {'Capture': latest['capture'], 'RtxId': board, 'IgpuId': latest['igpu_id'], 'RtxFramebuffer': latest['rtx_fb'],
+                   'NoEdidDriver': latest['no_edid_driver']},
         'Fwsec': fw, 'Code': latest['code'], 'HardwareTested': False,
         'Fixtures': {k: hashlib.sha256(v).hexdigest() for k, v in fixtures.items()},
     }

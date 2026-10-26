@@ -69,13 +69,17 @@ function Get-LocalInputDigest($Inputs) {
  try{return (($sha.ComputeHash($bytes) | ForEach-Object {$_.ToString('x2')}) -join '')}finally{$sha.Dispose()}
 }
 function Get-LocalTreeDigest([string]$Repo) {Get-LocalInputDigest @(Get-LocalTreeInputs $Repo)}
-function Get-LocalExpectedJobs {
- [ordered]@{'generator refusals'=0;'stock-selection'=0;'checks (real config)'=0;
+function Get-LocalExpectedJobs([bool]$NoEdidDriver=$false) {
+ $jobs=[ordered]@{'generator refusals'=0;'stock-selection'=0;'checks (real config)'=0;
  'checks other profile (must reject)'=1;'port'=0;'write-lock'=0;'master-attributes'=0;'runtime'=0;
  'profile-lock-entryLatchedSs1Full'=0;'profile-lock-entryLatchedSs1Preserve'=0;
  'r2 console replay (real graph)'=0;'r2 replay other profile (must reject)'=1;
  'cold pre-check (read-only)'=0;'full flow gates'=0;'core transaction (efi)'=0;
  'manual entry-latched'=0;'automatic internal'=0;'headless internal'=0;'headless USB (shipped child)'=0}
+ # A firmware without an EDID driver releases the GPU differently from every reviewed profile, so its
+ # evidence must also hold the driver-release replay on its own graph.
+ if($NoEdidDriver){$jobs['release replay, no EDID driver (real graph)']=0}
+ return $jobs
 }
 function Get-LocalObjectNames($Value) {
  if($null -eq $Value){return @()}
@@ -126,7 +130,7 @@ function Assert-LocalProfileEvidence([string]$Repo) {
   if($e.Inputs[$i].Path -cne $inputs[$i].Path -or $e.Inputs[$i].Sha256 -cne $inputs[$i].Sha256){throw 'Build input path/hash changed after tests'}
  }
  if($e.TreeSha256 -cne (Get-LocalInputDigest $inputs)){throw 'Build input digest changed after tests'}
- $jobs=Get-LocalExpectedJobs
+ $jobs=Get-LocalExpectedJobs ([bool]$report.Replay.NoEdidDriver)
  Assert-LocalKeys $e.Results @($jobs.Keys) 'Host jobs'
  foreach($name in $jobs.Keys){
   $job=$e.Results.$name
