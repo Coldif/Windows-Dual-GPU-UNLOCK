@@ -1,8 +1,9 @@
-# RTX 3080 inventory: X570-F GAMING / Ryzen 7 3700X
+# RTX 3080 research: X570-F GAMING / Ryzen 7 3700X
 
-**Status: inventory only; unlock support unestablished.** This contribution records
-a distinct Windows desktop configuration. No GPU benchmark, experimental EFI
-build or boot, or unlock was performed for this contribution.
+**Status: Windows inventory and offline research; unlock support unestablished.**
+This contribution records a distinct Windows desktop configuration. No GPU
+benchmark, experimental EFI build or boot, or unlock was performed for this
+contribution.
 
 Collected on **2026-10-26 (UTC)** against upstream
 [`5c98f11eaafdcb7a2a06fb14fcdcde7297eb409e`](https://github.com/impacifist/Windows-GPU-UNLOCK/tree/5c98f11eaafdcb7a2a06fb14fcdcde7297eb409e).
@@ -14,7 +15,14 @@ are not test results for this machine.
 - [inventory.json](inventory.json): reviewed output of the unchanged
   `tools/collect_compatibility.py` collector, preserving its schema and assessment.
 - [observations.json](observations.json): source revision, collector/test hashes,
-  selected NVIDIA metadata, commands/results and unresolved physical details.
+  selected NVIDIA metadata, commands/results and the original physical-detail
+  snapshot.
+- [FOLLOW-UP.md](FOLLOW-UP.md): primary-source hardware findings, evidence limits,
+  build readiness and additional offline validation.
+- [BENCHMARK-PLAN.md](BENCHMARK-PLAN.md): proposed ordinary CUDA baseline, including
+  numerical validation, raw samples, provenance and resource budgets.
+- [research-validation.json](research-validation.json): sanitized follow-up
+  observations, host-test outcomes and source hashes.
 
 The collector completed with exit code 0 and no missing sections. Its
 `assessment.status: not-assessed` and `can_unlock: false` values are intentionally
@@ -83,6 +91,10 @@ nvidia-smi.exe --query-gpu=name,pci.bus_id,pci.device_id,pci.sub_device_id,memor
   failures. They do not exercise the GPU or validate an EFI profile.
 - Source review: contributor guidance, compatibility table, RTX 3080 candidate
   notes and the benchmark guide at the pinned revision.
+- Follow-up: **28 offline benchmark-comparison tests passed**. The separate
+  mocked PowerShell runner suite stopped on an access-denied error before its
+  first runner invocation; it is not a passing result. See
+  [the detailed validation record](FOLLOW-UP.md#offline-validation-actually-performed).
 
 No new test code or executable support is introduced. Project licences,
 upstream credits and implementation files are unchanged.
@@ -93,17 +105,25 @@ The following are deliberately **unknown**, pending owner confirmation:
 
 - Physical card manufacturer/model and any VBIOS cross-flash history.
 - Which physical ports each monitor uses.
-- Availability of another display GPU or an integrated display adapter.
+- Availability of another installed or spare display GPU.
+
+The integrated-graphics question is now resolved from vendor specifications:
+the inventoried Ryzen 7 3700X has no iGPU, so this motherboard's HDMI/DisplayPort
+sockets do not provide an integrated display fallback with that CPU. The
+[follow-up sources and interpretation](FOLLOW-UP.md#hardware-conclusions-from-primary-sources)
+supplement the unchanged original collection record.
 
 No pre-boot compatibility, boot recovery, sleep/resume or performance claim can
 be made from this inventory. Read-only Windows metadata is the only hardware
 observation in this contribution.
 
-A separate ordinary stock benchmark contribution could establish a baseline.
+A separate ordinary CUDA benchmark contribution could establish a baseline.
 At this revision, [BENCHMARK.en.md](../../docs/BENCHMARK.en.md) documents named
 3090, 3090 Ti and 3070 Ti targets, not this 3080. Its current numeric checks inspect
-the first and last output elements. This contribution neither changes those
-targets nor supplies benchmark results.
+the first and last output elements. The [proposed benchmark plan](BENCHMARK-PLAN.md)
+also addresses the PCI-location mismatch, compiler support, raw timing retention
+and stronger output validation. These are researched requirements; executable
+targets and benchmark results are not added by this contribution.
 
 The immediate next step is to fill in the physical details and let maintainers
 review this independent inventory alongside existing reports. No experimental
