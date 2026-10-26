@@ -99,7 +99,7 @@ $manifest.HardwareProfile='ASUS-TUF-B650M-PLUS-WIFI-3057-RTX3090-FE'
 $accepted=$true;try{Assert-GuUsbManifest $sandbox $manifest}catch{$accepted=$false}
 if($accepted){throw 'Local metadata was accepted under a reviewed identity'};$checks++
 foreach($key in @($package.Keys|Where-Object {$_ -ne 'HardwareProfile'})){$manifest.Remove($key)}
-foreach($name in @('ASUS-TUF-B650M-PLUS-WIFI-3057-RTX3090-FE','ASUS-TUF-GAMING-B660M-E-D4-4003-RTX3070TI','GIGABYTE-X870-AORUS-ELITE-WIFI7-F13d-RTX3090TI')) {
+foreach($name in @('ASUS-TUF-B650M-PLUS-WIFI-3057-RTX3090-FE','ASUS-TUF-GAMING-B660M-E-D4-4003-RTX3070TI','GIGABYTE-X870-AORUS-ELITE-WIFI7-F13d-RTX3090TI','ASUS-PRIME-B660-PLUS-D4-3010-RTX3060')) {
  $manifest.HardwareProfile=$name;Assert-GuUsbManifest $sandbox $manifest;$checks++
 }
 foreach($path in @('internal-boot/efi_runtime.c','deps/edk2/MdePkg/Include/Uefi.h','research/headless/build-usb.ps1','research/profile/test-profile.ps1')) {

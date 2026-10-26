@@ -12,7 +12,7 @@ try {
  if($LASTEXITCODE -ne 0){throw 'Diagnostic tests failed'}
  # Probe regression tests: the real probe.c behind simulated EFI services for
  # both reviewed profiles. No GPU, firmware or driver access is available.
- foreach($profile in @('GU_PROFILE_B650M_3090FE','GU_PROFILE_B660M_3070TI','GU_PROFILE_X870_3090TI')) {
+ foreach($profile in @('GU_PROFILE_B650M_3090FE','GU_PROFILE_B660M_3070TI','GU_PROFILE_X870_3090TI','GU_PROFILE_B660PLUS_3060')) {
   & $Clang -std=c11 -O1 -Wall -Wextra -Werror -D_CRT_SECURE_NO_WARNINGS -DGU_DIAGNOSTIC_PROBE "-D$profile" -I ../../deps/edk2/MdePkg/Include -I ../../deps/edk2/MdePkg/Include/X64 test_probe.c probe.c ../unlock/sha256.c -o "build/diagnostic/test-probe-$profile.exe"
   if($LASTEXITCODE -ne 0){throw "Probe tests compile failed: $profile"}
   & "./build/diagnostic/test-probe-$profile.exe"

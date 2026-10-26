@@ -2,11 +2,12 @@
 
 [English](COMPATIBILITY.en.md) | **한국어**
 
-현재 소스에는 실기기 결과가 기록된 정확한 장비 프로필 세 개가 있습니다.
-내부 headless 두 구성과 headless USB 한 구성입니다. 최초 B650M은 유지관리자가
-시험했고, B660M·X870의 근거는 기여자의 보고입니다
+현재 소스에는 실기기 결과가 기록된 정확한 장비 프로필 네 개가 있습니다.
+내부 headless 두 구성과 headless USB 두 구성입니다. 최초 B650M은 유지관리자가
+시험했고, B660M·X870·B660-PLUS의 근거는 기여자의 보고입니다
 ([PR #5](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/5),
-[PR #10](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/10)).
+[PR #10](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/10),
+[PR #24](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/24)).
 빌드는 [internal-boot/unlock/machine-profile.h](../internal-boot/unlock/machine-profile.h)에서
 빌드 시점에 선택된 하나의 검토된 프로필 전용이며, 다른 GPU·플랫폼은 지원하지 않습니다.
 
@@ -15,6 +16,7 @@
 | `b650m-3090fe` | ASUS TUF GAMING B650M-PLUS WIFI BIOS 3057 / Ryzen 7 7800X3D / RTX 3090 FE | 내부; 최초 유지관리자 시험 |
 | `b660m-3070ti` | ASUS TUF GAMING B660M-E D4 BIOS 4003 / iGPU 없는 i7-12700F / MSI RTX 3070 Ti | 내부; 기여자 보고 |
 | `x870-3090ti` | Gigabyte X870 AORUS ELITE WIFI7 BIOS F13d / Ryzen 7 9800X3D / ASUS RTX 3090 Ti | USB 전용; 기여자 보고 |
+| `b660plus-3060` | ASUS PRIME B660-PLUS D4 BIOS 3010 / iGPU 없는 i5-12600KF / GA104 RTX 3060 12GB | USB 전용, 디스플레이 child 두 개, CSM 끔; 기여자 보고 |
 
 최신 태그 v0.3.1은 소스 전용 사전 릴리스이며, 현재 소스에는 그 이후의 USB 경로와
 X870 프로필 등이 포함됩니다. 실기기 보고는 각 기록의 빌드에 해당합니다. 현재 cold
@@ -114,6 +116,28 @@ X870 실기기 근거와 byte-identical 빌드 설명은 현재 main의 cold 사
 원래 PR #10 revision `7b578247a28ff66f2707bea5af0e3943aede7974`에 해당합니다.
 이전 wrapper·child 해시는 과거 provenance이며 새 빌드의 예상 해시가 아닙니다.
 보강된 빌드의 새 X870 실기기 부팅 보고는 없습니다.
+
+## 프로필 4: ASUS PRIME B660-PLUS D4 / RTX 3060 12GB(headless USB)
+
+[PR #24](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/24)가 기여한 정확한
+GA104 변형입니다. PCI `10de:2487`, subsystem `10de:1530`, VBIOS 94.04.71.00.87,
+12 GiB(`0x3000`), BIOS 3010, iGPU 없는 i5-12600KF 구성입니다. **CSM을 꺼야** 하며,
+모니터를 제보 당시처럼 연결한 GOP child 하나와 EDID 전용 child 하나의 aggregate
+콘솔을 요구합니다. 다른 RTX 3060 변형을 지원한다는 뜻은 아닙니다.
+
+`research/headless/build-usb.ps1 -HardwareProfile b660plus-3060`와
+[USB 안내](HEADLESS-USB.en.md)를 사용하세요. 내부 ESP 설치 도구에는 연결하지 않았고
+쓰기 빌드는 USB 경로만 허용합니다. 범용 상세 진단이나 GA102 전용 로컬 프로필
+생성 범위가 넓어진 것은 아닙니다.
+
+기여자는 완전 종료 후 USB 부팅 두 번에서 화면 복구와 Windows 직접 시작을 보고했습니다.
+원 기여 `60ae7e4`의 같은 장비 잠금 → 언락 PyTorch/cuBLAS n=4096 중앙값은 FP16
+26.12 → 49.07, BF16 25.77 → 49.41, TF32 12.98 → 25.06, FP32 7.99 → 7.98 TFLOPS입니다.
+저장소의 native 3090 측정 도구와 절차가 다르므로 카드 간 비교 수치로 사용하지 마세요.
+
+현재 통합본은 소유권·런타임·진단 검사를 보강했고 host·빌드 검증을 했지만 새 실기기
+부팅 시험은 하지 않았습니다. 재시작·절전 복귀·장기 안정성은 미검증입니다.
+[원 빌드 근거와 한계](../evidence/b660plus-3060-usb/README.md)를 참고하세요.
 
 ## 기록된 구성 밖의 범위
 

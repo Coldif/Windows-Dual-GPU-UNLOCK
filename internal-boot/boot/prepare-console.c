@@ -14,6 +14,19 @@
 #include <Protocol/SimpleTextOut.h>
 #include <Protocol/SimpleTextIn.h>
 #include <Protocol/EdidDiscovered.h>
+#ifndef GU_CONSOLE_MULTI_CHILD
+#define GU_CONSOLE_MULTI_CHILD 0
+#endif
+#ifndef GU_CONSOLE_CHILD_COUNT
+#define GU_CONSOLE_CHILD_COUNT 1
+#endif
+#if GU_CONSOLE_MULTI_CHILD && !GU_CONSOLE_AGGREGATE
+#error Multi-child console support requires the aggregate console profile
+#endif
+#if GU_CONSOLE_MULTI_CHILD && (GU_CONSOLE_CHILD_COUNT < 2 || GU_CONSOLE_CHILD_COUNT > 4)
+#error GU_CONSOLE_CHILD_COUNT must be 2..4 for a multi-child aggregate console
+#endif
+#define GU_AGGREGATE_MAX_CHILDREN 4
 #if defined(GU_HEADLESS_RESEARCH) && (!defined(GU_SINGLE_RTX_CONSOLE) || !defined(GU_FULL_UNLOCK) || !defined(GU_AUTOMATIC_BOOT) || defined(GU_DIAGNOSTIC_ONLY) || defined(GU_CONSOLE_PREPARE))
 #error Headless unlock requires an isolated automatic single RTX full build
 #endif
@@ -37,6 +50,11 @@ typedef struct {
 #if GU_CONSOLE_AGGREGATE
   EFI_HANDLE NvAgent,NvChildAgent,EdidAgent,ComboAgent,Agg;
   EFI_HANDLE AggCandidate,AggDriver;
+#if GU_CONSOLE_MULTI_CHILD
+  EFI_HANDLE Children[GU_AGGREGATE_MAX_CHILDREN];
+  UINT8 ChildPaths[GU_AGGREGATE_MAX_CHILDREN][36];
+  UINTN ChildCount;
+#endif
 #endif
   EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *AmdText,*ConsoleText,*ErrorText;
   EFI_SIMPLE_TEXT_INPUT_PROTOCOL *Keys;
@@ -271,14 +289,34 @@ static EFI_STATUS Consumers(EFI_SYSTEM_TABLE *t,PLAN *p,const GRAPH *g) {
     const EDGE *e=&g->Edges[i];
     if(e->Handle==p->RtxPci) {
       if(e->Count!=1 || !e->Agent)return EFI_ACCESS_DENIED;
-      if(GuGuidEqual(&e->Protocol,&PathGuid) && e->Attributes==EFI_OPEN_PROTOCOL_BY_CHILD_CONTROLLER && e->Controller==p->Rtx){children++;p->NvChildAgent=e->Agent;}
+      if(GuGuidEqual(&e->Protocol,&PathGuid) && e->Attributes==EFI_OPEN_PROTOCOL_BY_CHILD_CONTROLLER) {
+#if GU_CONSOLE_MULTI_CHILD
+        if(!e->Controller || children>=GU_AGGREGATE_MAX_CHILDREN)return EFI_ACCESS_DENIED;
+        for(UINTN prior=0;prior<children;prior++)if(p->Children[prior]==e->Controller)return EFI_ACCESS_DENIED;
+        p->Children[children++]=e->Controller;
+        if(!p->NvChildAgent)p->NvChildAgent=e->Agent;
+        else if(p->NvChildAgent!=e->Agent)return EFI_ACCESS_DENIED;
+#else
+        if(e->Controller!=p->Rtx)return EFI_ACCESS_DENIED;
+        children++;p->NvChildAgent=e->Agent;
+#endif
+      }
       else if(e->Attributes==EFI_OPEN_PROTOCOL_BY_DRIVER && e->Controller==p->RtxPci) {
         if(!nv)nv=e->Agent;else if(e->Agent!=nv)return EFI_ACCESS_DENIED;
         if(GuGuidEqual(&e->Protocol,&PciGuid)){p->NvAgent=e->Agent;owners++;}
       } else return EFI_ACCESS_DENIED;
     }
   }
+#if GU_CONSOLE_MULTI_CHILD
+  if(owners!=1 || children!=GU_CONSOLE_CHILD_COUNT || !nv || p->NvAgent!=nv || p->NvChildAgent!=nv)return EFI_ACCESS_DENIED;
+  UINTN primary=children;
+  for(UINTN c=0;c<children;c++)if(p->Children[c]==p->Rtx)primary=c;
+  if(primary==children)return EFI_ACCESS_DENIED;
+  EFI_HANDLE first=p->Children[0];p->Children[0]=p->Children[primary];p->Children[primary]=first;
+  p->ChildCount=children;
+#else
   if(owners!=1 || children!=1 || !nv || p->NvAgent!=nv || p->NvChildAgent!=nv)return EFI_ACCESS_DENIED;
+#endif
   for(UINTN i=0;i<g->Count;i++) {
     const EDGE *e=&g->Edges[i];
     if(e->Handle!=p->Rtx)continue;
@@ -291,6 +329,38 @@ static EFI_STATUS Consumers(EFI_SYSTEM_TABLE *t,PLAN *p,const GRAPH *g) {
   if(edid!=1 || combo!=1 || !p->Agg || !p->ComboAgent || childGopAgent!=p->ComboAgent ||
      p->Agg!=p->AggCandidate || !p->AggDriver ||
      p->Agg==p->Rtx || p->Agg==p->RtxPci || p->EdidAgent==nv || p->ComboAgent==nv || p->EdidAgent==p->ComboAgent)return EFI_ACCESS_DENIED;
+#if GU_CONSOLE_MULTI_CHILD
+  /* Primary child (c==0) is p->Rtx, already validated above as the console GOP
+   * child. Each additional child must be the same GPU (path/PCI), carry EDID
+   * from the same EdidAgent, and have no GOP or TextOut of its own. */
+  for(UINTN c=0;c<p->ChildCount;c++) {
+    EFI_HANDLE child=p->Children[c];EFI_DEVICE_PATH_PROTOCOL *path=NULL;
+    VOID *foundEdid=NULL,*other=NULL;UINT32 config[16];EFI_HANDLE pci=NULL;EFI_PCI_IO_PROTOCOL *io=NULL;
+    if(child==p->RtxPci || child==p->Console || child==p->Input || child==p->Error || child==p->Agg)return EFI_ACCESS_DENIED;
+    EFI_STATUS s=Interface(t->BootServices,child,&PathGuid,(VOID **)&path);
+    if(s!=EFI_SUCCESS || !DisplayRoute(path,RtxPath))return EFI_UNSUPPORTED;
+    s=PciFor(t->BootServices,path,1,GU_BOARD_ID,GU_BOARD_SUBSYSTEM,&pci,&io,config);
+    if(s!=EFI_SUCCESS || pci!=p->RtxPci || io!=p->RtxIo || !Bytes(config,p->RtxConfig,sizeof(config)))return EFI_NOT_READY;
+    for(UINTN prior=0;prior<c;prior++)if(Bytes(p->ChildPaths[prior],path,36))return EFI_UNSUPPORTED;
+    for(UINTN j=0;j<36;j++)p->ChildPaths[c][j]=((UINT8 *)path)[j];
+    if(c==0 && !Bytes(path,p->RtxDisplayPath,36))return EFI_NOT_READY;
+    if(Interface(t->BootServices,child,&EdidFoundGuid,&foundEdid)!=EFI_SUCCESS || !foundEdid)return EFI_UNSUPPORTED;
+    if(c) {
+      s=Interface(t->BootServices,child,&GopGuid,&other);
+      if(!((s==EFI_NOT_FOUND || s==EFI_UNSUPPORTED) && !other))return EFI_UNSUPPORTED;
+      s=Interface(t->BootServices,child,&TextGuid,&other);
+      if(!((s==EFI_NOT_FOUND || s==EFI_UNSUPPORTED) && !other))return EFI_UNSUPPORTED;
+      UINTN edges=0;
+      for(UINTN i=0;i<g->Count;i++) {
+        const EDGE *e=&g->Edges[i];if(e->Handle!=child)continue;
+        if(!GuGuidEqual(&e->Protocol,&EdidFoundGuid) || e->Attributes!=EFI_OPEN_PROTOCOL_BY_DRIVER ||
+           e->Controller!=child || e->Agent!=p->EdidAgent || e->Count!=1)return EFI_ACCESS_DENIED;
+        edges++;
+      }
+      if(edges!=1)return EFI_ACCESS_DENIED;
+    }
+  }
+#endif
   for(UINTN i=0;i<g->Count;i++) {
     const EDGE *e=&g->Edges[i];
     if(e->Handle!=p->Agg)continue;

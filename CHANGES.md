@@ -1,5 +1,52 @@
 # Changes
 
+## Unreleased — integrate the fourth exact-machine profile
+
+- Preserve the local-profile evidence gates while adding the reviewed B660-PLUS /
+  GA104 RTX 3060 identity to USB staging. Its write builds require the headless USB route.
+- Require exactly one held exclusive PCI ownership record in aggregate decode-restore
+  checks, matching the existing direct-console policy. Reject missing/duplicate/drifted
+  records before the restore gate; this corrects an existing aggregate-path omission.
+- Keep generic deep capture and local profile generation within their existing GA102
+  envelope; this exact GA104 profile does not widen those paths.
+- Retain contributor measurements and original build hashes at PR #24 `60ae7e4`.
+  Current-main integration has no new physical boot claim. Refresh both READMEs,
+  compatibility tables and USB guidance with that boundary.
+
+## Unreleased — profile: ASUS PRIME B660-PLUS D4 / RTX 3060 12GB (two-child aggregate console)
+
+- New profile `-DGU_PROFILE_B660PLUS_3060` (`-HardwareProfile b660plus-3060`,
+  `ASUS-PRIME-B660-PLUS-D4-3010-RTX3060`): GA104 RTX 3060 12GB `10de:2487` subsystem `10de:1530`,
+  12 GiB (`0x3000`), BAR0 `0x82000000`, FWSEC-FRTS at `0x416b4`/`0xea00` (VBIOS 94.04.71.00.87),
+  ASUS PRIME B660-PLUS D4 BIOS 3010. Console, combo-splitter, EDID and nvgop fingerprints are
+  identical to the B660M / 3070 Ti profile; constants derived from three agreeing read-only probe
+  captures, the last in the normal multi-monitor boot state. Headless USB only. Requires CSM
+  disabled (with CSM on, the BIOS INT10 driver owns the card and BAR0 moves, which the checks
+  refuse).
+- Contributor-reported hardware verification from a USB stick, two full-shutdown boots: first
+  with the original contribution's build (on the unmerged per-machine pipeline branch), then
+  with the original PR #24 build at `60ae7e4` (wrapper `809f483f...` with cold-precheck hardening, which passed;
+  child `be538381...`, byte-identical in both). Both: clean transaction (`SS0=0x88888888 SS1=0x8`,
+  one FLR, `clean=1`), Windows started directly with all monitors restored. PyTorch/cuBLAS GEMM
+  n=4096, FP32 accumulate, 30-sample median, locked (full shutdown, no stick) → original PR
+  build: FP16 26.12 → 49.07, BF16 25.77 → 49.41, TF32 12.98 → 25.06, FP32 7.99 → 7.98 TFLOPS
+  (first build: 50.04 / 50.23 / 25.24 / 8.03).
+- `GU_CONSOLE_MULTI_CHILD` / `GU_CONSOLE_CHILD_COUNT`: generalize the aggregate console to a GPU
+  that drives more than one display child — one active console GOP child plus EDID-only siblings.
+  `prepare-console.c` and `full-release.c` pin every child by path and require each sibling to be
+  EDID-only (no GOP or TextOut) from the same EdidAgent; the existing per-child EDID detach loop
+  then releases all children before nvgop. Existing single-child and direct-console layouts
+  are retained; the aggregate ownership gate is hardened above. Aggregate-GOP identity hardening (`AggCandidate`/`AggDriver`)
+  is preserved. Based on the three-child Z690 work in the `GinzaTech/codex/rtx3060ti-windows` fork,
+  generalized to a profile-driven child count.
+- Host tests: `research/profile/test-b660plus-3060.ps1` (16 jobs: preflight/port/transaction
+  against this card's real PROM and the stock assets, all EFI/MMIO/DMA simulated) and
+  `internal-boot/boot/test-aggregate-graph-b660plus.ps1` (WebAssembly replay of the real two-child
+  console graph through the compiled `Consumers`/`FullConsumers`/`FullExpected`, plus eight
+  fail-closed mutations). The contributor reports all passed; the 16 private-fixture jobs
+  were not independently rerun during integration. Mock/replay only, no GPU or firmware access. The PROM and
+  capture fixtures stay local and git-ignored under `research/profile/local/`.
+
 ## Unreleased — harden the per-machine pipeline before integration
 
 - Bind all diagnostic dumps to the wrapper's validated launch root. Preserve fixed-profile
