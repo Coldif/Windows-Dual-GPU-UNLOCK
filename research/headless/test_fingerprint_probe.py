@@ -140,6 +140,59 @@ class FingerprintTests(unittest.TestCase):
         self.assertEqual(info['cold']['wpr2_hi'], '0')
         self.assertNotIn('0x1fa828', info['missing_mmio'])
 
+    def test_duplicate_success_or_failed_read_cannot_hide_a_previous_read(self):
+        for status in ('0000000000000000', '8000000000000007'):
+            with self.subTest(status=status):
+                self.cap.write_text(capture(len(self.nvgop), len(self.edid)) +
+                    f'mmio off=0x00000000 status=0x{status} value=0xb76000a1\n', encoding='ascii')
+                with self.assertRaisesRegex(ValueError, 'duplicate MMIO'):
+                    fp.parse(self.cap)
+
+    def test_marker_does_not_verify_file_close_or_hardware_provenance(self):
+        with self.cap.open('a', encoding='ascii') as output:
+            output.write('capture-complete=1\n')
+        info = fp.parse(self.cap)
+        self.assertTrue(info['capture_complete'])
+        self.assertFalse(info['file_close_verified'])
+        self.assertFalse(info['hardware_provenance_verified'])
+        self.assertIn('0x82381c', info['failed_mmio'])
+
+    def test_ambiguous_target_config_and_markers_refused(self):
+        base = capture(len(self.nvgop), len(self.edid))
+        config = next(line for line in base.splitlines() if line.startswith('cfg dwords='))
+        target = base.splitlines()[0]
+        for extra in (config + '\n', target + '\n', 'capture-complete=1\ncapture-complete=0\n'):
+            self.cap.write_text(base + extra, encoding='ascii')
+            with self.assertRaises(ValueError):
+                fp.parse(self.cap)
+        for words in ([], ['00000000'] * 63, ['00000000'] * 65,
+                      ['100000000'] + ['00000000'] * 63):
+            self.cap.write_text(base.replace(config, 'cfg dwords=' + ' '.join(words)), encoding='ascii')
+            with self.assertRaisesRegex(ValueError, '64 config DWORDs'):
+                fp.parse(self.cap)
+
+    def test_mem_off_is_observed_without_claiming_safety(self):
+        info = fp.parse(self.cap)
+        self.assertFalse(info['pci_memory_enabled'])
+        self.assertFalse(info['pci_bus_master_enabled'])
+        self.assertFalse(info['capture_complete'])
+
+    def test_oversize_capture_refused(self):
+        self.cap.write_bytes(b'x' * (8 * 1024 * 1024 + 1))
+        with self.assertRaisesRegex(ValueError, 'format limit'):
+            fp.parse(self.cap)
+
+    def test_malformed_status_cannot_be_reported_as_success(self):
+        base = capture(len(self.nvgop), len(self.edid))
+        records = ['probe status=0x0000000000000000', 'subsystem=0x0000000040961458',
+                   'probe-bar0 base=0x0000000042000000', 'prom sha256=' + 'ab' * 32]
+        for record in records:
+            for replacement in (record + 'truncated', record.split('=')[0] + '=',
+                                record + record[-1] * 64):
+                self.cap.write_text(base.replace(record, replacement), encoding='ascii')
+                with self.subTest(record=record, replacement=replacement), self.assertRaises(ValueError):
+                    fp.parse(self.cap)
+
 
 if __name__ == "__main__":
     unittest.main()

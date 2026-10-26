@@ -40,10 +40,11 @@ def analyze(raw, capture_index=None):
     if capture_index < 0 or capture_index >= len(sections):
         raise ValueError('Capture index out of range')
     section = sections[capture_index]
-    if section.count('capture-complete=1\n') != 1 or 'capture-complete=0' in section:
+    if re.findall(r'^capture-complete=.*$', section, re.M) != ['capture-complete=1']:
         raise ValueError('Incomplete or ambiguous capture')
     section = section.split('capture-complete=1\n')[0]
-    console = re.search(r'^console out=(0x[0-9a-f]+) error=(0x[0-9a-f]+) input=(0x[0-9a-f]+)$', section, re.M)
+    consoles = re.findall(r'^console out=.*$', section, re.M)
+    console = re.fullmatch(r'console out=(0x[0-9a-f]+) error=(0x[0-9a-f]+) input=(0x[0-9a-f]+)', consoles[0]) if len(consoles) == 1 else None
     if not console:
         raise ValueError('Missing system console handles')
     records = re.findall(r'^handle id=(0x[0-9a-f]+)\n(.*?)(?=^handle id=|\Z)', section, re.M | re.S)
@@ -55,14 +56,18 @@ def analyze(raw, capture_index=None):
         raise ValueError('Declared handle snapshot does not match records')
     if any(h not in handles for h in console.groups()):
         raise ValueError('Unresolved console handle')
-    parents = []
+    parents, pci_commands = [], []
     for h, block in records:
-        cfg = re.search(r'^pci config-dwords=([^\n]+)$', block, re.M)
-        if not cfg:
+        configs = re.findall(r'^pci config-dwords=([^\n]*)$', block, re.M)
+        statuses = re.findall(r'^pci config-status=([^\n]*)$', block, re.M)
+        if not configs and not statuses:
             continue
-        words = [int(w, 16) for w in cfg[1].split()]
-        if len(words) != 16 or 'pci config-status=0x0000000000000000' not in block:
+        if len(configs) != 1 or statuses != ['0x0000000000000000']:
+            raise ValueError('Incomplete or ambiguous PCI identity record')
+        tokens = configs[0].split()
+        if len(tokens) != 16 or any(not re.fullmatch('[0-9a-f]{1,8}', word) for word in tokens):
             raise ValueError('Incomplete PCI identity record')
+        words = [int(w, 16) for w in tokens]
         path = device_path(block)
         if not path:
             raise ValueError('Missing PCI device path')
@@ -72,6 +77,11 @@ def analyze(raw, capture_index=None):
         elif words[0] == 0x164e1002 and words[11] == 0x88771043:
             role = 'amd_igpu_exact_id'
         parents.append((h, path[:-4], role))
+        pci_commands.append({'role': role, 'vendor_device': f'{words[0]:08x}',
+                             'subsystem': f'{words[11]:08x}',
+                             'command': f'{words[1] & 0xffff:04x}',
+                             'memory_enabled': bool(words[1] & 2),
+                             'bus_master_enabled': bool(words[1] & 4)})
     physical, virtual = [], 0
     for h, block in records:
         if 'protocol guid=' + GOP not in block:
@@ -112,12 +122,15 @@ def analyze(raw, capture_index=None):
         'system_text_output_present': console_text,
         'system_text_input_present': input_protocol,
         'single_rtx_display_topology_observed': candidate,
+        'pci_command_observations': pci_commands,
+        'file_close_verified': False,
         'hardware_access': False,
         'authorizes_driver_detach': False,
         'authorizes_unlock': False,
         'headless_handoff_verified': False,
         'limitations': [
             'Offline parsing cannot establish capture freshness or real hardware provenance.',
+            'The capture footer precedes final flush/close; it does not verify durable storage, cleanup or Windows handoff.',
             'Only PCI identity/path topology is classified; driver code, ownership safety, PROM, input liveness and Windows behavior are not validated.',
             'An installed iGPU with no active GOP is not equivalent evidence to a CPU without an iGPU.',
         ],

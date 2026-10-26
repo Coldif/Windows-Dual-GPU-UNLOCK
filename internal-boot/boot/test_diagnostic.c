@@ -8,6 +8,8 @@
 static char Output[128*1024];
 static UINTN OutputBytes;
 static int Scenario,LocateCalls,ReadCalls,StopCalls,Checks;
+static VOID *FailFree;
+static int FreeFailures;
 static EFI_HANDLE H[4]={(VOID *)1,(VOID *)2,(VOID *)3,(VOID *)4};
 static EFI_GUID Dummy={0x12345678,0,0,{0}};
 static EFI_DEVICE_PATH_PROTOCOL EndPath={0x7f,0xff,{4,0}};
@@ -18,9 +20,14 @@ static EFI_PCI_IO_PROTOCOL Pci={0};
 static EFI_DRIVER_BINDING_PROTOCOL Driver={0};
 static EFI_LOADED_IMAGE_PROTOCOL Image={0};
 static EFI_STATUS EFIAPI Allocate(EFI_MEMORY_TYPE type,UINTN n,VOID **out) {
-  (void)type;*out=malloc(n);return *out?EFI_SUCCESS:EFI_OUT_OF_RESOURCES;
+  (void)type;*out=malloc(n);if(Scenario==15 && !FailFree && !FreeFailures)FailFree=*out;
+  return *out?EFI_SUCCESS:EFI_OUT_OF_RESOURCES;
 }
-static EFI_STATUS EFIAPI Free(VOID *p) {free(p);return EFI_SUCCESS;}
+static EFI_STATUS EFIAPI Free(VOID *p) {
+  BOOLEAN bad=p==FailFree;free(p);
+  if(bad){FailFree=NULL;FreeFailures++;return EFI_DEVICE_ERROR;}
+  return EFI_SUCCESS;
+}
 static EFI_STATUS EFIAPI Write(EFI_FILE_PROTOCOL *f,UINTN *n,VOID *p) {
   (void)f;
   if(Scenario==8){if(*n)(*n)--;return EFI_SUCCESS;}
@@ -31,12 +38,14 @@ static EFI_STATUS EFIAPI FileFlush(EFI_FILE_PROTOCOL *f) {(void)f;return Scenari
 static EFI_STATUS EFIAPI Locate(EFI_LOCATE_SEARCH_TYPE search,EFI_GUID *g,VOID *key,UINTN *n,EFI_HANDLE **out) {
   (void)g;(void)key;if(search!=AllHandles)abort();LocateCalls++;
   *out=malloc(sizeof(H));memcpy(*out,H,sizeof(H));*n=4;
+  if((Scenario==13 && LocateCalls==2) || (Scenario==14 && LocateCalls==1))FailFree=*out;
   if(Scenario==1)*n=MAX_HANDLES+1;
   if(Scenario==2 && LocateCalls==2)(*out)[1]=(VOID *)9;
   return EFI_SUCCESS;
 }
 static EFI_STATUS EFIAPI Protocols(EFI_HANDLE h,EFI_GUID ***out,UINTN *n) {
   *out=malloc(3*sizeof(EFI_GUID *));
+  if(Scenario==12 && !FreeFailures)FailFree=*out;
   if(h==H[0] || h==H[1]){(*out)[0]=&PathGuid;(*out)[1]=&GopGuid;(*out)[2]=&PciGuid;*n=3;}
   else if(h==H[2]){(*out)[0]=&DriverGuid;(*out)[1]=&ImageGuid;*n=2;}
   else {(*out)[0]=&Dummy;*n=1;}
@@ -46,6 +55,7 @@ static EFI_STATUS EFIAPI Protocols(EFI_HANDLE h,EFI_GUID ***out,UINTN *n) {
 }
 static EFI_STATUS EFIAPI Opens(EFI_HANDLE h,EFI_GUID *g,EFI_OPEN_PROTOCOL_INFORMATION_ENTRY **out,UINTN *n) {
   (void)g;*n=2;*out=calloc(2,sizeof(**out));
+  if(Scenario==11 && !FreeFailures)FailFree=*out;
   (*out)[0].AgentHandle=H[2];(*out)[0].ControllerHandle=h;
   (*out)[0].Attributes=EFI_OPEN_PROTOCOL_BY_DRIVER;(*out)[0].OpenCount=1;
   (*out)[1].AgentHandle=H[3];(*out)[1].ControllerHandle=H[3];
@@ -88,6 +98,7 @@ static void Check(int condition,const char *name) {
 }
 static EFI_STATUS Run(int scenario) {
   Scenario=scenario;OutputBytes=0;Output[0]=0;LocateCalls=0;ReadCalls=0;StopCalls=0;
+  FailFree=NULL;FreeFailures=0;
   EFI_BOOT_SERVICES bs={0};EFI_RUNTIME_SERVICES rt={0};EFI_SYSTEM_TABLE table={0};EFI_FILE_PROTOCOL file={0};
   bs.AllocatePool=Allocate;bs.FreePool=Free;bs.LocateHandleBuffer=Locate;
   bs.ProtocolsPerHandle=Protocols;bs.OpenProtocolInformation=Opens;bs.HandleProtocol=Handle;
@@ -117,7 +128,14 @@ int main(void) {
   }
   Check(Run(8)==EFI_DEVICE_ERROR,"short write fails");
   Check(Run(9)==EFI_DEVICE_ERROR,"flush failure fails");
+  Check(strstr(Output,"capture-complete=1")!=NULL,"footer cannot prove final flush success");
   Check(Run(10)==EFI_NOT_READY,"null GOP mode is incomplete");
+  const char *reasons[]={"opens-free","protocols-free","after-free","handles-free","variable-free"};
+  for(int i=11;i<=15;i++) {
+    Check(Run(i)==EFI_NOT_READY,"cleanup failure makes graph incomplete");
+    Check(FreeFailures==1 && strstr(Output,reasons[i-11])!=NULL,"cleanup failure reason retained");
+    Check(strstr(Output,"capture-complete=0")!=NULL,"cleanup failure cannot be complete");
+  }
   Check(GuCaptureGraph(NULL,NULL)==EFI_INVALID_PARAMETER,"null input rejected");
   printf("PASS diagnostic host checks: %d; no device/driver mutation services provided\n",Checks);
   return 0;

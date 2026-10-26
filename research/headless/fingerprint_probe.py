@@ -65,9 +65,19 @@ def text_section(dump: bytes):
 
 
 def parse(capture: Path):
-    lines = capture.read_text(encoding="ascii", errors="replace").splitlines()
-    out = {"capture": capture.name, "sha256": hashlib.sha256(capture.read_bytes()).hexdigest()}
-    out['capture_complete'] = lines.count('capture-complete=1') == 1 and 'capture-complete=0' not in lines
+    with capture.open('rb') as stream:
+        raw = stream.read(8 * 1024 * 1024 + 1)
+    if len(raw) > 8 * 1024 * 1024:
+        raise ValueError('Capture exceeds the diagnostic format limit')
+    text = raw.decode('utf-8-sig').replace('\r\n', '\n')
+    lines = text.splitlines()
+    out = {"capture": capture.name, "sha256": hashlib.sha256(raw).hexdigest()}
+    complete = [line for line in lines if line.startswith('capture-complete=')]
+    if len(complete) > 1 or any(line not in ('capture-complete=0', 'capture-complete=1') for line in complete):
+        raise ValueError('Ambiguous capture completion markers')
+    out['capture_complete'] = complete == ['capture-complete=1']
+    out['file_close_verified'] = False
+    out['hardware_provenance_verified'] = False
     simple = {
         "subsystem": r"^subsystem=0x([0-9a-f]+)",
         "bar0": r"^probe-bar0 base=0x([0-9a-f]+)",
@@ -76,25 +86,44 @@ def parse(capture: Path):
         "result": r"^diagnostic-result status=0x([0-9a-f]+)",
         "gops": r"^gops=([0-9a-f]+)",
     }
+    prefixes = {'subsystem': 'subsystem=', 'bar0': 'probe-bar0 ',
+                'prom_sha256': 'prom sha256=', 'probe_status': 'probe status=',
+                'result': 'diagnostic-result ', 'gops': 'gops='}
     for key, pat in simple.items():
-        for line in lines:
-            m = re.match(pat, line)
-            if m:
-                out[key] = m.group(1)
-                break
-    for line in lines:
+        records = [line for line in lines if line.startswith(prefixes[key])]
+        if len(records) > 1:
+            raise ValueError('Duplicate probe field: ' + key)
+        if records:
+            m = re.fullmatch(pat, records[0])
+            if not m:
+                raise ValueError('Malformed probe field: ' + key)
+            if key != 'prom_sha256':
+                limit = 4096 if key == 'gops' else 0xffffffff if key == 'subsystem' else 0xffffffffffffffff
+                if len(m.group(1)) > 16 or int(m.group(1), 16) > limit:
+                    raise ValueError('Out-of-range probe field: ' + key)
+            out[key] = m.group(1)
+    targets = [line for line in lines if line.startswith('probe-target ')]
+    configs = [line for line in lines if line.startswith('cfg dwords=')]
+    if len(targets) != 1 or len(configs) != 1:
+        raise ValueError('Expected one probe target and one config snapshot')
+    words = configs[0].removeprefix('cfg dwords=').split()
+    if len(words) != 64 or any(not re.fullmatch('[0-9a-f]{8}', word) for word in words):
+        raise ValueError('Expected exactly 64 config DWORDs')
+    out['board_id'] = words[0]
+    command = int(words[1], 16) & 0xffff
+    out['pci_command'] = f'{command:04x}'
+    out['pci_memory_enabled'] = bool(command & 2)
+    out['pci_bus_master_enabled'] = bool(command & 4)
+    for line in targets:
         m = re.match(r"^probe-target seg=0x([0-9a-f]+) bus=0x([0-9a-f]+) dev=0x([0-9a-f]+) fun=0x([0-9a-f]+)", line)
-        if m:
-            out["bdf"] = "%04x:%02x:%02x.%x" % tuple(int(x, 16) for x in m.groups())
-        m = re.match(r"^cfg dwords=(.*)", line)
-        if m and "board_id" not in out:
-            words = [int(w, 16) for w in m.group(1).split()]
-            out["board_id"] = f"{words[0]:08x}"
-    mmio = {}
-    for line in lines:
-        m = re.match(r"^mmio off=0x([0-9a-f]+) status=0x([0-9a-f]+) value=0x([0-9a-f]+)", line)
-        if m and int(m.group(2), 16) == 0:
-            mmio[int(m.group(1), 16)] = int(m.group(3), 16)
+        if not m or m.end() != len(line):
+            raise ValueError('Malformed probe target')
+        location = tuple(int(x, 16) for x in m.groups())
+        if any(value > limit for value, limit in zip(location, (65535, 255, 31, 7))):
+            raise ValueError('Probe PCI location out of range')
+        out["bdf"] = "%04x:%02x:%02x.%x" % location
+    mmio, statuses = _profile.probe_mmio(text)
+    out['failed_mmio'] = [f'{offset:#x}' for offset, status in statuses.items() if status != 0]
     def observed(offset, fmt='x'):
         return format(mmio[offset], fmt) if offset in mmio else None
     out["chip"] = observed(0, '08x')

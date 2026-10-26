@@ -51,6 +51,16 @@ static EFI_HANDLE Self,OwnDevice,WindowsImage;
 static EFI_HANDLE UnlockImage;
 #endif
 static EFI_FILE_PROTOCOL *Root,*Log;
+/* Close each owned handle once, even when the first close fails. A failed
+ * close forbids StartImage; retain the first failure for the caller. */
+static EFI_STATUS CloseBootFiles(EFI_STATUS *LogStatus,EFI_STATUS *RootStatus) {
+  EFI_FILE_PROTOCOL *log=Log,*root=Root;Log=NULL;Root=NULL;
+  EFI_STATUS a=log && log->Close?log->Close(log):EFI_INVALID_PARAMETER;
+  EFI_STATUS b=root && root->Close?root->Close(root):EFI_INVALID_PARAMETER;
+  if(LogStatus)*LogStatus=a;
+  if(RootStatus)*RootStatus=b;
+  return a!=EFI_SUCCESS?a:b;
+}
 #ifdef GU_SINGLE_RTX_CONSOLE
 static BOOLEAN ResearchOutputDisabled;
 #endif
@@ -324,10 +334,10 @@ static EFI_STATUS FullWindows(VOID *Context) {
   s=GuVerifyReleased(Table,FALSE);
   s=ReportVerification(s);if(s!=EFI_SUCCESS)return s;
   s=Record(NULL,"windows-close-files-next-then-final-verify-and-StartImage",EFI_SUCCESS);if(s!=EFI_SUCCESS)return s;
-  s=Log->Close(Log);Log=NULL;
-  ScreenStatus("windows-close-log",s);if(s!=EFI_SUCCESS)return s;
-  s=Root->Close(Root);Root=NULL;
-  ScreenStatus("windows-close-root",s);if(s!=EFI_SUCCESS)return s;
+  EFI_STATUS logStatus,rootStatus;
+  s=CloseBootFiles(&logStatus,&rootStatus);
+  ScreenStatus("windows-close-log",logStatus);
+  ScreenStatus("windows-close-root",rootStatus);if(s!=EFI_SUCCESS)return s;
   Say(L"Final fresh verification, then Windows StartImage. Failures below identify the stopping stage.\r\n");
   s=GuVerifyReleased(Table,FALSE);
   if(s!=EFI_SUCCESS){ScreenStatus("windows-final-verify",s);return ReportVerification(s);}
@@ -340,8 +350,7 @@ static EFI_STATUS FullWindows(VOID *Context) {
 static EFI_STATUS Windows(VOID *Context) {
   (void)Context;
   Say(L"Starting Windows Boot Manager directly. No reset.\r\n");
-  EFI_STATUS s=Log->Close(Log);Log=NULL;if(s!=EFI_SUCCESS)return s;
-  s=Root->Close(Root);Root=NULL;if(s!=EFI_SUCCESS)return s;
+  EFI_STATUS s=CloseBootFiles(NULL,NULL);if(s!=EFI_SUCCESS)return s;
   return Table->BootServices->StartImage(WindowsImage,NULL,NULL);
 }
 #endif
@@ -349,8 +358,7 @@ static EFI_STATUS Windows(VOID *Context) {
 static EFI_STATUS ReadyConsoleWindows(VOID *Context) {
   (void)Context;
   Say(L"Console test recorded. Verifying final state, then starting Windows directly.\r\n");
-  EFI_STATUS s=Log->Close(Log);Log=NULL;if(s!=EFI_SUCCESS)return s;
-  s=Root->Close(Root);Root=NULL;return s;
+  return CloseBootFiles(NULL,NULL);
 }
 static EFI_STATUS VerifyConsole(VOID *Context) {
   (void)Context;return GuVerifyPreparedConsole(Table);

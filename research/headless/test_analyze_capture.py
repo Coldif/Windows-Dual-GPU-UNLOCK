@@ -95,6 +95,34 @@ class CaptureTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             analyze(b'x' * (8 * 1024 * 1024 + 1))
 
+    def test_mem_and_bme_are_observations_not_topology_or_authority(self):
+        for command in (0, 2, 6):
+            with self.subTest(command=command):
+                raw = fixture().replace(b'220410de 00000000', f'220410de {command:08x}'.encode())
+                report = analyze(raw)
+                row = report['pci_command_observations'][0]
+                self.assertEqual(row['memory_enabled'], bool(command & 2))
+                self.assertEqual(row['bus_master_enabled'], bool(command & 4))
+                self.assertTrue(report['single_rtx_display_topology_observed'])
+                self.assertFalse(report['authorizes_unlock'])
+                self.assertFalse(report['file_close_verified'])
+
+    def test_duplicate_pci_config_and_status_rejected(self):
+        base = fixture()
+        config = next(line for line in base.splitlines() if line.startswith(b'pci config-dwords='))
+        for extra in (config, b'pci config-status=0x0000000000000000',
+                      b'pci config-status=0x8000000000000007'):
+            with self.subTest(extra=extra), self.assertRaises(ValueError):
+                analyze(base.replace(config, config + b'\n' + extra))
+
+    def test_unknown_completion_and_duplicate_console_rejected(self):
+        base = fixture()
+        for raw in (base + b'capture-complete=2\n',
+                    base.replace(b'console out=0x1 error=0x1 input=0x1',
+                                 b'console out=0x1 error=0x1 input=0x1\nconsole out=0x1 error=0x1 input=0x1')):
+            with self.assertRaises(ValueError):
+                analyze(raw)
+
 
 if __name__ == '__main__':
     unittest.main()
