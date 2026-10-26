@@ -167,6 +167,10 @@ static EFI_STATUS Prom(VOID) {
   if(bs->FreePool(data)!=EFI_SUCCESS)s=EFI_DEVICE_ERROR;
   return s;
 }
+static BOOLEAN CodeRange(UINTN base,UINT64 size,UINTN rva,UINTN bytes,UINTN stop) {
+  return base && bytes && rva<=size && bytes<=size-rva &&
+    stop>=rva && stop-rva<bytes && size<=~(UINTN)0-base;
+}
 static EFI_STATUS Profile(EFI_HANDLE agent,BOOLEAN mouse) {
   EFI_BOOT_SERVICES *bs=Full.Table->BootServices;EFI_DRIVER_BINDING_PROTOCOL *d=NULL;EFI_LOADED_IMAGE_PROTOCOL *im=NULL;
   EFI_STATUS s=Interface(bs,agent,&BindingGuid,(VOID **)&d);
@@ -188,6 +192,9 @@ static EFI_STATUS Profile(EFI_HANDLE agent,BOOLEAN mouse) {
   /* Both original PE relocation tables contain zero relocations in .text.
    * Therefore hash the loaded code range directly; never hash relocated data. */
   UINTN rva=mouse?0x1000:0x280,bytes=mouse?GU_EDID_TEXT_BYTES:GU_NVGOP_TEXT_BYTES;
+  UINTN base=(UINTN)im->ImageBase,stop=mouse?GU_EDID_STOP:GU_NVGOP_STOP;
+  if(!CodeRange(base,im->ImageSize,rva,bytes,stop) ||
+     d->Stop!=(EFI_DRIVER_BINDING_STOP)(base+stop))return EFI_UNSUPPORTED;
   const char *hash=mouse?GU_EDID_TEXT_SHA256:GU_NVGOP_TEXT_SHA256;
   return GuHashMatches((UINT8 *)im->ImageBase+rva,bytes,hash)?EFI_SUCCESS:EFI_CRC_ERROR;
 }

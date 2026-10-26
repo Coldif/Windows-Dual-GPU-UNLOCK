@@ -149,7 +149,13 @@ Do not remove checks or substitute a PROM hash to force another machine through.
 No VBIOS flashing or Windows driver replacement is part of the procedure.
 Driver 617.14 was unchanged in the documented run. Host mock tests do not add hardware
 support. New systems require [compatibility reporting](docs/CONTRIBUTING.en.md) and
-[portability validation](docs/PORTABILITY.en.md).
+[portability validation](docs/PORTABILITY.en.md). A machine inside the hardware-proven envelope
+can build and test its own local profile with the [new-machine pipeline](docs/NEW-MACHINE.en.md).
+This experimental workflow inventories NVIDIA display devices, but deep capture is
+limited to one RTX 3090 / 3090 Ti in the reviewed PCI/BAR state. A generated local
+profile is not a fourth verified machine profile. USB write builds require all
+19 host jobs and unchanged profile, fixtures and build inputs; hardware validation
+is still required. Staging the unlock package needs `-StageUnlock`.
 
 ## License and attribution
 

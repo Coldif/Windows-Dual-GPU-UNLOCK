@@ -1,5 +1,46 @@
 # Changes
 
+## Unreleased — harden the per-machine pipeline before integration
+
+- Bind all diagnostic dumps to the wrapper's validated launch root. Preserve fixed-profile
+  hash-only PROM diagnostics; generic PROM dumping is limited to one reviewed GA102 PCI
+  identity, MEM1/BME0, BDF and BAR resource envelope with a final identity/config recheck.
+  Complete the MMIO batch before logging or file-service calls.
+- Reject malformed/truncated loaded PE headers, sections, relocation blocks and code/Stop
+  ranges; bound runtime code hashing as well as offline generation.
+- Require format-2 evidence with exactly 19 expected jobs, four fixtures, profile report
+  identity and an ordered build-input manifest including EFI runtime and EDK2 headers.
+- Archive earlier local captures when resuming. Describe the experimental local workflow
+  in both READMEs without adding a fourth hardware-verified profile.
+- The byte-identical wrapper claim below describes the original contribution's private
+  capture rebuild, not this hardened integration. No new physical boot is claimed.
+
+## 2026-10-25 — per-machine pipeline: probe → local profile → tests → stick
+
+- `research/profile/new-machine.ps1`: one resumable command for a machine without a reviewed
+  profile. Stages the generic read-only probe on a USB stick, then (after two probe boots)
+  generates a local profile, runs its host tests, builds the headless USB package, and with
+  `-StageUnlock` stages it. Files only; booting is always manual. See
+  [docs/NEW-MACHINE.en.md](docs/NEW-MACHINE.en.md).
+- Generic probe `-DGU_PROBE_GENERIC` (`research/profile/build-probe.ps1`): records every NVIDIA
+  display controller instead of one known card and dumps the PROM to `PROM.BIN`; compiles only
+  into a read-only diagnostic build. `-DGU_USB_PROBE` lets the diagnostic log to the USB stick
+  it booted from, like `GU_USB_MEDIA`.
+- `research/profile/make-profile.py` derives every `machine-profile.h` constant from the
+  captures' own ownership graph, driver dumps and PROM (via `fwsec-locate`, the production
+  VBIOS parser on the host), and refuses captures outside `research/profile/proven.json` or
+  that disagree between boots. On the X870 / RTX 3090 Ti captures it reproduces all 25 reviewed
+  constants and both host fixtures exactly, and the resulting USB pair is byte-identical to the
+  hardware-verified one (wrapper `19a145a2...`, child `6ffe6165...`).
+- `-DGU_PROFILE_LOCAL` / `-HardwareProfile local` (`unlock/build.ps1`, `build-usb.ps1`,
+  `test-cold-precheck.ps1`): includes the generated, git-ignored `unlock/profile-local.h`.
+  Write builds and `stage-usb.ps1` require `research/profile/local/test-results.json` from a
+  passing `research/profile/test-profile.ps1` bound to the exact header, fixtures and source
+  tree; headless USB only.
+- `research/profile/test-profile.ps1`: the reviewed-profile host jobs made generic for the local
+  profile (19 jobs incl. the production transaction against the card's real PROM), plus
+  `test_make_profile.py` refusal cases built by mutating the machine's own captures.
+
 ## Unreleased — integrate the third profile with matched benchmark evidence
 
 - Preserve the hardened pre-release checks while integrating the exact X870 /

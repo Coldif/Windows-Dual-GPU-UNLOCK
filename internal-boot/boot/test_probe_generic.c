@@ -1,0 +1,132 @@
+/* GPL-2.0-only. Real generic probe, RAM-only EFI mocks. No firmware/device writes. */
+#define main FixedProbeMain
+#include "test_probe.c"
+#undef main
+#include <IndustryStandard/Acpi.h>
+
+enum {G_OK,G_UNKNOWN,G_BME,G_MEM_OFF,G_BAD_BAR,G_BAD_RESOURCE,G_CHANGED,G_MULTI,
+      G_SHORT_WRITE,G_FLUSH,G_CLOSE,G_OTHER_BDF,G_PROTOCOL_CHANGED,G_CFG_FAIL,G_BAD_CHECKSUM};
+static int Mode,RootCloses,RootOpens,ForeignOpens,SfsSearches,Dumps;
+static EFI_FILE_PROTOCOL DumpFile,ForeignRoot;
+static EFI_HANDLE BindingHandle=(VOID *)50,ImageHandle=(VOID *)51;
+static EFI_DRIVER_BINDING_PROTOCOL Binding;
+static EFI_LOADED_IMAGE_PROTOCOL Image;
+static UINT8 ImageBytes[512];
+static CAPTURE *ActiveCapture;
+static int Drifted,ReadsAfterDrift;
+
+static EFI_STATUS EFIAPI GenericRead(EFI_PCI_IO_PROTOCOL *io,EFI_PCI_IO_PROTOCOL_WIDTH w,UINT32 at,UINTN n,VOID *data) {
+  if(w==EfiPciIoWidthUint32 && at==8 && n==1){*(UINT32 *)data=0x030000a1;return EFI_SUCCESS;}
+  EFI_STATUS s=PciRead(io,w,at,n,data);
+  if(s==EFI_SUCCESS && w==EfiPciIoWidthUint32 && at==0) {
+    UINT32 *v=data;
+    if(Mode==G_UNKNOWN)v[0]=0x999910de;
+    if(n==64){
+      v[1]=(Mode==G_BME)?6U:((Mode==G_MEM_OFF)?0U:2U);
+      v[2]=0x030000a1;v[4]=GU_BAR0_BASE;
+      if(Mode==G_BAD_BAR)v[4]|=4U;
+      if(Mode==G_CHANGED && S.CfgReads>1)v[11]^=1U;
+      if(Mode==G_CFG_FAIL && S.CfgReads>1)return EFI_DEVICE_ERROR;
+      if(ActiveCapture && S.CfgReads>1){memset(ActiveCapture->Buffer,'x',sizeof(ActiveCapture->Buffer)-1);ActiveCapture->Used=sizeof(ActiveCapture->Buffer)-1;}
+    }
+  }
+  return s;
+}
+static EFI_STATUS EFIAPI DriftLog(EFI_FILE_PROTOCOL *f,UINTN *n,VOID *data) {
+  if(S.CfgReads>1 && S.PromReads<(int)PROM_DWORDS)Drifted=1;
+  return LogWrite(f,n,data);
+}
+static EFI_STATUS EFIAPI GuardedMem(EFI_PCI_IO_PROTOCOL *io,EFI_PCI_IO_PROTOCOL_WIDTH w,UINT8 bar,UINT64 at,UINTN n,VOID *data) {
+  if(Drifted)ReadsAfterDrift++;
+  return MemRead(io,w,bar,at,n,data);
+}
+static EFI_STATUS EFIAPI GenericLocation(EFI_PCI_IO_PROTOCOL *io,UINTN *seg,UINTN *bus,UINTN *dev,UINTN *fun) {
+  EFI_STATUS s=Location(io,seg,bus,dev,fun);if(Mode==G_OTHER_BDF)*bus=2;return s;
+}
+static EFI_STATUS EFIAPI Bar(EFI_PCI_IO_PROTOCOL *io,UINT8 index,UINT64 *supports,VOID **out) {
+  (void)io;(void)index;(void)supports;
+  UINT8 *p=calloc(1,sizeof(EFI_ACPI_ADDRESS_SPACE_DESCRIPTOR)+2);if(!p)return EFI_OUT_OF_RESOURCES;
+  EFI_ACPI_ADDRESS_SPACE_DESCRIPTOR *d=(VOID *)p;
+  d->Desc=ACPI_ADDRESS_SPACE_DESCRIPTOR;d->Len=sizeof(*d)-3;d->AddrSpaceGranularity=32;
+  d->AddrRangeMin=GU_BAR0_BASE;d->AddrRangeMax=(UINT64)GU_BAR0_BASE+0xffffff;d->AddrLen=0x1000000;
+  p[sizeof(*d)]=ACPI_END_TAG_DESCRIPTOR;
+  if(Mode==G_BAD_RESOURCE)d->AddrLen=0x800000;
+  if(Mode==G_BAD_CHECKSUM){UINT8 sum=0;for(UINTN i=0;i<sizeof(*d)+1;i++)sum=(UINT8)(sum+p[i]);p[sizeof(*d)+1]=(UINT8)(1-sum);if(!p[sizeof(*d)+1])p[sizeof(*d)+1]=2;}
+  *out=p;return EFI_SUCCESS;
+}
+static EFI_STATUS EFIAPI GenericLocate(EFI_LOCATE_SEARCH_TYPE search,EFI_GUID *g,VOID *key,UINTN *n,EFI_HANDLE **out) {
+  if(g && !memcmp(g,&WantSfs,sizeof(*g))){SfsSearches++;return EFI_DEVICE_ERROR;}
+  if(g && !memcmp(g,&WantBind,sizeof(*g))) {
+    *out=malloc(sizeof(EFI_HANDLE));if(!*out)return EFI_OUT_OF_RESOURCES;
+    (*out)[0]=BindingHandle;*n=1;return EFI_SUCCESS;
+  }
+  if(g && !memcmp(g,&WantPci,sizeof(*g)) && Mode==G_MULTI) {
+    *out=malloc(2*sizeof(EFI_HANDLE));if(!*out)return EFI_OUT_OF_RESOURCES;
+    (*out)[0]=PciHandle;(*out)[1]=(VOID *)4;*n=2;return EFI_SUCCESS;
+  }
+  return Locate(search,g,key,n,out);
+}
+static EFI_STATUS EFIAPI GenericHandle(EFI_HANDLE h,EFI_GUID *g,VOID **out) {
+  EFI_GUID wantImage=EFI_LOADED_IMAGE_PROTOCOL_GUID;
+  if(h==BindingHandle && !memcmp(g,&WantBind,sizeof(*g))){*out=&Binding;return EFI_SUCCESS;}
+  if(h==ImageHandle && !memcmp(g,&wantImage,sizeof(*g))){*out=&Image;return EFI_SUCCESS;}
+  if(h==(VOID *)4 && !memcmp(g,&WantPci,sizeof(*g))){*out=&Pci;return EFI_SUCCESS;}
+  if(Mode==G_PROTOCOL_CHANGED && h==PciHandle && S.PromAllocs){*out=NULL;return EFI_NOT_FOUND;}
+  return Handle(h,g,out);
+}
+static EFI_STATUS EFIAPI DumpWrite(EFI_FILE_PROTOCOL *f,UINTN *n,VOID *data) {
+  (void)f;(void)data;Dumps++;if(Mode==G_SHORT_WRITE)(*n)--;return EFI_SUCCESS;
+}
+static EFI_STATUS EFIAPI DumpFlush(EFI_FILE_PROTOCOL *f){(void)f;return Mode==G_FLUSH?EFI_DEVICE_ERROR:EFI_SUCCESS;}
+static EFI_STATUS EFIAPI DumpClose(EFI_FILE_PROTOCOL *f){(void)f;return Mode==G_CLOSE?EFI_DEVICE_ERROR:EFI_SUCCESS;}
+static EFI_STATUS EFIAPI BorrowedClose(EFI_FILE_PROTOCOL *f){(void)f;RootCloses++;return EFI_SUCCESS;}
+static EFI_STATUS EFIAPI DumpOpen(EFI_FILE_PROTOCOL *f,EFI_FILE_PROTOCOL **out,CHAR16 *name,UINT64 mode,UINT64 attrs) {
+  (void)name;(void)mode;(void)attrs;
+  if(f==&RootFile)RootOpens++;else ForeignOpens++;
+  *out=&DumpFile;return EFI_SUCCESS;
+}
+static void GenericSetup(int mode) {
+  Setup(SC_OK);Mode=mode;RootCloses=RootOpens=ForeignOpens=SfsSearches=Dumps=0;
+  ActiveCapture=NULL;Drifted=ReadsAfterDrift=0;
+  Pci.Pci.Read=GenericRead;Pci.GetBarAttributes=Bar;Pci.GetLocation=GenericLocation;
+  Bs.LocateHandleBuffer=GenericLocate;Bs.HandleProtocol=GenericHandle;
+  memset(&Binding,0,sizeof(Binding));Binding.ImageHandle=ImageHandle;
+  memset(&Image,0,sizeof(Image));Image.ImageBase=ImageBytes;Image.ImageSize=sizeof(ImageBytes);
+  DumpFile=LogFile;DumpFile.Write=DumpWrite;DumpFile.Flush=DumpFlush;DumpFile.Close=DumpClose;
+  RootFile.Open=DumpOpen;RootFile.Close=BorrowedClose;ForeignRoot=RootFile;
+}
+static EFI_STATUS GenericRun(int mode,BOOLEAN withRoot) {
+  GenericSetup(mode);
+  EFI_STATUS s=GuCaptureGraphOnVolume(&Table,&LogFile,withRoot?&RootFile:NULL);
+  Check(SfsSearches==0 && ForeignOpens==0,"never discovers or writes another volume");
+  Check(RootCloses==0,"borrowed root is never closed");
+  return s;
+}
+int main(void) {
+  Check(GenericRun(G_OK,TRUE)==EFI_SUCCESS,"reviewed generic envelope succeeds");
+  Check(S.RegReads==16 && S.PromReads==PROM_DWORDS,"reviewed generic capture reads bounded windows");
+  Check(RootOpens==2 && Dumps==2,"PROM and image use validated launch root");
+  Check(Logged("capture-complete=1"),"complete generic capture recorded");
+  const int refuse[]={G_UNKNOWN,G_BME,G_MEM_OFF,G_BAD_BAR,G_BAD_RESOURCE,G_CHANGED,G_MULTI,G_OTHER_BDF,G_PROTOCOL_CHANGED,G_CFG_FAIL,G_BAD_CHECKSUM};
+  for(UINTN i=0;i<sizeof(refuse)/sizeof(refuse[0]);i++) {
+    Check(GenericRun(refuse[i],TRUE)==EFI_NOT_READY,"unreviewed or changed state fails closed");
+    Check(S.RegReads==0 && S.PromReads==0,"refused generic target performs no MMIO or PROM reads");
+    Check(!Logged("capture-complete=1"),"refusal cannot claim complete capture");
+  }
+  for(int m=G_SHORT_WRITE;m<=G_CLOSE;m++) {
+    Check(GenericRun(m,TRUE)==EFI_NOT_READY,"dump write/flush/close failure invalidates capture");
+    Check(!Logged("capture-complete=1"),"failed dump never claims complete capture");
+  }
+  Check(GenericRun(G_OK,FALSE)==EFI_NOT_READY,"missing root never uses a prior root or another filesystem");
+  Check(RootOpens==0 && Dumps==0,"capture without root creates no dump");
+  Check(GuCaptureGraph(&Table,&LogFile)==EFI_NOT_READY,"legacy graph API cannot inherit the last root");
+  Check(RootOpens==0,"legacy API uses no stale root");
+  GenericSetup(G_OK);
+  static CAPTURE capture;memset(&capture,0,sizeof(capture));
+  capture.Table=&Table;capture.File=&LogFile;capture.DumpRoot=&RootFile;capture.Complete=TRUE;capture.Io=EFI_SUCCESS;
+  ActiveCapture=&capture;LogFile.Write=DriftLog;Pci.Mem.Read=GuardedMem;
+  Check(GuProbeGpu(&Table,&capture)==EFI_SUCCESS && capture.Complete,"near-full log buffer capture succeeds");
+  Check(S.PromReads==PROM_DWORDS && ReadsAfterDrift==0 && !Drifted,"log callbacks cannot intervene between raw-state check and MMIO batch");
+  printf("PASS generic probe checks: %d; RAM-only mock files, no hardware access\n",Checks);
+  return 0;
+}

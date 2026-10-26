@@ -78,6 +78,15 @@ static void RejectBeforeMmio(EFI_STATUS expected,const char *name) {
   UINT32 zero[9]={0};Check(Bytes(Values,zero,sizeof(zero)),"pre-MMIO rejection has no cold-state evidence");
 }
 int main(void){
+  Check(CodeRange(0x100000,0x3000,0x280,0x400,0x300),"bounded driver code accepted");
+  Check(!CodeRange(0,0x3000,0x280,0x400,0x300),"null image rejected before hashing");
+  Check(!CodeRange(0x100000,0x3000,0x280,0,0x300),"empty code rejected before hashing");
+  Check(!CodeRange(0x100000,0x200,0x280,0x400,0x300),"code RVA past image rejected");
+  Check(!CodeRange(0x100000,0x300,0x280,0x400,0x300),"truncated code rejected before hashing");
+  Check(!CodeRange(0x100000,0x3000,0x280,0x400,0x27f),"Stop before code rejected");
+  Check(!CodeRange(0x100000,0x3000,0x280,0x400,0x680),"Stop at code end rejected");
+  Check(!CodeRange(~(UINTN)0-0x100,0x3000,0x280,0x400,0x300),"image pointer overflow rejected");
+  Check(!CodeRange(0x100000,0x3000,0x280,~(UINTN)0,0x300),"code length overflow rejected");
   DevCount=1;Card(&Devs[0]);Check(Run()==EFI_SUCCESS,"profile cold state with valid decoding and BAR accepted");
   Check(Reads==9 && BarQueries==1 && ConfigReads==3,"valid target checked around resource lifetime before nine reads");
   for(UINT32 ss1=0;ss1<=15;ss1++){Card(&Devs[0]);Devs[0].regs[7]=ss1;Check(Run()==EFI_SUCCESS,"any power-on SS1 0..15 accepted");}
