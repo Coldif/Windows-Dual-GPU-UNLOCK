@@ -1,5 +1,18 @@
 # Changes
 
+## Unreleased — integrate the fourth exact-machine profile
+
+- Preserve the local-profile evidence gates while adding the reviewed B660-PLUS /
+  GA104 RTX 3060 identity to USB staging. Its write builds require the headless USB route.
+- Require exactly one held exclusive PCI ownership record in aggregate decode-restore
+  checks, matching the existing direct-console policy. Reject missing/duplicate/drifted
+  records before the restore gate; this corrects an existing aggregate-path omission.
+- Keep generic deep capture and local profile generation within their existing GA102
+  envelope; this exact GA104 profile does not widen those paths.
+- Retain contributor measurements and original build hashes at PR #24 `60ae7e4`.
+  Current-main integration has no new physical boot claim. Refresh both READMEs,
+  compatibility tables and USB guidance with that boundary.
+
 ## Unreleased — profile: ASUS PRIME B660-PLUS D4 / RTX 3060 12GB (two-child aggregate console)
 
 - New profile `-DGU_PROFILE_B660PLUS_3060` (`-HardwareProfile b660plus-3060`,
@@ -12,26 +25,68 @@
   refuse).
 - Contributor-reported hardware verification from a USB stick, two full-shutdown boots: first
   with the original contribution's build (on the unmerged per-machine pipeline branch), then
-  with this tree's build (wrapper `809f483f...` with main's cold-precheck hardening, which passed;
+  with the original PR #24 build at `60ae7e4` (wrapper `809f483f...` with cold-precheck hardening, which passed;
   child `be538381...`, byte-identical in both). Both: clean transaction (`SS0=0x88888888 SS1=0x8`,
   one FLR, `clean=1`), Windows started directly with all monitors restored. PyTorch/cuBLAS GEMM
-  n=4096, FP32 accumulate, 30-sample median, locked (full shutdown, no stick) → unlocked on this
-  tree: FP16 26.12 → 49.07, BF16 25.77 → 49.41, TF32 12.98 → 25.06, FP32 7.99 → 7.98 TFLOPS
+  n=4096, FP32 accumulate, 30-sample median, locked (full shutdown, no stick) → original PR
+  build: FP16 26.12 → 49.07, BF16 25.77 → 49.41, TF32 12.98 → 25.06, FP32 7.99 → 7.98 TFLOPS
   (first build: 50.04 / 50.23 / 25.24 / 8.03).
 - `GU_CONSOLE_MULTI_CHILD` / `GU_CONSOLE_CHILD_COUNT`: generalize the aggregate console to a GPU
   that drives more than one display child — one active console GOP child plus EDID-only siblings.
   `prepare-console.c` and `full-release.c` pin every child by path and require each sibling to be
   EDID-only (no GOP or TextOut) from the same EdidAgent; the existing per-child EDID detach loop
-  then releases all children before nvgop. Single-child aggregate (B660M) and non-aggregate (B650M,
-  X870) profiles are unchanged. The aggregate-GOP identity hardening (`AggCandidate`/`AggDriver`)
+  then releases all children before nvgop. Existing single-child and direct-console layouts
+  are retained; the aggregate ownership gate is hardened above. Aggregate-GOP identity hardening (`AggCandidate`/`AggDriver`)
   is preserved. Based on the three-child Z690 work in the `GinzaTech/codex/rtx3060ti-windows` fork,
   generalized to a profile-driven child count.
 - Host tests: `research/profile/test-b660plus-3060.ps1` (16 jobs: preflight/port/transaction
   against this card's real PROM and the stock assets, all EFI/MMIO/DMA simulated) and
   `internal-boot/boot/test-aggregate-graph-b660plus.ps1` (WebAssembly replay of the real two-child
   console graph through the compiled `Consumers`/`FullConsumers`/`FullExpected`, plus eight
-  fail-closed mutations). All pass; mock/replay only, no GPU or firmware access. The PROM and
+  fail-closed mutations). The contributor reports all passed; the 16 private-fixture jobs
+  were not independently rerun during integration. Mock/replay only, no GPU or firmware access. The PROM and
   capture fixtures stay local and git-ignored under `research/profile/local/`.
+
+## Unreleased — harden the per-machine pipeline before integration
+
+- Bind all diagnostic dumps to the wrapper's validated launch root. Preserve fixed-profile
+  hash-only PROM diagnostics; generic PROM dumping is limited to one reviewed GA102 PCI
+  identity, MEM1/BME0, BDF and BAR resource envelope with a final identity/config recheck.
+  Complete the MMIO batch before logging or file-service calls.
+- Reject malformed/truncated loaded PE headers, sections, relocation blocks and code/Stop
+  ranges; bound runtime code hashing as well as offline generation.
+- Require format-2 evidence with exactly 19 expected jobs, four fixtures, profile report
+  identity and an ordered build-input manifest including EFI runtime and EDK2 headers.
+- Archive earlier local captures when resuming. Describe the experimental local workflow
+  in both READMEs without adding a fourth hardware-verified profile.
+- The byte-identical wrapper claim below describes the original contribution's private
+  capture rebuild, not this hardened integration. No new physical boot is claimed.
+
+## 2026-10-25 — per-machine pipeline: probe → local profile → tests → stick
+
+- `research/profile/new-machine.ps1`: one resumable command for a machine without a reviewed
+  profile. Stages the generic read-only probe on a USB stick, then (after two probe boots)
+  generates a local profile, runs its host tests, builds the headless USB package, and with
+  `-StageUnlock` stages it. Files only; booting is always manual. See
+  [docs/NEW-MACHINE.en.md](docs/NEW-MACHINE.en.md).
+- Generic probe `-DGU_PROBE_GENERIC` (`research/profile/build-probe.ps1`): records every NVIDIA
+  display controller instead of one known card and dumps the PROM to `PROM.BIN`; compiles only
+  into a read-only diagnostic build. `-DGU_USB_PROBE` lets the diagnostic log to the USB stick
+  it booted from, like `GU_USB_MEDIA`.
+- `research/profile/make-profile.py` derives every `machine-profile.h` constant from the
+  captures' own ownership graph, driver dumps and PROM (via `fwsec-locate`, the production
+  VBIOS parser on the host), and refuses captures outside `research/profile/proven.json` or
+  that disagree between boots. On the X870 / RTX 3090 Ti captures it reproduces all 25 reviewed
+  constants and both host fixtures exactly, and the resulting USB pair is byte-identical to the
+  hardware-verified one (wrapper `19a145a2...`, child `6ffe6165...`).
+- `-DGU_PROFILE_LOCAL` / `-HardwareProfile local` (`unlock/build.ps1`, `build-usb.ps1`,
+  `test-cold-precheck.ps1`): includes the generated, git-ignored `unlock/profile-local.h`.
+  Write builds and `stage-usb.ps1` require `research/profile/local/test-results.json` from a
+  passing `research/profile/test-profile.ps1` bound to the exact header, fixtures and source
+  tree; headless USB only.
+- `research/profile/test-profile.ps1`: the reviewed-profile host jobs made generic for the local
+  profile (19 jobs incl. the production transaction against the card's real PROM), plus
+  `test_make_profile.py` refusal cases built by mutating the machine's own captures.
 
 ## Unreleased — integrate the third profile with matched benchmark evidence
 

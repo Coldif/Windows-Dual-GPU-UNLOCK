@@ -33,5 +33,6 @@ research/headless/registration.local.json
 research/headless/r2-registration.local.json
 research/headless/headless-registration.local.json
 internal-boot/deps/
-# Per-machine profile fixtures and captures (PROM, probe reports): never committed.
+# Per-machine pipeline (research/profile): generated profile, captures, fixtures, evidence.
+internal-boot/unlock/profile-local.h
 research/profile/local/

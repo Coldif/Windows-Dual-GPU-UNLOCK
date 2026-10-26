@@ -2,11 +2,12 @@
 
 **English** | [한국어](COMPATIBILITY.ko.md)
 
-The current source contains three exact-machine profiles with recorded hardware
-results: two internal headless configurations and one headless USB configuration.
-The original B650M run was performed by the maintainer; B660M and X870 evidence
+The current source contains four exact-machine profiles with recorded hardware
+results: two internal headless configurations and two headless USB configurations.
+The original B650M run was performed by the maintainer; B660M, X870 and B660-PLUS evidence
 comes from contributors ([PR #5](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/5),
-[PR #10](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/10)). Builds compile
+[PR #10](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/10),
+[PR #24](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/24)). Builds compile
 for exactly one reviewed profile selected at build time in
 [internal-boot/unlock/machine-profile.h](../internal-boot/unlock/machine-profile.h);
 other GPUs or platforms remain unsupported.
@@ -16,6 +17,7 @@ other GPUs or platforms remain unsupported.
 | `b650m-3090fe` | ASUS TUF GAMING B650M-PLUS WIFI BIOS 3057 / Ryzen 7 7800X3D / RTX 3090 FE | Internal; original maintainer's run |
 | `b660m-3070ti` | ASUS TUF GAMING B660M-E D4 BIOS 4003 / i7-12700F (no iGPU) / MSI RTX 3070 Ti | Internal; contributor report |
 | `x870-3090ti` | Gigabyte X870 AORUS ELITE WIFI7 BIOS F13d / Ryzen 7 9800X3D / ASUS RTX 3090 Ti | USB only; contributor report |
+| `b660plus-3060` | ASUS PRIME B660-PLUS D4 BIOS 3010 / i5-12600KF (no iGPU) / GA104 RTX 3060 12GB | USB only, two display children, CSM off; contributor report |
 
 The latest tag is the source-only pre-release v0.3.1; this source tree includes
 later work, including the USB route and X870 profile. Hardware reports describe
@@ -121,6 +123,29 @@ revision `7b578247a28ff66f2707bea5af0e3943aede7974`, before the current main's
 cold-precheck hardening. The old wrapper/child hashes are historical provenance,
 not expected hashes for a new build. The updated build has no new X870 physical
 boot report. [Evidence provenance](../evidence/x870-3090ti-usb/README.md).
+
+## Profile 4: ASUS PRIME B660-PLUS D4 / RTX 3060 12GB (headless USB)
+
+[PR #24](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/24) contributes this
+exact GA104 variant, PCI `10de:2487`, subsystem `10de:1530`, VBIOS 94.04.71.00.87,
+12 GiB (`0x3000`), on BIOS 3010 with an i5-12600KF (no iGPU). It requires **CSM
+disabled** and the reported aggregate console: one GOP child and one EDID-only
+sibling, with both monitors connected as captured. Other RTX 3060 variants are not covered.
+
+Use `research/headless/build-usb.ps1 -HardwareProfile b660plus-3060` and the
+[USB guide](HEADLESS-USB.en.md). Internal ESP installers do not support this profile;
+its write-build gate rejects non-USB builds. It does not widen generic deep capture
+or the GA102-only local-profile generator.
+
+The contributor reports two full-shutdown USB boots with display restoration and
+direct Windows start. On original revision `60ae7e4`, the same-machine locked →
+unlocked PyTorch/cuBLAS n=4096 medians were FP16 26.12 → 49.07, BF16 25.77 → 49.41,
+TF32 12.98 → 25.06 and FP32 7.99 → 7.98 TFLOPS. These are a different benchmark
+protocol from the repository's native 3090 runner; they are not cross-card comparisons.
+
+Current integration adds ownership and runtime/capture hardening; it has host/build
+validation, not a new physical boot. Restart, sleep/resume and long-term reliability
+remain unverified. [Build provenance and limits](../evidence/b660plus-3060-usb/README.md).
 
 ## Scope beyond the recorded configurations
 

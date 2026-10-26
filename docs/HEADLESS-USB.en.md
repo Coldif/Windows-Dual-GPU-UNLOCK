@@ -44,6 +44,12 @@ this hardening. No new physical boot or recovery result is claimed here.
 
 ## Build and stage
 
+Select `-HardwareProfile b660plus-3060` for the exact ASUS PRIME B660-PLUS D4 /
+GA104 RTX 3060 12GB profile. It requires BIOS 3010, CSM disabled and the reported
+two-child aggregate display topology. It ships only this headless USB route;
+`Configure.ps1` and the internal installer do not support it. Other RTX 3060 cards,
+including GA106 variants, are not covered. See [its evidence](../evidence/b660plus-3060-usb/README.md).
+
 ```powershell
 # Windows ESP GUID: Get-Partition | Where-Object IsSystem | Select Guid
 .\research\headless\build-usb.ps1 -WindowsEspGuid 'YOUR-WINDOWS-ESP-GUID' `

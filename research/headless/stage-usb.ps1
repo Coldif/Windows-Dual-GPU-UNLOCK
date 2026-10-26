@@ -15,7 +15,10 @@ function Put([string]$src,[string]$rel,[string]$hash) {
  "{0,-48} {1}" -f $rel,$hash
 }
 $m=Get-Content (Join-Path $repo 'internal-boot/boot/build/headless/usb-manifest.json') -Raw | ConvertFrom-Json
-if($m.Mode -ne 'single-rtx-headless-unlock-then-windows-usb'){throw 'Build the package with research/headless/build-usb.ps1 first'}
+# Validate identity before the first destination write, including missing/unknown
+# profile names which must never bypass the local evidence gate.
+. (Join-Path $repo 'internal-boot/unlock/local-profile.ps1')
+Assert-GuUsbManifest $repo $m
 $child=Join-Path $repo 'internal-boot/unlock/build/experimental/entryLatchedSs1Full/internal/automatic/headless-research/usb/RTX3090-EXPERIMENTAL-entryLatchedSs1Full-INTERNAL-AUTO-HEADLESS-RESEARCH-USB.EFI'
 $boot=Join-Path $usb 'EFI\BOOT\BOOTX64.EFI'
 if(Test-Path -LiteralPath $boot) {

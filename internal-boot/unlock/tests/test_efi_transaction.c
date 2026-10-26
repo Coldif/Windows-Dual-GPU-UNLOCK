@@ -139,6 +139,9 @@ static VOID check_fwsec_image(void) {
   CHECK(fw.image_off==0x41758 && fw.image_size==0xea00 && fw.dmem_size==sizeof(gsp_dmem)); /* VBIOS 94.02.a0.00.2c */
 #elif defined(GU_PROFILE_B660PLUS_3060)
   CHECK(fw.image_off==0x416b4 && fw.image_size==0xea00 && fw.dmem_size==sizeof(gsp_dmem)); /* VBIOS 94.04.71.00.87 */
+#elif defined(GU_PROFILE_LOCAL)
+  /* Pinned by make-profile.py from fwsec-locate on this machine's PROM.BIN. */
+  CHECK(fw.image_off==GU_LOCAL_FWSEC_IMAGE_OFF && fw.image_size==GU_LOCAL_FWSEC_IMAGE_SIZE && fw.dmem_size==sizeof(gsp_dmem));
 #else
 #error Pin this profile's FWSEC-FRTS image offset and size from its PROM
 #endif

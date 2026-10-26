@@ -3,18 +3,25 @@
 # child accept only the USB device they were loaded from instead of a pinned internal
 # ESP GUID. Builds files only: no staging, boot entries or firmware settings change.
 param([Parameter(Mandatory)][guid]$WindowsEspGuid,[string]$Clang='clang',[string]$LldLink='lld-link',[string]$Python='python',
- [ValidateSet('b650m-3090fe','b660m-3070ti','x870-3090ti','b660plus-3060')][string]$HardwareProfile='b650m-3090fe')
+ [ValidateSet('b650m-3090fe','b660m-3070ti','x870-3090ti','b660plus-3060','local')][string]$HardwareProfile='b650m-3090fe')
 $profiles=@{
  'b650m-3090fe'=@{Defines=@('-DGU_PROFILE_B650M_3090FE');Name='ASUS-TUF-B650M-PLUS-WIFI-3057-RTX3090-FE'}
  'b660m-3070ti'=@{Defines=@('-DGU_PROFILE_B660M_3070TI');Name='ASUS-TUF-GAMING-B660M-E-D4-4003-RTX3070TI'}
  'x870-3090ti'=@{Defines=@('-DGU_PROFILE_X870_3090TI');Name='GIGABYTE-X870-AORUS-ELITE-WIFI7-F13d-RTX3090TI'}
  'b660plus-3060'=@{Defines=@('-DGU_PROFILE_B660PLUS_3060');Name='ASUS-PRIME-B660-PLUS-D4-3010-RTX3060'}
 }
-$hw=$profiles[$HardwareProfile]
 $ErrorActionPreference='Stop'
 $repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $boot=Join-Path $repo 'internal-boot/boot'
 $unlock=Join-Path $repo 'internal-boot/unlock'
+. (Join-Path $unlock 'local-profile.ps1')
+# 'local': this machine's generated profile; refused here and again in build.ps1 without passing evidence.
+if($HardwareProfile -eq 'local'){
+ $local=Get-LocalProfile $repo;$localEvidence=Assert-LocalProfileEvidence $repo
+ $localEvidenceSha=Get-GuSha256 (Join-Path $repo 'research/profile/local/test-results.json')
+ $hw=@{Defines=@($local.Define);Name=$local.Name}
+}
+else{$hw=$profiles[$HardwareProfile]}
 function GuidC([guid]$Value){
  $b=$Value.ToByteArray();$tail=($b[8..15] | ForEach-Object {'0x{0:x2}' -f $_}) -join ','
  return ('{{0x{0:x8},0x{1:x4},0x{2:x4},{{{3}}}}}' -f [BitConverter]::ToUInt32($b,0),[BitConverter]::ToUInt16($b,4),[BitConverter]::ToUInt16($b,6),$tail)
@@ -47,8 +54,18 @@ try {
  if($LASTEXITCODE -ne 0){throw 'Headless USB wrapper link failed'}
  & $Python ../unlock/verify_pe.py build/headless/HEADLESS.EFI build/headless/HEADLESS.map --output build/headless/pe-verification.json
  if($LASTEXITCODE -ne 0){throw 'Headless USB wrapper PE verification failed'}
- [ordered]@{Format=2;HardwareProfile=$hw.Name;Mode='single-rtx-headless-unlock-then-windows-usb';CanUnlock=$true;RequiresHumanKey=$false;HardwareTested=$false;
+ $usbManifest=[ordered]@{Format=2;HardwareProfile=$hw.Name;Mode='single-rtx-headless-unlock-then-windows-usb';CanUnlock=$true;RequiresHumanKey=$false;HardwareTested=$false;
   ChildSha256=$hash;ChildBytes=(Get-Item $child).Length;EfiSha256=(Get-FileHash -LiteralPath build/headless/HEADLESS.EFI).Hash.ToLowerInvariant();EfiBytes=(Get-Item build/headless/HEADLESS.EFI).Length;
-  BuiltUtc=[DateTime]::UtcNow.ToString('o')} | ConvertTo-Json | Set-Content build/headless/usb-manifest.json -Encoding utf8
+  BuiltUtc=[DateTime]::UtcNow.ToString('o')}
+ if($HardwareProfile -eq 'local'){
+  $currentEvidence=Assert-LocalProfileEvidence $repo
+  if($currentEvidence.TreeSha256 -cne $localEvidence.TreeSha256 -or
+     (Get-LocalProfile $repo).HeaderSha256 -cne $local.HeaderSha256 -or
+     (Get-GuSha256 (Join-Path $repo 'research/profile/local/test-results.json')) -cne $localEvidenceSha){throw 'Local build inputs or evidence changed while packaging; rerun tests and rebuild'}
+  $usbManifest.LocalProfileHeaderSha256=$local.HeaderSha256
+  $usbManifest.LocalProfileTreeSha256=$localEvidence.TreeSha256
+  $usbManifest.LocalProfileEvidenceSha256=$localEvidenceSha
+ }
+ $usbManifest | ConvertTo-Json | Set-Content build/headless/usb-manifest.json -Encoding utf8
  Get-Content build/headless/usb-manifest.json
 } finally {Pop-Location}

@@ -7,12 +7,15 @@ Contributor-reported results from one machine, 2026-10-25, two boots:
 | Run | Build | Wrapper `BOOTX64.EFI` | Child `UNLOCK-HEADLESS.EFI` |
 |---|---|---|---|
 | AUTO000000 | original contribution on the per-machine pipeline branch | `3e9bcb8f7c32211047d8c865fb98f1b14ed3d8b8bd49dc758f6a247cf3f8989a` (39,936 B) | `be5383812af499dddd278ecb4ddd8d1145127dec66b1d7b25f009feb57236985` (67,584 B) |
-| AUTO000001 | **this tree** (rebased onto hardened main) | `809f483f0a0f9b286bc718b0825bc01ef05be5f559fb3f45758a703e0a339088` (40,448 B) | same, byte-identical |
+| AUTO000001 | original PR #24, `60ae7e4e3cb141200280ea82e8618ee39a8b14bd` | `809f483f0a0f9b286bc718b0825bc01ef05be5f559fb3f45758a703e0a339088` (40,448 B) | same, byte-identical |
 
-The second run boots the exact wrapper/child pair this source tree builds
+The contributor reports the second run booted the exact wrapper/child pair the original PR revision builds
 (`build-usb.ps1 -HardwareProfile b660plus-3060`; the wrapper embeds the builder's Windows ESP
 GUID, so other machines get a different wrapper hash). Its wrapper includes main's
 cold-precheck hardening, which passed on hardware (`pre-release-cold-check status=0`).
+Later integration with main includes runtime hash bounds and validated-root capture
+changes. Its host/build checks do not constitute another physical boot. The hashes
+above identify historical contributor builds, not expected hashes for current main.
 
 ## Machine
 
@@ -45,7 +48,7 @@ disabled), 2 s warmup, median of 30 samples, all-ones reference check. Same driv
 script before and after. Locked baseline taken after a full shutdown and a normal boot without the
 stick.
 
-| TFLOPS | Locked | After AUTO000000 | After AUTO000001 (this tree) |
+| TFLOPS | Locked | After AUTO000000 | After AUTO000001 (original PR revision) |
 |---|---:|---:|---:|
 | FP32 (no tensor) | 7.99 | 8.03 (1.00×) | 7.98 (1.00×) |
 | TF32 tensor | 12.98 | 25.24 (1.94×) | 25.06 (1.93×) |
