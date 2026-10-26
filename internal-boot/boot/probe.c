@@ -12,6 +12,16 @@
 #include "probe.h"
 #include "../unlock/machine-profile.h"
 
+#if defined(GU_PROBE_DUMP_PROM) && (!defined(GU_DIAGNOSTIC_ONLY) || !defined(GU_DIAGNOSTIC_PROBE) || !defined(GU_USB_MEDIA) || defined(GU_FULL_UNLOCK) || defined(GU_EXPERIMENTAL_3090))
+#error GU_PROBE_DUMP_PROM is only for the observation-only diagnostic image
+#endif
+#if defined(GU_PROBE_GENERIC) || defined(GU_PROBE_DUMP_PROM) || defined(GU_PROFILE_H610M_3060) || defined(GU_PROFILE_PROBE_H610M_3060) || (defined(GU_DIAGNOSTIC_ONLY) && defined(GU_USB_MEDIA))
+#define GU_CHECKED_PROBE 1
+#endif
+#if defined(GU_PROBE_DUMP_PROM) || defined(GU_PROFILE_H610M_3060) || defined(GU_PROFILE_PROBE_H610M_3060) || (defined(GU_DIAGNOSTIC_ONLY) && defined(GU_USB_MEDIA))
+#define GU_PROBE_PRESERVE_CAPTURE 1
+#endif
+
 VOID Text(CAPTURE *c,const char *s);
 VOID Hex(CAPTURE *c,UINT64 v,UINTN digits);
 VOID End(CAPTURE *c);
@@ -38,6 +48,19 @@ static EFI_GUID GopGuidL=EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID;
 static EFI_SYSTEM_TABLE *SysT;
 static UINTN DumpIndex;
 static CHAR16 ImgPrefix[]=L"\\RTX3090-UNLOCK\\IMG";
+
+#ifdef GU_PROBE_PRESERVE_CAPTURE
+/* No CREATE flag until absence was confirmed. Never replace an earlier capture.
+ * Repeated boots require the operator to archive the complete capture set. */
+static BOOLEAN NewDump(CAPTURE *c,EFI_FILE_PROTOCOL *root,CHAR16 *name) {
+  EFI_FILE_PROTOCOL *prior=NULL;
+  EFI_STATUS s=root->Open(root,&prior,name,EFI_FILE_MODE_READ,0);
+  if(s==EFI_NOT_FOUND && !prior)return TRUE;
+  if(s==EFI_SUCCESS && prior && prior!=root && prior->Close)prior->Close(prior);
+  Problem(c,"dump-exists-or-unreadable",s==EFI_SUCCESS?EFI_ALREADY_STARTED:s);
+  return FALSE;
+}
+#endif
 
 static VOID PH(CAPTURE *c,const char *s,UINT64 v){Text(c,s);Hex(c,v,16);End(c);}
 
@@ -67,6 +90,9 @@ static VOID DumpImage(CAPTURE *c,EFI_FILE_PROTOCOL *root,EFI_HANDLE img) {
   while(ImgPrefix[k])name[k]=ImgPrefix[k],k++;
   name[k++]=(CHAR16)('0'+(i/10)%10);name[k++]=(CHAR16)('0'+i%10);
   name[k++]='.';name[k++]='B';name[k++]='I';name[k++]='N';name[k]=0;
+#ifdef GU_PROBE_PRESERVE_CAPTURE
+  if(!NewDump(c,root,name))return;
+#endif
   EFI_FILE_PROTOCOL *f=NULL;
   EFI_STATUS s=root->Open(root,&f,name,EFI_FILE_MODE_READ|EFI_FILE_MODE_WRITE|EFI_FILE_MODE_CREATE,0);
   if(s!=EFI_SUCCESS||!f){Problem(c,"img-open",s);return;}
@@ -98,8 +124,11 @@ static VOID ProbeCaps(CAPTURE *c,EFI_PCI_IO_PROTOCOL *io) {
 }
 
 /* Host-test fixture only: the same PROM bytes that were hashed, never parsed here. */
-#ifdef GU_PROBE_GENERIC
+#if defined(GU_PROBE_GENERIC) || defined(GU_PROBE_DUMP_PROM)
 static VOID DumpProm(CAPTURE *c,EFI_FILE_PROTOCOL *root,UINT8 *page) {
+#ifdef GU_PROBE_PRESERVE_CAPTURE
+  if(!NewDump(c,root,L"\\RTX3090-UNLOCK\\PROM.BIN"))return;
+#endif
   EFI_FILE_PROTOCOL *f=NULL;
   EFI_STATUS s=root->Open(root,&f,L"\\RTX3090-UNLOCK\\PROM.BIN",EFI_FILE_MODE_READ|EFI_FILE_MODE_WRITE|EFI_FILE_MODE_CREATE,0);
   if(s!=EFI_SUCCESS||!f){Problem(c,"prom-open",s);return;}
@@ -112,12 +141,21 @@ static VOID DumpProm(CAPTURE *c,EFI_FILE_PROTOCOL *root,UINT8 *page) {
 }
 #endif
 
-#ifdef GU_PROBE_GENERIC
-/* Generic inventory never implies permission to read another GPU's register map.
- * Only the reviewed GA102 PCI identities and 16 MiB, MEM1/BME0 envelope qualify.
+#ifdef GU_CHECKED_PROBE
+/* Inventory never implies permission to read another GPU's register map.
+ * Generic reads accept reviewed GA102 identities; named probes pin their own
+ * PCI/subsystem and require the same 16 MiB, MEM1/BME0 resource envelope.
  * All allocation/protocol calls finish before the final identity/config recheck. */
 static BOOLEAN ProbeEnvelope(CAPTURE *c,EFI_PCI_IO_PROTOCOL *io,const UINT32 *cfg) {
-  if((cfg[0]!=0x220410deU && cfg[0]!=0x220310deU) || cfg[2]!=0x030000a1U ||
+#ifdef GU_PROBE_GENERIC
+  BOOLEAN identity=cfg[0]==0x220410deU || cfg[0]==0x220310deU;
+#else
+  BOOLEAN identity=cfg[0]==GU_BOARD_ID && cfg[11]==GU_BOARD_SUBSYSTEM;
+#ifdef GU_BAR0_BASE
+  if(cfg[4]!=(UINT32)GU_BAR0_BASE)identity=FALSE;
+#endif
+#endif
+  if(!identity || cfg[2]!=0x030000a1U ||
      (cfg[1]&6U)!=2U || !cfg[4] || (cfg[4]&0xffffffU) || !io->GetBarAttributes || !io->Mem.Read)return FALSE;
   VOID *raw=NULL;
   EFI_STATUS s=io->GetBarAttributes(io,0,NULL,&raw);
@@ -154,7 +192,7 @@ static VOID ProbeBar(CAPTURE *c,EFI_PCI_IO_PROTOCOL *io,UINT32 bar,EFI_FILE_PROT
     0x8219c0,0x822804,0x823804,0x82381c,0x823820,0x824140
   };
   UINT8 *page=NULL;EFI_STATUS s;
-#ifdef GU_PROBE_GENERIC
+#ifdef GU_CHECKED_PROBE
   if(!ProbeEnvelope(c,io,cfg)){Problem(c,"probe-unreviewed-envelope",EFI_UNSUPPORTED);return;}
   s=c->Table->BootServices->AllocatePool(EfiBootServicesData,0x100000,(VOID **)&page);
   if(s!=EFI_SUCCESS || !page){Problem(c,"prom-alloc",s==EFI_SUCCESS?EFI_OUT_OF_RESOURCES:s);return;}
@@ -164,7 +202,7 @@ static VOID ProbeBar(CAPTURE *c,EFI_PCI_IO_PROTOCOL *io,UINT32 bar,EFI_FILE_PROT
 #else
   (void)handle;(void)cfg;
 #endif
-#ifdef GU_PROBE_GENERIC
+#ifdef GU_CHECKED_PROBE
   UINT32 values[sizeof(offs)/sizeof(offs[0])];
   EFI_STATUS statuses[sizeof(offs)/sizeof(offs[0])];
   /* No logging, file I/O, allocation or other firmware-service call between
@@ -181,7 +219,7 @@ static VOID ProbeBar(CAPTURE *c,EFI_PCI_IO_PROTOCOL *io,UINT32 bar,EFI_FILE_PROT
   Text(c,"probe-bar0 base=0x");Hex(c,bar,16);End(c);
   for(UINTN i=0;i<sizeof(offs)/sizeof(offs[0]);i++) {
     UINT32 v=0xdeadbeef;
-#ifdef GU_PROBE_GENERIC
+#ifdef GU_CHECKED_PROBE
     EFI_STATUS s=statuses[i];v=values[i];
 #else
     EFI_STATUS s=io->Mem.Read(io,EfiPciIoWidthUint32,0,offs[i],1,&v);
@@ -189,13 +227,13 @@ static VOID ProbeBar(CAPTURE *c,EFI_PCI_IO_PROTOCOL *io,UINT32 bar,EFI_FILE_PROT
     Text(c,"mmio off=0x");Hex(c,offs[i],8);Text(c," status=0x");Hex(c,s,16);Text(c," value=0x");Hex(c,v,8);End(c);
   }
   UINT8 digest[32];
-#ifndef GU_PROBE_GENERIC
+#ifndef GU_CHECKED_PROBE
   s=c->Table->BootServices->AllocatePool(EfiBootServicesData,0x100000,(VOID **)&page);
 #else
   s=EFI_SUCCESS;
 #endif
   if(s==EFI_SUCCESS && page) {
-#ifndef GU_PROBE_GENERIC
+#ifndef GU_CHECKED_PROBE
     for(UINTN i=0;i<0x100000/4 && s==EFI_SUCCESS;i++)
       s=io->Mem.Read(io,EfiPciIoWidthUint32,0,0x300000+i*4,1,((UINT32*)page)+i);
 #else
@@ -204,7 +242,7 @@ static VOID ProbeBar(CAPTURE *c,EFI_PCI_IO_PROTOCOL *io,UINT32 bar,EFI_FILE_PROT
     if(s==EFI_SUCCESS) {
       GuSha256(page,0x100000,digest);
       Text(c,"prom sha256=");for(UINTN i=0;i<32;i++)Hex(c,digest[i],2);End(c);
-#ifdef GU_PROBE_GENERIC
+#if defined(GU_PROBE_GENERIC) || defined(GU_PROBE_DUMP_PROM)
       if(root)DumpProm(c,root,page);else Problem(c,"prom-dump-volume",EFI_NOT_FOUND);
 #else
       (void)root; /* Reviewed fixed-profile diagnostics remain hash-only. */
@@ -257,7 +295,7 @@ EFI_STATUS GuProbeGpu(EFI_SYSTEM_TABLE *t,CAPTURE *c) {
   EFI_STATUS s=bs->LocateHandleBuffer(ByProtocol,&PciGuidL,NULL,&n,&hs);
   if(s!=EFI_SUCCESS||!hs){Problem(c,"pci-enum",s);return s;}
   if(n>1024){bs->FreePool(hs);Problem(c,"pci-count",EFI_BAD_BUFFER_SIZE);return EFI_BAD_BUFFER_SIZE;}
-#ifdef GU_PROBE_GENERIC
+#ifdef GU_CHECKED_PROBE
   UINTN candidates=0;BOOLEAN inventoryOk=TRUE;
   /* Count all display targets before any MMIO/PROM access. Multiple devices
    * cannot share a single PROM.BIN or be used to generate one local profile. */
@@ -275,6 +313,7 @@ EFI_STATUS GuProbeGpu(EFI_SYSTEM_TABLE *t,CAPTURE *c) {
   for(UINTN i=0;i<n && c->Io==EFI_SUCCESS;i++) {
     EFI_PCI_IO_PROTOCOL *io=NULL;UINT32 id=0;
     if(bs->HandleProtocol(hs[i],&PciGuidL,(VOID **)&io)!=EFI_SUCCESS||!io)continue;
+    if(!io->Pci.Read || !io->GetLocation){Problem(c,"pci-methods",EFI_UNSUPPORTED);continue;}
     if(io->Pci.Read(io,EfiPciIoWidthUint32,0,1,&id)!=EFI_SUCCESS)continue;
     if(!ProbeTarget(io,id))continue;
     found++;
@@ -299,7 +338,7 @@ EFI_STATUS GuProbeGpu(EFI_SYSTEM_TABLE *t,CAPTURE *c) {
     UINT32 sub=0;io->Pci.Read(io,EfiPciIoWidthUint32,0x2c,1,&sub);PH(c,"subsystem=0x",sub);
     ProbeCaps(c,io);
     UINT32 bar=cfg[0x10/4]&~0xfU;
-#ifdef GU_PROBE_GENERIC
+#ifdef GU_CHECKED_PROBE
     if(!inventoryOk || candidates!=1)continue;
 #endif
     if(bar)ProbeBar(c,io,bar,root,hs[i],cfg);else Problem(c,"bar0",EFI_UNSUPPORTED);

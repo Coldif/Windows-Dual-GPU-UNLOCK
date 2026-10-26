@@ -1,5 +1,40 @@
 # Changes
 
+## Unreleased — harden GA106 observation and integrate the fifth profile
+
+- Preserve current GA104/GA102 profiles, LOCAL gates, ownership checks and TF32 tools
+  while adding the exact H610M GA106 headless USB profile. Keep the README GPU-based.
+- Apply bounded BAR/MEM/BME and allocation-return identity checks to the new named
+  probes and USB diagnostic path. Keep generic discovery inside its existing GA102 envelope.
+- Refuse existing or unreadable image/PROM dump files. Observation staging requires an
+  archived/empty capture set; EFI absence checks assume no concurrent writer and are not
+  an atomic exclusive-create primitive.
+- Validate typed observation capabilities, exact profile/defines, source and platform
+  config digests and EFI hashes before staging. Diagnostic builds exclude generated
+  unlock headers entirely. Use the shared bounded PE parser for offline fingerprints;
+  missing/failed MMIO stays null, never a fabricated zero.
+- Contributor physical evidence remains pinned to original PR #30 `4b748f5`.
+  Current integration has host/build verification only, with no new EFI or GPU execution.
+
+## Unreleased: Gigabyte H610M H / RTX 3060 12GB GA106 machine profile (headless USB)
+
+- Added `-DGU_PROFILE_H610M_3060` (`-HardwareProfile h610m-3060` in `unlock/build.ps1`,
+  `research/headless/build-usb.ps1`, `boot/test-cold-precheck.ps1`, `boot/build-diagnostic.ps1`
+  and `unlock/test-all.ps1`) for Gigabyte H610M H BIOS FC, Core i5-14400 and Gigabyte RTX 3060
+  12GB (GA106, `10de:2504`/`1458:4096`). It uses the non-aggregate single-RTX console and is the
+  first GA106 entry. It pins the 12 GiB layout (`frts=0x2ffe00000`) and FWSEC-FRTS at PROM
+  `0x416bc` (`0xea00` bytes).
+- Added a read-only probe path for new machines. `GU_PROFILE_PROBE_H610M_3060` pins only the PCI
+  identity and refuses to compile with any release or unlock define.
+  `build-diagnostic.ps1 -UsbMedia [-DumpProm]` and `research/headless/build-observe-usb.ps1` /
+  `stage-observe-usb.ps1` build and stage the observation EFI on a USB stick. A USB diagnostic
+  returns to the firmware BootOrder on failure, because it performs no driver release or GPU writes.
+  `research/headless/fingerprint_probe.py` derives profile candidates offline.
+- `test-all.ps1` takes `-HardwareProfile` and `-PeBase`. The defaults are unchanged.
+- Contributor-reported hardware result: one clean USB transaction, with direct Windows start
+  and both displays recovered. torch.mm n=8192 medians: BF16 27.2 → 46.3 and FP16 27.1 → 46.6
+  TFLOPS. [Evidence](evidence/h610m-3060-usb/README.md).
+
 ## Unreleased — include TF32 in future benchmark runs
 
 - Add explicit TF32 Tensor GEMM with FP32 input/output buffers and FP32 accumulation

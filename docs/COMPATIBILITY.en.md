@@ -2,12 +2,13 @@
 
 **English** | [한국어](COMPATIBILITY.ko.md)
 
-The current source contains four exact-machine profiles with recorded hardware
-results: two internal headless configurations and two headless USB configurations.
+The current source contains five exact-machine profiles with recorded hardware
+results: two internal headless configurations and three headless USB configurations.
 The original B650M run was performed by the maintainer; B660M, X870 and B660-PLUS evidence
 comes from contributors ([PR #5](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/5),
 [PR #10](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/10),
-[PR #24](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/24)). Builds compile
+[PR #24](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/24),
+[PR #30](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/30)). Builds compile
 for exactly one reviewed profile selected at build time in
 [internal-boot/unlock/machine-profile.h](../internal-boot/unlock/machine-profile.h);
 other GPUs or platforms remain unsupported.
@@ -18,6 +19,7 @@ other GPUs or platforms remain unsupported.
 | `b660m-3070ti` | ASUS TUF GAMING B660M-E D4 BIOS 4003 / i7-12700F (no iGPU) / MSI RTX 3070 Ti | Internal; contributor report |
 | `x870-3090ti` | Gigabyte X870 AORUS ELITE WIFI7 BIOS F13d / Ryzen 7 9800X3D / ASUS RTX 3090 Ti | USB only; contributor report |
 | `b660plus-3060` | ASUS PRIME B660-PLUS D4 BIOS 3010 / i5-12600KF (no iGPU) / GA104 RTX 3060 12GB | USB only, two display children, CSM off; contributor report |
+| `h610m-3060` | Gigabyte H610M H BIOS FC / i5-14400 (iGPU enabled, no GOP) / Gigabyte GA106 RTX 3060 12GB | USB only, two display children; contributor report |
 
 The latest tag is the source-only pre-release v0.3.1; this source tree includes
 later work, including the USB route and X870 profile. Hardware reports describe
@@ -146,6 +148,25 @@ protocol from the repository's native 3090 runner; they are not cross-card compa
 Current integration adds ownership and runtime/capture hardening; it has host/build
 validation, not a new physical boot. Restart, sleep/resume and long-term reliability
 remain unverified. [Build provenance and limits](../evidence/b660plus-3060-usb/README.md).
+
+## Profile 5: Gigabyte H610M H / RTX 3060 12GB GA106 (headless USB)
+
+[PR #30](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/30) contributes PCI
+`10de:2504`, subsystem `1458:4096`, VBIOS 94.06.2f.40.73, 12 GiB (`0x3000`), on
+Gigabyte H610M H BIOS FC with an i5-14400. The UHD 730 is enabled but has no GOP;
+both monitors are on the RTX, producing two non-aggregate display children.
+This differs from Profile 4's GA104 chip and aggregate console.
+
+Build with `research/headless/build-usb.ps1 -HardwareProfile h610m-3060`. Only the
+[headless USB route](HEADLESS-USB.en.md) is shipped; internal write builds are rejected.
+The profile does not widen generic discovery or the GA102 local-profile generator.
+
+The contributor reports one clean transaction, direct Windows entry and both displays
+restored. An earlier boot without the RTX GOP was refused before release. Matched
+torch.mm n=8192 medians were FP16 27.06 → 46.61, BF16 27.18 → 46.28, TF32 13.50 →
+24.02, FP32 9.58 → 9.34 TFLOPS. This is not the repository's cuBLAS n=4096 protocol.
+These reports and hashes identify original revision `4b748f5`, not a physical test
+of the later hardened integration. [Evidence and limits](../evidence/h610m-3060-usb/README.md).
 
 ## Scope beyond the recorded configurations
 

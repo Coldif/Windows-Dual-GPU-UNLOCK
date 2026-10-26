@@ -13,6 +13,11 @@
 #undef NULL
 #include "diagnostic.c" /* Real Text/Hex/End/Problem and GuCaptureGraph. */
 
+#ifndef GU_BAR0_BASE
+/* Probe-only profiles pin no BAR; the probe reads it from config space. */
+#define GU_BAR0_BASE 0xf6000000ULL
+#endif
+
 #define PROM_DWORDS (0x100000U/4U)
 static EFI_GUID WantPci=EFI_PCI_IO_PROTOCOL_GUID;
 static EFI_GUID WantSfs=EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_GUID;

@@ -2,12 +2,13 @@
 
 [English](COMPATIBILITY.en.md) | **한국어**
 
-현재 소스에는 실기기 결과가 기록된 정확한 장비 프로필 네 개가 있습니다.
-내부 headless 두 구성과 headless USB 두 구성입니다. 최초 B650M은 유지관리자가
+현재 소스에는 실기기 결과가 기록된 정확한 장비 프로필 다섯 개가 있습니다.
+내부 headless 두 구성과 headless USB 세 구성입니다. 최초 B650M은 유지관리자가
 시험했고, B660M·X870·B660-PLUS의 근거는 기여자의 보고입니다
 ([PR #5](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/5),
 [PR #10](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/10),
-[PR #24](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/24)).
+[PR #24](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/24),
+[PR #30](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/30)).
 빌드는 [internal-boot/unlock/machine-profile.h](../internal-boot/unlock/machine-profile.h)에서
 빌드 시점에 선택된 하나의 검토된 프로필 전용이며, 다른 GPU·플랫폼은 지원하지 않습니다.
 
@@ -17,6 +18,7 @@
 | `b660m-3070ti` | ASUS TUF GAMING B660M-E D4 BIOS 4003 / iGPU 없는 i7-12700F / MSI RTX 3070 Ti | 내부; 기여자 보고 |
 | `x870-3090ti` | Gigabyte X870 AORUS ELITE WIFI7 BIOS F13d / Ryzen 7 9800X3D / ASUS RTX 3090 Ti | USB 전용; 기여자 보고 |
 | `b660plus-3060` | ASUS PRIME B660-PLUS D4 BIOS 3010 / iGPU 없는 i5-12600KF / GA104 RTX 3060 12GB | USB 전용, 디스플레이 child 두 개, CSM 끔; 기여자 보고 |
+| `h610m-3060` | Gigabyte H610M H BIOS FC / i5-14400(iGPU 켜짐, GOP 없음) / Gigabyte GA106 RTX 3060 12GB | USB 전용, 디스플레이 child 두 개; 기여자 보고 |
 
 최신 태그 v0.3.1은 소스 전용 사전 릴리스이며, 현재 소스에는 그 이후의 USB 경로와
 X870 프로필 등이 포함됩니다. 실기기 보고는 각 기록의 빌드에 해당합니다. 현재 cold
@@ -138,6 +140,25 @@ GA104 변형입니다. PCI `10de:2487`, subsystem `10de:1530`, VBIOS 94.04.71.00
 현재 통합본은 소유권·런타임·진단 검사를 보강했고 host·빌드 검증을 했지만 새 실기기
 부팅 시험은 하지 않았습니다. 재시작·절전 복귀·장기 안정성은 미검증입니다.
 [원 빌드 근거와 한계](../evidence/b660plus-3060-usb/README.md)를 참고하세요.
+
+## 프로필 5: Gigabyte H610M H / RTX 3060 12GB GA106(headless USB)
+
+[PR #30](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/30)의 PCI `10de:2504`,
+subsystem `1458:4096`, VBIOS 94.06.2f.40.73, 12 GiB(`0x3000`) 구성입니다.
+Gigabyte H610M H BIOS FC와 i5-14400을 사용하고 UHD 730은 켜져 있지만 GOP는 없습니다.
+모니터 두 대 모두 RTX에 연결하며, 프로필 4의 GA104 aggregate 콘솔과 달리
+non-aggregate 디스플레이 child 두 개를 사용합니다.
+
+`research/headless/build-usb.ps1 -HardwareProfile h610m-3060`와
+[headless USB 절차](HEADLESS-USB.en.md)만 지원하며 내부 쓰기 빌드는 거부합니다.
+범용 진단·GA102 로컬 프로필 생성기의 허용 범위가 넓어진 것은 아닙니다.
+
+기여자는 깨끗한 트랜잭션 한 번과 Windows 직접 시작·두 화면 복구를 보고했습니다.
+그 전 RTX GOP가 없던 부팅은 해제 전에 거부됐습니다. 같은 장비의 torch.mm n=8192
+중앙값은 FP16 27.06 → 46.61, BF16 27.18 → 46.28, TF32 13.50 → 24.02,
+FP32 9.58 → 9.34 TFLOPS입니다. 저장소의 cuBLAS n=4096과는 다른 측정 절차입니다.
+실기기 보고와 해시는 원 기여 `4b748f5`에 해당하며 이후 보강한 통합본의 실기기 시험이
+아닙니다. [근거와 한계](../evidence/h610m-3060-usb/README.md)를 참고하세요.
 
 ## 기록된 구성 밖의 범위
 

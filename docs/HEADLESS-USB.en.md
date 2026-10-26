@@ -50,6 +50,21 @@ two-child aggregate display topology. It ships only this headless USB route;
 `Configure.ps1` and the internal installer do not support it. Other RTX 3060 cards,
 including GA106 variants, are not covered. See [its evidence](../evidence/b660plus-3060-usb/README.md).
 
+The separate `-HardwareProfile h610m-3060` selects the exact Gigabyte H610M H BIOS FC /
+Gigabyte GA106 RTX 3060 profile. Its two-display route is non-aggregate and differs
+from B660-PLUS. It is also USB-only. See [its evidence](../evidence/h610m-3060-usb/README.md)
+and [compatibility requirements](COMPATIBILITY.en.md).
+
+For read-only porting captures, `build-observe-usb.ps1` and `stage-observe-usb.ps1`
+produce a separate diagnostic package. `-DumpProm` opts into saving the PROM.
+Staging checks typed capabilities, source/config hashes and the EFI hash before
+copying, and refuses an existing capture set. Preserve each complete DIAG/IMG/PROM
+set in a separate local archive and clear its active location by moving the set
+before the next boot. Existing or unreadable dump files invalidate the new capture
+instead of being overwritten. There must be no other writer to the stick: the EFI
+absence check followed by CREATE is not an atomic exclusive-create operation.
+These hashes are local stale-input guards, not signatures for an untrusted host.
+
 ```powershell
 # Windows ESP GUID: Get-Partition | Where-Object IsSystem | Select Guid
 .\research\headless\build-usb.ps1 -WindowsEspGuid 'YOUR-WINDOWS-ESP-GUID' `

@@ -12,7 +12,7 @@ GPU model.** Check the linked motherboard, BIOS and card requirements before bui
 
 | GPU | Current status | Details |
 |---|---|---|
-| **RTX 3060 12GB (GA104)** | Hardware success reported; headless USB only | [Supported configuration](docs/COMPATIBILITY.en.md#profile-4-asus-prime-b660-plus-d4--rtx-3060-12gb-headless-usb) |
+| **RTX 3060 12GB (GA104 / GA106)** | Hardware success reported; headless USB only | [GA104](docs/COMPATIBILITY.en.md#profile-4-asus-prime-b660-plus-d4--rtx-3060-12gb-headless-usb) · [GA106](docs/COMPATIBILITY.en.md#profile-5-gigabyte-h610m-h--rtx-3060-12gb-ga106-headless-usb) |
 | **RTX 3070 Ti 8GB** | Hardware success reported; internal headless | [Supported configuration](docs/COMPATIBILITY.en.md#profile-2-asus-tuf-b660m-e-d4--rtx-3070-ti-aggregate-console) |
 | **RTX 3080** | No dedicated profile in this port; upstream project target | [Project origins](THIRD_PARTY_NOTICES.md) |
 | **RTX 3090 FE 24GB** | Hardware success recorded; internal headless; default profile | [Supported configuration](docs/COMPATIBILITY.en.md#profile-1-asus-tuf-b650m--rtx-3090-fe-original) |
@@ -33,11 +33,11 @@ Firmware assets and private, partition-specific EFI binaries are not bundled.
 | Path | Display and input | Instructions |
 |---|---|---|
 | **Internal headless** | B650M/3090 FE or B660M/3070 Ti profile; monitors on RTX; display temporarily removed; no T/U/Enter | [Internal headless guide](docs/HEADLESS.en.md) |
-| **Headless USB** | X870/3090 Ti and B660-PLUS/3060 contributor-tested routes; profile-specific wrapper and child on a FAT32 USB stick | [Headless USB guide](docs/HEADLESS-USB.en.md) |
+| **Headless USB** | Reported RTX 3060 / 3090 Ti configurations; profile-specific wrapper and child on a FAT32 USB stick | [Headless USB guide](docs/HEADLESS-USB.en.md) |
 | Internal AMD-display manual / Auto | Original B650M profile, motherboard/iGPU display preserved; manual variant requires U | [Existing internal guide](docs/INTERNAL-BOOT.en.md) |
 | Legacy USB manual | Original AMD/iGPU display profile; U once, then Boot Override to Windows without reset | [Legacy USB guide](docs/GUIDE.en.md) |
 
-X870 and B660-PLUS are not wired into `Configure.ps1` or `Headless.ps1`; use the USB guide.
+X870, B660-PLUS and H610M are not wired into `Configure.ps1` or `Headless.ps1`; use the USB guide.
 USB packages can also be built for the first two profiles, but their recorded
 internal boots do not validate those USB routes. The legacy USB EFI retains its
 AMD display requirement. BIOS priority `USB → Windows` alone does not implement

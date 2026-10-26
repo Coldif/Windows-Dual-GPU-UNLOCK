@@ -10,11 +10,23 @@
  */
 #pragma once
 
-#if (defined(GU_PROFILE_B650M_3090FE) + defined(GU_PROFILE_B660M_3070TI) + defined(GU_PROFILE_X870_3090TI) + defined(GU_PROFILE_B660PLUS_3060) + defined(GU_PROFILE_LOCAL)) > 1
+#if (defined(GU_PROFILE_B650M_3090FE) + defined(GU_PROFILE_B660M_3070TI) + defined(GU_PROFILE_X870_3090TI) + defined(GU_PROFILE_B660PLUS_3060) + defined(GU_PROFILE_LOCAL) + defined(GU_PROFILE_H610M_3060) + defined(GU_PROFILE_PROBE_H610M_3060)) > 1
 #error Select exactly one machine profile
 #endif
-#if !defined(GU_PROFILE_B650M_3090FE) && !defined(GU_PROFILE_B660M_3070TI) && !defined(GU_PROFILE_X870_3090TI) && !defined(GU_PROFILE_B660PLUS_3060) && !defined(GU_PROFILE_LOCAL)
+#if !defined(GU_PROFILE_B650M_3090FE) && !defined(GU_PROFILE_B660M_3070TI) && !defined(GU_PROFILE_X870_3090TI) && !defined(GU_PROFILE_B660PLUS_3060) && !defined(GU_PROFILE_LOCAL) && !defined(GU_PROFILE_H610M_3060) && !defined(GU_PROFILE_PROBE_H610M_3060)
 #define GU_PROFILE_B650M_3090FE 1
+#endif
+
+/* Probe-only identity: never a write profile. It selects the read-only probe
+ * target and nothing else, so any build that could arm, release a driver or
+ * unlock must fail to compile with it. */
+#if defined(GU_PROFILE_PROBE_H610M_3060)
+#if !defined(GU_DIAGNOSTIC_PROBE) || (!defined(GU_DIAGNOSTIC_ONLY) && !defined(GU_PROBE_HOST_TEST))
+#error GU_PROFILE_PROBE_H610M_3060 is for the read-only diagnostic probe only
+#endif
+#if defined(GU_FULL_UNLOCK) || defined(GU_EXPERIMENTAL_3090) || defined(GU_UEFI_PORT) || defined(GU_INTERNAL_BOOT) || defined(GU_CONSOLE_PREPARE) || defined(GU_AUTOMATIC_BOOT) || defined(GU_HEADLESS_RESEARCH)
+#error GU_PROFILE_PROBE_H610M_3060 must not be combined with release or unlock builds
+#endif
 #endif
 
 /* 1 = the AMI combo splitter owns the console on top of the target GPU
@@ -49,6 +61,57 @@
 #if !defined(GU_LOCAL_PROFILE_GENERATOR) || GU_CONSOLE_AGGREGATE
 #error profile-local.h must come from research/profile/make-profile.py (non-aggregate topology)
 #endif
+
+#elif defined(GU_PROFILE_PROBE_H610M_3060)
+
+/* Gigabyte H610M H BIOS FC, Core i5-14400 (UHD 730 iGPU 8086:4682 active),
+ * Gigabyte RTX 3060 12GB (GA106): UNREVIEWED, probe only. Only the PCI
+ * identity is known from Windows; BAR0, VRAM size, chip ID, PROM hash, root
+ * port, display paths and driver fingerprints are what the probe collects.
+ * Deliberately defines none of them, so write-side code cannot compile. */
+#define GU_PROFILE_NAME "PROBE-ONLY-GIGABYTE-H610M-H-FC-RTX3060-12GB"
+#define GU_BOARD_ID 0x250410deU
+#define GU_BOARD_SUBSYSTEM 0x40961458U
+
+#elif defined(GU_PROFILE_H610M_3060)
+
+/* Gigabyte H610M H BIOS FC, Core i5-14400 (UHD 730 iGPU 8086:4682 enabled,
+ * no GOP), Gigabyte RTX 3060 12GB (GA106, 1458:4096): contributor-reported
+ * hardware results are pinned in evidence/h610m-3060-usb. Single-RTX console (non-aggregate);
+ * two monitors give two nvgop display children, one with the console GOP.
+ * Values come from three identical read-only probe captures (2026-10-26);
+ * BAR0 extent matches the Windows resource assignment. */
+#define GU_PROFILE_NAME "GIGABYTE-H610M-H-FC-RTX3060-12GB"
+#define GU_BOARD_ID 0x250410deU
+#define GU_BOARD_SUBSYSTEM 0x40961458U
+#define GU_BAR0_BASE 0x42000000ULL
+#define GU_BAR0_END 0x42ffffffULL
+#define GU_DEVICE_MEMORY_SIZE 0x3000U
+#define GU_CHIP_ID 0xb76000a1U
+#define GU_PROM_SHA256 "727dd8332f028783d3de2f81a707e4d9448c3238db6180271f3a8e9c03a808c9"
+#define GU_ROOT_PORT_DEVICE 1U
+#define GU_ROOT_PORT_FUNCTION 0U
+/* 36-byte display device path: ACPI root, PciRoot(0), Pci(1,0), Pci(0,0), ADR. */
+#define GU_RTX_PATH_BYTES   2,1,12,0,0xd0,0x41,3,10,0,0,0,0,1,1,6,0,0,1,1,1,6,0,0,0,2,3,8,0,0x30,3,1,128,127,255,4,0
+/* AMI console splitter text-out driver (BIOS FC image fingerprint). */
+#define GU_CONSOLE_TEXT_SIZE 0x5de0U
+#define GU_CONSOLE_TEXT_STOP 0xf90U
+#define GU_CONSOLE_TEXT_VERSION 0x10U
+/* AMI graphics console driver (BIOS FC image fingerprint). */
+#define GU_CONSOLE_GFX_SIZE 0x3c20U
+#define GU_CONSOLE_GFX_STOP 0xb60U
+#define GU_CONSOLE_GFX_VERSION 0x10U
+/* AMI EDID/mouse runtime driver (BIOS FC image fingerprint). */
+#define GU_EDID_IMAGE_SIZE 0x9000U
+#define GU_EDID_STOP 0x14d4U
+#define GU_EDID_TEXT_BYTES 0x3bb2U
+#define GU_EDID_TEXT_SHA256 "49fe68461765963d0b63144b0a7863f3b2db5926f1c988cbacc1e85ebe2b96f4"
+/* nvgop-ga1xx 0x60010: byte-identical .text to the B660M/3070 Ti entry. */
+#define GU_NVGOP_VERSION 0x60010U
+#define GU_NVGOP_IMAGE_SIZE 0x26ae0U
+#define GU_NVGOP_STOP 0x678U
+#define GU_NVGOP_TEXT_BYTES 0x20d33U
+#define GU_NVGOP_TEXT_SHA256 "615b37a708b1894e18d7fa60cfcdacaa4d8b598863a10b8103d231a595847b2b"
 
 #elif defined(GU_PROFILE_X870_3090TI)
 

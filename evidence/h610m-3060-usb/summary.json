@@ -1,0 +1,64 @@
+{
+  "profile": "h610m-3060",
+  "source_revision": "4b748f5e88344f1a1a1fa8d7b5788e528cb19dba",
+  "evidence_source": "contributor-reported; original build only",
+  "integrated_build_hardware_tested": false,
+  "hardware": {
+    "board": "Gigabyte H610M H",
+    "bios": "FC",
+    "cpu": "Intel Core i5-14400 (UHD 730 iGPU 8086:4682 enabled, no GOP)",
+    "gpu": "Gigabyte RTX 3060 12 GiB (GA106) 10de:2504 / 1458:4096",
+    "vbios": "94.06.2f.40.73",
+    "display": "two monitors, both on the RTX (single-RTX headless topology, non-aggregate console, two nvgop display children)"
+  },
+  "software": {
+    "windows": "Windows 11 Pro build 26200",
+    "nvidia_driver": "610.88",
+    "benchmark": "torch 2.10.0+cu126 torch.mm, n=8192, FP32 accumulation (reduced-precision reduction off), warm-up per mode, five samples of ten multiplies, median; same script, driver and 170 W power limit before and after"
+  },
+  "route": "headless USB (GU_USB_MEDIA), FAT32 MBR stick, firmware boot menu (F12)",
+  "efi": {
+    "child_sha256": "82998f4875d8fb44f1841ef60f78b5df12998ddb9773425d5a3351dba776cd0b",
+    "wrapper_sha256": "74c4d19a590cb0b2823c2849f29b3d02c5b06a6ec6aa327eca4e66bec5c919eb",
+    "reproducible": "Contributor reports original revision 4b748f5 rebuilt both files byte-identically on the test machine with build-usb.ps1 -HardwareProfile h610m-3060; this is not a current-main hash claim. The wrapper embeds the builder's Windows ESP GUID."
+  },
+  "probe": {
+    "captures": 4,
+    "note": "three cold boots plus one PROM-dump boot of the read-only USB observation EFI; identical identity, BAR0, PROM digest, GOP path and driver fingerprints; only the entry selectors differ",
+    "entry_selectors_seen": ["0x06204001/0x6", "0x06206001/0x4", "0x02206001/0x6"],
+    "fwsec_frts": {"prom_offset": "0x416bc", "bytes": "0xea00"}
+  },
+  "runs": [
+    {
+      "log": "HLS000000",
+      "boot": "full shutdown",
+      "result": "refused before any release: console-prepare-preflight EFI_NOT_FOUND (no RTX GOP in that boot, monitors likely not detected); returned to firmware BootOrder",
+      "windows": "normal boot, locked"
+    },
+    {
+      "log": "HLS000001 / AUTO000000",
+      "boot": "full shutdown",
+      "wrapper": "with pre-check (passed: cold)",
+      "entry_ss0": "0x2206001",
+      "entry_ss1": "0x6",
+      "final": "status=0 clean=1 FLR=1",
+      "windows": "direct start, both displays recovered"
+    }
+  ],
+  "selectors_after": {
+    "ss0": "0x88888888",
+    "ss1": "0x8"
+  },
+  "tflops_medians": {
+    "locked_baseline": {"fp32": 9.58, "tf32": 13.50, "fp16": 27.06, "bf16": 27.18},
+    "after_AUTO000000": {"fp32": 9.34, "tf32": 24.02, "fp16": 46.61, "bf16": 46.28}
+  },
+  "not_established": [
+    "repeated cold-boot reliability (one successful transaction)",
+    "Windows restart behaviour and the pre-check skip branch on hardware",
+    "sleep/hibernate resume",
+    "long-term stability, games/applications",
+    "internal-ESP route for this profile",
+    "results with the repository's cuBLAS benchmark (different method from other profiles)"
+  ]
+}

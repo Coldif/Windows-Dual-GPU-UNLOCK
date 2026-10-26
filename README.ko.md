@@ -11,7 +11,7 @@
 
 | GPU | 현재 상태 | 상세 조건 |
 |---|---|---|
-| **RTX 3060 12GB (GA104)** | 실기기 성공 보고 · headless USB 전용 | [지원 구성](docs/COMPATIBILITY.ko.md#프로필-4-asus-prime-b660-plus-d4--rtx-3060-12gbheadless-usb) |
+| **RTX 3060 12GB (GA104 / GA106)** | 실기기 성공 보고 · headless USB 전용 | [GA104](docs/COMPATIBILITY.ko.md#프로필-4-asus-prime-b660-plus-d4--rtx-3060-12gbheadless-usb) · [GA106](docs/COMPATIBILITY.ko.md#프로필-5-gigabyte-h610m-h--rtx-3060-12gb-ga106headless-usb) |
 | **RTX 3070 Ti 8GB** | 실기기 성공 보고 · 내부 headless | [지원 구성](docs/COMPATIBILITY.ko.md#프로필-2-asus-tuf-b660m-e-d4--rtx-3070-tiaggregate-console) |
 | **RTX 3080** | 이 포트의 전용 프로필 없음 · 상위 프로젝트 대상 | [프로젝트 출처](THIRD_PARTY_NOTICES.md) |
 | **RTX 3090 FE 24GB** | 실기기 성공 기록 · 내부 headless · 기본 프로필 | [지원 구성](docs/COMPATIBILITY.ko.md#프로필-1-asus-tuf-b650m--rtx-3090-fe최초-검증) |
@@ -31,11 +31,11 @@ EFI 바이너리는 포함하지 않습니다.
 | 경로 | 화면·입력 조건 | 안내 |
 |---|---|---|
 | **내부 headless** | B650M/3090 FE 또는 B660M/3070 Ti 프로필; 모니터는 RTX, 도중 화면 제거, T/U/Enter 불필요 | [내부 headless 안내](docs/HEADLESS.ko.md) |
-| **Headless USB** | 기여자가 시험한 X870/3090 Ti, B660-PLUS/3060 경로; FAT32 USB에 프로필별 wrapper·child 배치 | [Headless USB 안내 — 영어](docs/HEADLESS-USB.en.md) |
+| **Headless USB** | 성공 보고가 있는 RTX 3060 / 3090 Ti 구성; FAT32 USB에 프로필별 wrapper·child 배치 | [Headless USB 안내 — 영어](docs/HEADLESS-USB.en.md) |
 | 기존 내부 AMD 화면 manual / Auto | 최초 B650M 프로필, 메인보드/iGPU 화면 유지, manual은 U 필요 | [기존 내부 부팅 안내](docs/INTERNAL-BOOT.ko.md) |
 | 기존 USB manual | 최초 AMD/iGPU 화면 프로필, U 한 번, 리셋 없이 Boot Override로 Windows | [기존 USB 안내](docs/GUIDE.ko.md) |
 
-X870과 B660-PLUS는 `Configure.ps1`·`Headless.ps1`에 연결하지 않았으므로 USB 안내를 사용하세요.
+X870·B660-PLUS·H610M은 `Configure.ps1`·`Headless.ps1`에 연결하지 않았으므로 USB 안내를 사용하세요.
 첫 두 프로필도 USB 패키지 빌드는 가능하지만, 기록된 내부 부팅이 USB 경로까지 검증하지는
 않습니다. 기존 USB EFI에는 AMD 출력 조건이 있습니다. BIOS를 `USB → Windows`로
 설정하는 것만으로 직접 인계가 구현되지는 않습니다.

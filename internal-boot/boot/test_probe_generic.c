@@ -5,8 +5,9 @@
 #include <IndustryStandard/Acpi.h>
 
 enum {G_OK,G_UNKNOWN,G_BME,G_MEM_OFF,G_BAD_BAR,G_BAD_RESOURCE,G_CHANGED,G_MULTI,
-      G_SHORT_WRITE,G_FLUSH,G_CLOSE,G_OTHER_BDF,G_PROTOCOL_CHANGED,G_CFG_FAIL,G_BAD_CHECKSUM};
-static int Mode,RootCloses,RootOpens,ForeignOpens,SfsSearches,Dumps;
+      G_SHORT_WRITE,G_FLUSH,G_CLOSE,G_OTHER_BDF,G_PROTOCOL_CHANGED,G_CFG_FAIL,G_BAD_CHECKSUM,
+      G_EXISTING_PROM,G_EXISTING_IMG,G_DUMP_READ_ERROR};
+static int Mode,RootCloses,RootOpens,ForeignOpens,SfsSearches,Dumps,ExistingWriteAttempts;
 static EFI_FILE_PROTOCOL DumpFile,ForeignRoot;
 static EFI_HANDLE BindingHandle=(VOID *)50,ImageHandle=(VOID *)51;
 static EFI_DRIVER_BINDING_PROTOCOL Binding;
@@ -20,7 +21,7 @@ static EFI_STATUS EFIAPI GenericRead(EFI_PCI_IO_PROTOCOL *io,EFI_PCI_IO_PROTOCOL
   EFI_STATUS s=PciRead(io,w,at,n,data);
   if(s==EFI_SUCCESS && w==EfiPciIoWidthUint32 && at==0) {
     UINT32 *v=data;
-    if(Mode==G_UNKNOWN)v[0]=0x999910de;
+    if(Mode==G_UNKNOWN && n==64)v[0]=0x999910de;
     if(n==64){
       v[1]=(Mode==G_BME)?6U:((Mode==G_MEM_OFF)?0U:2U);
       v[2]=0x030000a1;v[4]=GU_BAR0_BASE;
@@ -81,13 +82,25 @@ static EFI_STATUS EFIAPI DumpFlush(EFI_FILE_PROTOCOL *f){(void)f;return Mode==G_
 static EFI_STATUS EFIAPI DumpClose(EFI_FILE_PROTOCOL *f){(void)f;return Mode==G_CLOSE?EFI_DEVICE_ERROR:EFI_SUCCESS;}
 static EFI_STATUS EFIAPI BorrowedClose(EFI_FILE_PROTOCOL *f){(void)f;RootCloses++;return EFI_SUCCESS;}
 static EFI_STATUS EFIAPI DumpOpen(EFI_FILE_PROTOCOL *f,EFI_FILE_PROTOCOL **out,CHAR16 *name,UINT64 mode,UINT64 attrs) {
-  (void)name;(void)mode;(void)attrs;
+  (void)attrs;
+  const CHAR16 prom[]=L"\\RTX3090-UNLOCK\\PROM.BIN";
+  UINTN at=0;while(prom[at] && prom[at]==name[at])at++;
+  BOOLEAN isProm=prom[at]==name[at];
+  BOOLEAN exists=(Mode==G_EXISTING_PROM && isProm) || (Mode==G_EXISTING_IMG && !isProm);
+  if(!(mode&(EFI_FILE_MODE_WRITE|EFI_FILE_MODE_CREATE))) {
+    *out=NULL;
+    if(Mode==G_DUMP_READ_ERROR)return EFI_DEVICE_ERROR;
+    if(exists){*out=&DumpFile;return EFI_SUCCESS;}
+    return EFI_NOT_FOUND;
+  }
+  if(exists)ExistingWriteAttempts++;
   if(f==&RootFile)RootOpens++;else ForeignOpens++;
   *out=&DumpFile;return EFI_SUCCESS;
 }
 static void GenericSetup(int mode) {
   Setup(SC_OK);Mode=mode;RootCloses=RootOpens=ForeignOpens=SfsSearches=Dumps=0;
   ActiveCapture=NULL;Drifted=ReadsAfterDrift=0;
+  ExistingWriteAttempts=0;
   Pci.Pci.Read=GenericRead;Pci.GetBarAttributes=Bar;Pci.GetLocation=GenericLocation;
   Bs.LocateHandleBuffer=GenericLocate;Bs.HandleProtocol=GenericHandle;
   memset(&Binding,0,sizeof(Binding));Binding.ImageHandle=ImageHandle;
@@ -105,7 +118,11 @@ static EFI_STATUS GenericRun(int mode,BOOLEAN withRoot) {
 int main(void) {
   Check(GenericRun(G_OK,TRUE)==EFI_SUCCESS,"reviewed generic envelope succeeds");
   Check(S.RegReads==16 && S.PromReads==PROM_DWORDS,"reviewed generic capture reads bounded windows");
+#if defined(GU_PROBE_GENERIC) || defined(GU_PROBE_DUMP_PROM)
   Check(RootOpens==2 && Dumps==2,"PROM and image use validated launch root");
+#else
+  Check(RootOpens==1 && Dumps==1,"hash-only profile writes images to validated launch root");
+#endif
   Check(Logged("capture-complete=1"),"complete generic capture recorded");
   const int refuse[]={G_UNKNOWN,G_BME,G_MEM_OFF,G_BAD_BAR,G_BAD_RESOURCE,G_CHANGED,G_MULTI,G_OTHER_BDF,G_PROTOCOL_CHANGED,G_CFG_FAIL,G_BAD_CHECKSUM};
   for(UINTN i=0;i<sizeof(refuse)/sizeof(refuse[0]);i++) {
@@ -121,6 +138,16 @@ int main(void) {
   Check(RootOpens==0 && Dumps==0,"capture without root creates no dump");
   Check(GuCaptureGraph(&Table,&LogFile)==EFI_NOT_READY,"legacy graph API cannot inherit the last root");
   Check(RootOpens==0,"legacy API uses no stale root");
+#if defined(GU_PROBE_DUMP_PROM) || defined(GU_PROFILE_H610M_3060) || defined(GU_PROFILE_PROBE_H610M_3060)
+  Check(GenericRun(G_EXISTING_IMG,TRUE)==EFI_NOT_READY,"existing image capture invalidates new capture");
+  Check(ExistingWriteAttempts==0,"existing image capture is never opened for write");
+  Check(GenericRun(G_DUMP_READ_ERROR,TRUE)==EFI_NOT_READY,"unreadable capture file fails closed");
+  Check(RootOpens==0 && ExistingWriteAttempts==0,"file presence error permits no new dump write");
+#ifdef GU_PROBE_DUMP_PROM
+  Check(GenericRun(G_EXISTING_PROM,TRUE)==EFI_NOT_READY,"existing PROM invalidates new capture");
+  Check(ExistingWriteAttempts==0,"existing PROM is never opened for write");
+#endif
+#endif
   GenericSetup(G_OK);
   static CAPTURE capture;memset(&capture,0,sizeof(capture));
   capture.Table=&Table;capture.File=&LogFile;capture.DumpRoot=&RootFile;capture.Complete=TRUE;capture.Io=EFI_SUCCESS;
