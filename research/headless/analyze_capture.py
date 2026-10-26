@@ -11,6 +11,49 @@ TEXT = '387477c2-69c7-11d2-8e39-00a0c969723b'
 INPUT = '387477c1-69c7-11d2-8e39-00a0c969723b'
 
 
+def ownership_observations(records):
+    """Summarize recorded opens, without inferring Driver Model authority.
+
+    In particular attribute 0x8 is recorded literally, not relabelled as a
+    BY_CHILD_CONTROLLER relationship or used to authorize a detach stage.
+    """
+    summary, snapshots = {}, 0
+    for _, block in records:
+        prefix = block.split('protocol guid=', 1)[0]
+        if any(line.startswith(('opens ', 'open ')) for line in prefix.splitlines()):
+            raise ValueError('Open snapshot has no protocol')
+        chunks = re.findall(r'^protocol guid=([0-9a-f-]+)\n(.*?)(?=^protocol guid=|\Z)', block, re.M | re.S)
+        if len(chunks) != len([line for line in block.splitlines() if line.startswith('protocol guid=')]):
+            raise ValueError('Malformed protocol snapshot')
+        seen = set()
+        for protocol, detail in chunks:
+            if not re.fullmatch(r'[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}', protocol):
+                raise ValueError('Malformed protocol GUID')
+            if protocol in seen:
+                raise ValueError('Duplicate protocol snapshot')
+            seen.add(protocol)
+            headers = [line for line in detail.splitlines() if line.startswith('opens ')]
+            rows = [line for line in detail.splitlines() if line.startswith('open ')]
+            if not headers and not rows:
+                continue  # Older/minimal observational fixtures omit opens.
+            header = re.fullmatch(r'opens status=0x([0-9a-f]{1,16}) count=0x([0-9a-f]{1,16})', headers[0]) if len(headers) == 1 else None
+            if not header or int(header[1], 16) or int(header[2], 16) > 512 or int(header[2], 16) != len(rows):
+                raise ValueError('Incomplete or ambiguous open snapshot')
+            snapshots += 1
+            for line in rows:
+                row = re.fullmatch(r'open agent=0x([0-9a-f]{1,16}) controller=0x([0-9a-f]{1,16}) attributes=0x([0-9a-f]{1,16}) count=0x([0-9a-f]{1,16})', line)
+                if not row or int(row[3], 16) > 0xffffffff or int(row[4], 16) > 0xffffffff:
+                    raise ValueError('Malformed open record')
+                key = (protocol, int(row[3], 16))
+                item = summary.setdefault(key, {'protocol': protocol, 'attributes': f'{key[1]:x}',
+                                                'records': 0, 'reported_open_count': 0})
+                item['records'] += 1
+                item['reported_open_count'] += int(row[4], 16)
+    return {'scope': 'all recorded handles; not target-specific',
+            'snapshot_count': snapshots, 'role_interpretation_performed': False,
+            'attributes': [summary[key] for key in sorted(summary)]}
+
+
 def device_path(block):
     rows = re.findall(r'^path-node raw=([0-9a-f]+)$', block, re.M)
     if not rows:
@@ -123,6 +166,7 @@ def analyze(raw, capture_index=None):
         'system_text_input_present': input_protocol,
         'single_rtx_display_topology_observed': candidate,
         'pci_command_observations': pci_commands,
+        'ownership_observations': ownership_observations(records),
         'file_close_verified': False,
         'hardware_access': False,
         'authorizes_driver_detach': False,
