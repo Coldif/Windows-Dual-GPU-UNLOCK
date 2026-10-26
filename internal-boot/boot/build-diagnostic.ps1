@@ -1,4 +1,8 @@
-param([string]$Clang='clang',[string]$LldLink='lld-link',[string]$Python='python')
+param([string]$Clang='clang',[string]$LldLink='lld-link',[string]$Python='python',
+ [ValidateSet('b650m-3090fe','b660m-3070ti','x870-3090ti','h610m-3060','probe-h610m-3060')][string]$HardwareProfile='b650m-3090fe',[switch]$UsbMedia,[switch]$DumpProm)
+$profiles=@{'b650m-3090fe'=@();'b660m-3070ti'=@('-DGU_PROFILE_B660M_3070TI');'x870-3090ti'=@('-DGU_PROFILE_X870_3090TI');'h610m-3060'=@('-DGU_PROFILE_H610M_3060');'probe-h610m-3060'=@('-DGU_PROFILE_PROBE_H610M_3060')}
+$defines=@($profiles[$HardwareProfile]);if($UsbMedia){$defines+='-DGU_USB_MEDIA'}
+if($DumpProm){if(!$UsbMedia){throw '-DumpProm writes the PROM to the observation stick; it requires -UsbMedia'};$defines+='-DGU_PROBE_DUMP_PROM'}
 $ErrorActionPreference='Stop'
 Push-Location -LiteralPath $PSScriptRoot
 try {
@@ -7,7 +11,7 @@ try {
  $objects=@()
  foreach($source in $sources) {
   $obj='build/diagnostic/'+[IO.Path]::GetFileNameWithoutExtension($source)+'.obj'
-  & $Clang -target x86_64-pc-windows-msvc -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -mno-red-zone -fshort-wchar -Os -Wall -Wextra -Werror -DGU_DIAGNOSTIC_ONLY -DGU_DIAGNOSTIC_PROBE -I ../../deps/edk2/MdePkg/Include -I ../../deps/edk2/MdePkg/Include/X64 -c $source -o $obj
+  & $Clang -target x86_64-pc-windows-msvc -std=c11 -ffreestanding -fno-builtin -fno-stack-protector -mno-red-zone -fshort-wchar -Os -Wall -Wextra -Werror -DGU_DIAGNOSTIC_ONLY -DGU_DIAGNOSTIC_PROBE @defines -I ../../deps/edk2/MdePkg/Include -I ../../deps/edk2/MdePkg/Include/X64 -c $source -o $obj
   if($LASTEXITCODE -ne 0){throw "Compile failed: $source"}
   $objects+=$obj
  }
@@ -15,12 +19,13 @@ try {
  if($LASTEXITCODE -ne 0){throw 'Diagnostic link failed'}
  & $Python ../unlock/verify_pe.py build/diagnostic/DIAGNOSTIC.EFI build/diagnostic/DIAGNOSTIC.map --output build/diagnostic/pe-verification.json
  if($LASTEXITCODE -ne 0){throw 'Diagnostic PE verification failed'}
- $sourceManifest=@(($sources+@('diagnostic.h','media.h')) | ForEach-Object {
+ $sourceManifest=@(($sources+@('diagnostic.h','media.h','probe.h','../unlock/machine-profile.h')) | ForEach-Object {
   [ordered]@{Path=$_;Sha256=(Get-FileHash -LiteralPath $_ -Algorithm SHA256).Hash}
  })
  [ordered]@{
   HardwareTested=$false;Mode='graph-capture-then-normal-windows';CanUnlock=$false
   CanDetach=$false;WritesFirmwareVariables=$false
+  HardwareProfile=$HardwareProfile;UsbMedia=[bool]$UsbMedia;DumpsProm=[bool]$DumpProm;Defines=$defines
   EfiSha256=(Get-FileHash -LiteralPath build/diagnostic/DIAGNOSTIC.EFI -Algorithm SHA256).Hash
   BuiltUtc=[DateTime]::UtcNow.ToString('o');Sources=$sourceManifest
  } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath build/diagnostic/manifest.json -Encoding utf8

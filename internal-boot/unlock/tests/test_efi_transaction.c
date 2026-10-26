@@ -137,6 +137,8 @@ static VOID check_fwsec_image(void) {
   CHECK(fw.image_off==0x4239c && fw.image_size==0xde00 && fw.dmem_size==sizeof(gsp_dmem));
 #elif defined(GU_PROFILE_X870_3090TI)
   CHECK(fw.image_off==0x41758 && fw.image_size==0xea00 && fw.dmem_size==sizeof(gsp_dmem)); /* VBIOS 94.02.a0.00.2c */
+#elif defined(GU_PROFILE_H610M_3060)
+  CHECK(fw.image_off==0x416bc && fw.image_size==0xea00 && fw.dmem_size==sizeof(gsp_dmem)); /* Gigabyte RTX 3060 12GB PROM 727dd833 */
 #else
 #error Pin this profile's FWSEC-FRTS image offset and size from its PROM
 #endif

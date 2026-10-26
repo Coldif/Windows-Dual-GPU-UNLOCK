@@ -1,5 +1,24 @@
 # Changes
 
+## Unreleased: Gigabyte H610M H / RTX 3060 12GB GA106 machine profile (headless USB)
+
+- Added `-DGU_PROFILE_H610M_3060` (`-HardwareProfile h610m-3060` in `unlock/build.ps1`,
+  `research/headless/build-usb.ps1`, `boot/test-cold-precheck.ps1`, `boot/build-diagnostic.ps1`
+  and `unlock/test-all.ps1`) for Gigabyte H610M H BIOS FC, Core i5-14400 and Gigabyte RTX 3060
+  12GB (GA106, `10de:2504`/`1458:4096`). It uses the non-aggregate single-RTX console and is the
+  first GA106 entry. It pins the 12 GiB layout (`frts=0x2ffe00000`) and FWSEC-FRTS at PROM
+  `0x416bc` (`0xea00` bytes).
+- Added a read-only probe path for new machines. `GU_PROFILE_PROBE_H610M_3060` pins only the PCI
+  identity and refuses to compile with any release or unlock define.
+  `build-diagnostic.ps1 -UsbMedia [-DumpProm]` and `research/headless/build-observe-usb.ps1` /
+  `stage-observe-usb.ps1` build and stage the observation EFI on a USB stick. A USB diagnostic
+  returns to the firmware BootOrder on failure, because it never touches the device.
+  `research/headless/fingerprint_probe.py` derives profile candidates offline.
+- `test-all.ps1` takes `-HardwareProfile` and `-PeBase`. The defaults are unchanged.
+- Contributor-reported hardware result: one clean USB transaction, with direct Windows start
+  and both displays recovered. torch.mm n=8192 medians: BF16 27.2 → 46.3 and FP16 27.1 → 46.6
+  TFLOPS. [Evidence](evidence/h610m-3060-usb/README.md).
+
 ## Unreleased — integrate the third profile with matched benchmark evidence
 
 - Preserve the hardened pre-release checks while integrating the exact X870 /

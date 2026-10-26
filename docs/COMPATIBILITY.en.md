@@ -2,9 +2,9 @@
 
 **English** | [한국어](COMPATIBILITY.ko.md)
 
-The current source contains three exact-machine profiles with recorded hardware
-results: two internal headless configurations and one headless USB configuration.
-The original B650M run was performed by the maintainer; B660M and X870 evidence
+The current source contains four exact-machine profiles with recorded hardware
+results: two internal headless configurations and two headless USB configurations.
+The original B650M run was performed by the maintainer; B660M, X870 and H610M evidence
 comes from contributors ([PR #5](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/5),
 [PR #10](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/10)). Builds compile
 for exactly one reviewed profile selected at build time in
@@ -16,6 +16,7 @@ other GPUs or platforms remain unsupported.
 | `b650m-3090fe` | ASUS TUF GAMING B650M-PLUS WIFI BIOS 3057 / Ryzen 7 7800X3D / RTX 3090 FE | Internal; original maintainer's run |
 | `b660m-3070ti` | ASUS TUF GAMING B660M-E D4 BIOS 4003 / i7-12700F (no iGPU) / MSI RTX 3070 Ti | Internal; contributor report |
 | `x870-3090ti` | Gigabyte X870 AORUS ELITE WIFI7 BIOS F13d / Ryzen 7 9800X3D / ASUS RTX 3090 Ti | USB only; contributor report |
+| `h610m-3060` | Gigabyte H610M H BIOS FC / Core i5-14400 / Gigabyte RTX 3060 12GB (GA106) | USB only; contributor report |
 
 The latest tag is the source-only pre-release v0.3.1; this source tree includes
 later work, including the USB route and X870 profile. Hardware reports describe
@@ -121,6 +122,40 @@ revision `7b578247a28ff66f2707bea5af0e3943aede7974`, before the current main's
 cold-precheck hardening. The old wrapper/child hashes are historical provenance,
 not expected hashes for a new build. The updated build has no new X870 physical
 boot report. [Evidence provenance](../evidence/x870-3090ti-usb/README.md).
+
+## Profile 4: Gigabyte H610M H / RTX 3060 12GB GA106 (headless USB)
+
+This is a profile reported by a contributor and the first GA106 card. It uses the
+[headless USB route](HEADLESS-USB.en.md), with both monitors on the RTX. The Intel
+UHD 730 iGPU is enabled but has no active GOP. The console topology is the
+non-aggregate single-RTX one (`GU_CONSOLE_AGGREGATE 0`). Two monitors give two
+nvgop display children, one of them with the console GOP.
+
+| Common GPU/platform item | Validated value |
+|---|---|
+| Card | Gigabyte RTX 3060, 12 GiB (GA106), VBIOS 94.06.2f.40.73 |
+| PCI identity | `10de:2504`, subsystem `1458:4096` |
+| GPU BDF | `0000:01:00.0` (root port `00:01.0`) |
+| Chip / VRAM register | `0xb76000a1` / `0x3000` MiB |
+| BAR0 | `0x42000000`, 16 MiB |
+| PROM SHA256 | `727dd8332f028783d3de2f81a707e4d9448c3238db6180271f3a8e9c03a808c9` |
+| Motherboard / BIOS | Gigabyte H610M H / FC |
+| CPU | Intel Core i5-14400 (iGPU `8086:4682`, no GOP) |
+| Recorded Windows / driver | Windows 11 Pro 26200 / NVIDIA 610.88 |
+| UEFI / Secure Boot | x64 / disabled, CSM disabled |
+| Selector profile | `entryLatchedSs1Full`; targets SS0 `0x88888888`, SS1 `0x8` |
+
+The values come from three identical read-only probe boots (`GU_PROFILE_PROBE_H610M_3060`,
+probe-only) plus one PROM-dump boot. FWSEC-FRTS is at PROM `0x416bc` (`0xea00` bytes).
+The 12 GiB layout puts FRTS at `0x2ffe00000`. One full-shutdown boot completed a clean
+transaction (`FINAL status=0 clean=1`, one FLR) and Windows started directly with both
+displays recovered. An earlier boot had no RTX GOP and was refused before release.
+torch.mm n=8192 medians: BF16 27.2 → 46.3 and FP16 27.1 → 46.6 TFLOPS. This method
+differs from the cuBLAS benchmark used for the other profiles.
+[Evidence](../evidence/h610m-3060-usb/README.md).
+
+Build with `research/headless/build-usb.ps1 -HardwareProfile h610m-3060`. The internal-ESP
+installer is not wired for this profile.
 
 ## Scope beyond the recorded configurations
 

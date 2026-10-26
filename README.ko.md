@@ -3,8 +3,8 @@
 [English](README.md) | **한국어**
 
 커뮤니티 기여로 확장하는 실험용 UEFI GPU 언락과 Windows 직접 인계 구현입니다.
-현재 소스에는 **실기기 결과가 기록된 정확한 장비 프로필 세 개**가 있습니다.
-내부 headless 두 구성과 headless USB 한 구성입니다. GPU 모델명만으로 지원을
+현재 소스에는 **실기기 결과가 기록된 정확한 장비 프로필 네 개**가 있습니다.
+내부 headless 두 구성과 headless USB 두 구성입니다. GPU 모델명만으로 지원을
 판단하지 말고 빌드 전에 [호환성](docs/COMPATIBILITY.ko.md)을 확인하세요.
 
 | 빌드 프로필 | 정확한 GPU / 메인보드 / BIOS / CPU | 기록된 경로와 근거 |
@@ -12,6 +12,7 @@
 | `b650m-3090fe` (기본값) | RTX 3090 FE / ASUS TUF GAMING B650M-PLUS WIFI / 3057 / Ryzen 7 7800X3D | 내부 headless; [최초 유지관리자의 실기기 근거](evidence/headless-handoff/README.md) |
 | `b660m-3070ti` | MSI RTX 3070 Ti / ASUS TUF GAMING B660M-E D4 / 4003 / **iGPU 없는** Core i7-12700F | 내부 headless, aggregate console; [기여자의 보고·구현 PR #5](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/5) |
 | `x870-3090ti` | ASUS RTX 3090 Ti / Gigabyte X870 AORUS ELITE WIFI7 / F13d / Ryzen 7 9800X3D | **Headless USB 전용**; [기여자 PR #10](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/10), [공개 근거](evidence/x870-3090ti-usb/README.md) |
+| `h610m-3060` | Gigabyte RTX 3060 12GB(GA106) / Gigabyte H610M H / FC / Core i5-14400(iGPU 켜짐, GOP 없음) | **Headless USB 전용**; 기여자 보고, [공개 근거](evidence/h610m-3060-usb/README.md) |
 
 실기기 결과는 각 보고서의 정확한 빌드와 장비에 해당합니다. 현재 cold 사전검사 보강은
 host·빌드 검증을 거쳤으며, **이 변경으로 새 실기기 부팅·복구 시험을 한 것은 아닙니다.**

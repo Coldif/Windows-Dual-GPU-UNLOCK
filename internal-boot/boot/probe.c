@@ -11,6 +11,10 @@
 #include "probe.h"
 #include "../unlock/machine-profile.h"
 
+#if defined(GU_PROBE_DUMP_PROM) && !defined(GU_DIAGNOSTIC_ONLY)
+#error GU_PROBE_DUMP_PROM is only for the observation-only diagnostic image
+#endif
+
 VOID Text(CAPTURE *c,const char *s);
 VOID Hex(CAPTURE *c,UINT64 v,UINTN digits);
 VOID End(CAPTURE *c);
@@ -83,6 +87,23 @@ static VOID ProbeCaps(CAPTURE *c,EFI_PCI_IO_PROTOCOL *io) {
   }
 }
 
+#ifdef GU_PROBE_DUMP_PROM
+/* Probe-only builds: keep the same 1 MiB PROM window the digest covers, so host
+ * tests can pin VBIOS parsing (FWSEC-FRTS location) for a new profile. Written
+ * to the probe's own log volume only; never publish the file. */
+static EFI_FILE_PROTOCOL *PromRoot;
+static VOID DumpProm(CAPTURE *c,const UINT8 *page,UINTN bytes) {
+  if(!PromRoot){Problem(c,"prom-dump-volume",EFI_NOT_FOUND);return;}
+  EFI_FILE_PROTOCOL *f=NULL;
+  EFI_STATUS s=PromRoot->Open(PromRoot,&f,L"\\RTX3090-UNLOCK\\PROM.BIN",EFI_FILE_MODE_READ|EFI_FILE_MODE_WRITE|EFI_FILE_MODE_CREATE,0);
+  if(s!=EFI_SUCCESS||!f){Problem(c,"prom-dump-open",s);return;}
+  UINTN n=bytes;s=f->Write(f,&n,(VOID *)page);
+  if(s!=EFI_SUCCESS||n!=bytes)Problem(c,"prom-dump-write",s==EFI_SUCCESS?EFI_END_OF_FILE:s);
+  else{Text(c,"prom dump bytes=0x");Hex(c,bytes,8);End(c);}
+  f->Close(f);
+}
+#endif
+
 static VOID ProbeBar(CAPTURE *c,EFI_PCI_IO_PROTOCOL *io,UINT32 bar) {
   static const UINT32 offs[]={
     0x000000,0x108154,0x108170,0x108180,0x108354,
@@ -104,6 +125,9 @@ static VOID ProbeBar(CAPTURE *c,EFI_PCI_IO_PROTOCOL *io,UINT32 bar) {
     if(s==EFI_SUCCESS) {
       GuSha256(page,0x100000,digest);
       Text(c,"prom sha256=");for(UINTN i=0;i<32;i++)Hex(c,digest[i],2);End(c);
+#ifdef GU_PROBE_DUMP_PROM
+      DumpProm(c,page,0x100000);
+#endif
     } else { Problem(c,"prom-read",s); }
     c->Table->BootServices->FreePool(page);
   } else Problem(c,"prom-alloc",s==EFI_SUCCESS?EFI_OUT_OF_RESOURCES:s);
@@ -159,6 +183,9 @@ EFI_STATUS GuProbeGpu(EFI_SYSTEM_TABLE *t,CAPTURE *c) {
       t->BootServices->FreePool(sh);
     }
   }
+#ifdef GU_PROBE_DUMP_PROM
+  PromRoot=root;
+#endif
   EFI_BOOT_SERVICES *bs=t->BootServices;EFI_HANDLE *hs=NULL;UINTN n=0,found=0,cfgFailed=0;
   EFI_STATUS cfgError=EFI_SUCCESS;
   EFI_STATUS s=bs->LocateHandleBuffer(ByProtocol,&PciGuidL,NULL,&n,&hs);

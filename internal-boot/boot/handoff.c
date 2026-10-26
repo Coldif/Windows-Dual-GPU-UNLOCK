@@ -428,6 +428,14 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE Image,EFI_SYSTEM_TABLE *St) {
     return s==EFI_SUCCESS || s==EFI_ABORTED?EFI_NOT_STARTED:s;
   }
 #endif
+#if defined(GU_DIAGNOSTIC_ONLY) && defined(GU_USB_MEDIA)
+  /* Observation stick: this image never releases a driver or writes GPU state,
+   * so a failed capture or Windows load hands back to the firmware BootOrder. */
+  if(Log){(void)Log->Close(Log);Log=NULL;}
+  if(Root){(void)Root->Close(Root);Root=NULL;}
+  Say(L"Nothing was changed. Returning to the firmware boot order.\r\n");
+  return s==EFI_SUCCESS || s==EFI_ABORTED?EFI_NOT_STARTED:s;
+#endif
   Stop();
   return EFI_ABORTED; /* unreachable: do not fall through firmware BootOrder */
 }

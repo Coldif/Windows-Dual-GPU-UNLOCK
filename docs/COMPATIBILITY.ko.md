@@ -2,9 +2,9 @@
 
 [English](COMPATIBILITY.en.md) | **한국어**
 
-현재 소스에는 실기기 결과가 기록된 정확한 장비 프로필 세 개가 있습니다.
-내부 headless 두 구성과 headless USB 한 구성입니다. 최초 B650M은 유지관리자가
-시험했고, B660M·X870의 근거는 기여자의 보고입니다
+현재 소스에는 실기기 결과가 기록된 정확한 장비 프로필 네 개가 있습니다.
+내부 headless 두 구성과 headless USB 두 구성입니다. 최초 B650M은 유지관리자가
+시험했고, B660M·X870·H610M의 근거는 기여자의 보고입니다
 ([PR #5](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/5),
 [PR #10](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/10)).
 빌드는 [internal-boot/unlock/machine-profile.h](../internal-boot/unlock/machine-profile.h)에서
@@ -15,6 +15,7 @@
 | `b650m-3090fe` | ASUS TUF GAMING B650M-PLUS WIFI BIOS 3057 / Ryzen 7 7800X3D / RTX 3090 FE | 내부; 최초 유지관리자 시험 |
 | `b660m-3070ti` | ASUS TUF GAMING B660M-E D4 BIOS 4003 / iGPU 없는 i7-12700F / MSI RTX 3070 Ti | 내부; 기여자 보고 |
 | `x870-3090ti` | Gigabyte X870 AORUS ELITE WIFI7 BIOS F13d / Ryzen 7 9800X3D / ASUS RTX 3090 Ti | USB 전용; 기여자 보고 |
+| `h610m-3060` | Gigabyte H610M H BIOS FC / Core i5-14400 / Gigabyte RTX 3060 12GB(GA106) | USB 전용; 기여자 보고 |
 
 최신 태그 v0.3.1은 소스 전용 사전 릴리스이며, 현재 소스에는 그 이후의 USB 경로와
 X870 프로필 등이 포함됩니다. 실기기 보고는 각 기록의 빌드에 해당합니다. 현재 cold
@@ -114,6 +115,35 @@ X870 실기기 근거와 byte-identical 빌드 설명은 현재 main의 cold 사
 원래 PR #10 revision `7b578247a28ff66f2707bea5af0e3943aede7974`에 해당합니다.
 이전 wrapper·child 해시는 과거 provenance이며 새 빌드의 예상 해시가 아닙니다.
 보강된 빌드의 새 X870 실기기 부팅 보고는 없습니다.
+
+## 프로필 4: Gigabyte H610M H / RTX 3060 12GB GA106(headless USB)
+
+기여자가 보고한 프로필이며 GA106 카드로는 처음입니다. [headless USB 경로](HEADLESS-USB.en.md)를 쓰고,
+모니터 2대를 모두 RTX에 연결했습니다. Intel UHD 730 iGPU는 켜져 있지만 활성 GOP가 없습니다.
+콘솔 구성은 non-aggregate 단일 RTX(`GU_CONSOLE_AGGREGATE 0`)입니다. 모니터가 2대라 nvgop
+화면 자식이 2개이고, 그중 하나에 콘솔 GOP가 있습니다.
+
+| 항목 | 검증된 값 |
+|---|---|
+| 카드 | Gigabyte RTX 3060 12 GiB(GA106), VBIOS 94.06.2f.40.73 |
+| PCI ID | `10de:2504`, subsystem `1458:4096` |
+| GPU BDF | `0000:01:00.0`(루트 포트 `00:01.0`) |
+| 칩 / VRAM | `0xb76000a1` / `0x3000` MiB |
+| BAR0 | `0x42000000`, 16 MiB |
+| PROM SHA256 | `727dd8332f028783d3de2f81a707e4d9448c3238db6180271f3a8e9c03a808c9` |
+| 메인보드 / BIOS | Gigabyte H610M H / FC |
+| CPU | Intel Core i5-14400(iGPU `8086:4682`, GOP 없음) |
+| 기록된 Windows / 드라이버 | Windows 11 Pro 26200 / NVIDIA 610.88 |
+| UEFI / Secure Boot | x64 / 꺼짐, CSM 꺼짐 |
+
+값은 읽기 전용 프로브 부팅 3회(모두 같은 값)와 PROM 저장 부팅 1회에서 얻었습니다.
+완전 종료 후 부팅 1회에서 트랜잭션이 깨끗하게 끝났고(`FINAL status=0 clean=1`, FLR 1회),
+Windows가 바로 시작되어 화면 2대가 모두 복구되었습니다. 그보다 앞선 부팅 1회는 RTX GOP가
+없어서 해제 전에 거부되었습니다. torch.mm n=8192 중앙값은 BF16 27.2 → 46.3, FP16 27.1 →
+46.6 TFLOPS입니다. 다른 프로필의 cuBLAS 벤치마크와는 측정 방법이 다릅니다.
+[공개 근거](../evidence/h610m-3060-usb/README.md).
+
+`research/headless/build-usb.ps1 -HardwareProfile h610m-3060`으로 빌드합니다.
 
 ## 기록된 구성 밖의 범위
 

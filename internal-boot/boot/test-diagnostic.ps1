@@ -18,4 +18,24 @@ try {
   & "./build/diagnostic/test-probe-$profile.exe"
   if($LASTEXITCODE -ne 0){throw "Probe tests failed: $profile"}
  }
+ # Probe-only profile: GU_PROBE_HOST_TEST stands in for GU_DIAGNOSTIC_ONLY.
+ & $Clang -std=c11 -O1 -Wall -Wextra -Werror -D_CRT_SECURE_NO_WARNINGS -DGU_DIAGNOSTIC_PROBE -DGU_PROBE_HOST_TEST -DGU_PROFILE_PROBE_H610M_3060 -I ../../deps/edk2/MdePkg/Include -I ../../deps/edk2/MdePkg/Include/X64 test_probe.c probe.c ../unlock/sha256.c -o build/diagnostic/test-probe-GU_PROFILE_PROBE_H610M_3060.exe
+ if($LASTEXITCODE -ne 0){throw 'Probe tests compile failed: GU_PROFILE_PROBE_H610M_3060'}
+ & ./build/diagnostic/test-probe-GU_PROFILE_PROBE_H610M_3060.exe
+ if($LASTEXITCODE -ne 0){throw 'Probe tests failed: GU_PROFILE_PROBE_H610M_3060'}
+ # The probe-only profile must never compile into a write-side unit. These compiles
+ # are expected to fail; PowerShell 5.1 would turn their stderr into a terminating error.
+ $ErrorActionPreference='Continue'
+ foreach($bad in @('-DGU_FULL_UNLOCK','-DGU_UEFI_PORT','-DGU_HEADLESS_RESEARCH')) {
+  $out=& $Clang -target x86_64-pc-windows-msvc -std=c11 -ffreestanding -fsyntax-only -DGU_DIAGNOSTIC_ONLY -DGU_DIAGNOSTIC_PROBE -DGU_PROFILE_PROBE_H610M_3060 $bad -I ../../deps/edk2/MdePkg/Include -I ../../deps/edk2/MdePkg/Include/X64 probe.c 2>&1 | Out-String
+  if($LASTEXITCODE -eq 0 -or $out -notmatch 'must not be combined with release or unlock builds'){throw "Probe-only profile not rejected by its guard with $bad"}
+ }
+ $out=& $Clang -target x86_64-pc-windows-msvc -std=c11 -ffreestanding -fsyntax-only -DGU_DIAGNOSTIC_PROBE -DGU_PROFILE_PROBE_H610M_3060 -I ../../deps/edk2/MdePkg/Include -I ../../deps/edk2/MdePkg/Include/X64 probe.c 2>&1 | Out-String
+ if($LASTEXITCODE -eq 0 -or $out -notmatch 'is for the read-only diagnostic probe only'){throw 'Probe-only profile not rejected outside a diagnostic-only build'}
+ $out=& $Clang -target x86_64-pc-windows-msvc -std=c11 -ffreestanding -fsyntax-only -DGU_DIAGNOSTIC_PROBE -DGU_PROBE_DUMP_PROM -I ../../deps/edk2/MdePkg/Include -I ../../deps/edk2/MdePkg/Include/X64 probe.c 2>&1 | Out-String
+ if($LASTEXITCODE -eq 0 -or $out -notmatch 'only for the observation-only diagnostic image'){throw 'PROM dump not rejected outside a diagnostic-only build'}
+ $ErrorActionPreference='Stop'
+ & $Clang -target x86_64-pc-windows-msvc -std=c11 -ffreestanding -fshort-wchar -fsyntax-only -Wall -Wextra -Werror -DGU_DIAGNOSTIC_ONLY -DGU_DIAGNOSTIC_PROBE -DGU_PROBE_DUMP_PROM -DGU_PROFILE_PROBE_H610M_3060 -I ../../deps/edk2/MdePkg/Include -I ../../deps/edk2/MdePkg/Include/X64 probe.c
+ if($LASTEXITCODE -ne 0){throw 'PROM dump probe does not compile'}
+ 'PASS probe-only profile rejected by write-side and non-diagnostic builds'
 } finally {Pop-Location}
