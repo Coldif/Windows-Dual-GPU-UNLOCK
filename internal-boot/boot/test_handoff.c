@@ -67,6 +67,30 @@ static EFI_STATUS EFIAPI open_file(EFI_FILE_PROTOCOL*r,EFI_FILE_PROTOCOL**f,CHAR
 static EFI_STATUS EFIAPI get_info(EFI_FILE_PROTOCOL*f,EFI_GUID*g,UINTN*n,VOID*p){(void)f;(void)g;EFI_FILE_INFO*info=p;memset(info,0,sizeof(*info));info->FileSize=metadataSize;info->Size=sizeof(*info);*n=badInfo?1:sizeof(*info);return EFI_SUCCESS;}
 static EFI_STATUS EFIAPI read_file(EFI_FILE_PROTOCOL*f,UINTN*n,VOID*p){(void)f;memcpy(p,imageBytes,*n);if(badHash)((UINT8*)p)[0]^=1;if(shortRead)(*n)--;return EFI_SUCCESS;}
 static EFI_STATUS EFIAPI close_file(EFI_FILE_PROTOCOL*f){(void)f;return EFI_SUCCESS;}
+static EFI_FILE_PROTOCOL closeLog,closeRoot;
+static EFI_STATUS closeLogResult,closeRootResult;
+static int closeLogCalls,closeRootCalls,startCalls;
+static EFI_STATUS EFIAPI tracked_close(EFI_FILE_PROTOCOL *f) {
+  if(f==&closeLog){closeLogCalls++;return closeLogResult;}
+  if(f==&closeRoot){closeRootCalls++;return closeRootResult;}
+  abort();
+}
+static EFI_STATUS EFIAPI start_image(EFI_HANDLE image,UINTN *size,CHAR16 **data) {
+  (void)image;(void)size;(void)data;startCalls++;return EFI_ABORTED;
+}
+static VOID close_tests(VOID) {
+  closeLog.Close=tracked_close;closeRoot.Close=tracked_close;
+  bs.StartImage=start_image;
+  for(int fault=0;fault<4;fault++) {
+    Log=&closeLog;Root=&closeRoot;closeLogCalls=closeRootCalls=startCalls=0;
+    closeLogResult=fault&1?EFI_DEVICE_ERROR:EFI_SUCCESS;
+    closeRootResult=fault&2?EFI_ACCESS_DENIED:EFI_SUCCESS;
+    EFI_STATUS s=Windows(NULL);
+    CHECK(s==(fault&1?EFI_DEVICE_ERROR:fault&2?EFI_ACCESS_DENIED:EFI_ABORTED));
+    CHECK(closeLogCalls==1 && closeRootCalls==1 && !Log && !Root);
+    CHECK(startCalls==(fault==0));
+  }
+}
 static EFI_STATUS EFIAPI load_image(BOOLEAN policy,EFI_HANDLE parent,EFI_DEVICE_PATH_PROTOCOL*p,VOID*data,UINTN n,EFI_HANDLE*out){
   (void)parent;CHECK(!policy && p && data && n==imageSize);CHECK(!memcmp(data,imageBytes,n));loadCalls++;*out=(VOID*)3;loaded.DeviceHandle=own;return loadResult;
 }
@@ -90,7 +114,7 @@ int main(int argc,char **argv) {
   FILE*f=fopen(argv[1],"rb");if(!f)return 2;
   fseek(f,0,SEEK_END);imageSize=(UINTN)ftell(f);rewind(f);imageBytes=malloc(imageSize);
   if(!imageBytes || fread(imageBytes,1,imageSize,f)!=imageSize)return 2;fclose(f);
-  CHECK(imageSize==GU_UNLOCK_BYTES);flow_tests();path_tests();service_tests();free(imageBytes);
+  CHECK(imageSize==GU_UNLOCK_BYTES);flow_tests();path_tests();service_tests();close_tests();free(imageBytes);
   printf("%d handoff flow/media/image checks; failures=%d. No GPU access.\n",checks,failed);
   return failed?1:0;
 }

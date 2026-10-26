@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thank you for helping investigate portability. The current EFI is restricted to one verified machine.
+        Thank you for helping investigate portability. EFI support is restricted to the exact published machine profiles; a matching GPU model alone is insufficient.
         A report does not authorize unlock. Do not bypass checks or run a new experiment to complete this form.
         Read docs/CONTRIBUTING.en.md. Review all content before posting publicly.
         Never attach firmware, PROM/VBIOS dumps, recovery keys, serials, UUIDs or personal paths.
@@ -28,17 +28,27 @@ body:
     validations:
       required: true
   - type: textarea
+    id: board_and_vbios
+    attributes:
+      label: Physical GPU and VBIOS history
+      description: State the physical card manufacturer/model, reported PCI/subsystem IDs and VBIOS version if already known. Disclose any cross-flashed VBIOS. Unknown is valid; do not flash or dump firmware for this report.
+  - type: textarea
     id: display
     attributes:
       label: Physical display connection and available adapters
-      description: Where is the monitor connected? Is an iGPU or separate display GPU available? Unknown is a valid answer.
+      description: Where are the monitor cables connected, and how many monitors/adapters are present? Is an iGPU or separate display GPU available? Windows detection does not establish pre-boot GOP ownership. Unknown is valid.
     validations:
       required: true
+  - type: textarea
+    id: source_and_build
+    attributes:
+      label: Existing diagnostic or experiment source and build
+      description: If an experiment already occurred, provide source commit, local diff, profile, EFI SHA-256 and compiler version. Tie each capture to its build and display/BIOS settings. Leave unknown fields unknown; do not run an EFI to fill this form.
   - type: textarea
     id: existing_evidence
     attributes:
       label: Existing evidence, if any
-      description: For an already performed experiment only, include EFI SHA-256/profile, sanitized final-stage logs, boot handoff and benchmark conditions. Leave blank for inventory-only reports.
+      description: Separate diagnostic collection, unlock transaction/cleanup, Windows display recovery and matched before/after measurements. For existing measurements include precision/accumulation, matrix size, library/driver versions and run counts. Identify cold boot, restart, sleep or hibernation separately. Leave blank for inventory-only reports; do not start new tests for this form.
   - type: checkboxes
     id: reviewed
     attributes:

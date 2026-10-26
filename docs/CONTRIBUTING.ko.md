@@ -2,7 +2,7 @@
 
 [English](CONTRIBUTING.en.md) | **한국어**
 
-다른 메인보드·CPU·GPU의 환경 정보는 지원 확대 우선순위를 정하는 데 도움이 됩니다. **제보를 위해 EFI 부팅·BIOS 설정 변경·언락 실행을 할 필요가 없습니다.** 현재 EFI는 여전히 [검증한 PC](COMPATIBILITY.ko.md)에 고정되어 있습니다.
+다른 메인보드·CPU·GPU의 환경 정보는 지원 확대 우선순위를 정하는 데 도움이 됩니다. **제보를 위해 EFI 부팅·BIOS 설정 변경·언락 실행을 할 필요가 없습니다.** EFI 지원은 정확히 일치하는 [공개된 장비 프로필](COMPATIBILITY.ko.md)에 한정되며 GPU 모델명이 같다는 이유만으로 호환되지는 않습니다.
 
 ## Windows에서 환경 수집
 
@@ -31,10 +31,15 @@ Secure Boot 상태, 실제 모니터 연결, PCI BDF/BAR, PROM, cold 상태와 �
 [호환성 이슈 양식](https://github.com/impacifist/Windows-GPU-UNLOCK/issues/new?template=compatibility.yml)을 이용합니다. 양식이 없으면 일반 이슈도 가능합니다.
 
 - 검토한 보고서 또는 보드·CPU·GPU·Windows·드라이버 정보를 수동으로 적습니다.
+- 물리 카드의 제조사·모델과 다른 카드용 VBIOS를 기록한 이력을, 소프트웨어에 표시되는 PCI/subsystem ID·VBIOS 버전과 구분합니다. 표시되는 ID만으로 실제 PCB를 확정할 수 없습니다. 모르는 항목은 미확인으로 남기며, 제보를 위해 플래시하거나 펌웨어를 덤프하지 않습니다.
 - 모니터가 어디에 연결되어 있는지, iGPU 또는 별도 화면용 GPU가 있는지 적습니다.
 - 미실행·진단만 수집·기존 실험 기록 중 어느 상태인지 구분합니다. 미실행 제보도 유용합니다.
 - 이미 승인받아 수행한 실험이 있다면 EFI 해시·프로필, 비식별화한 최종 단계 로그, Windows 인계와 동일 조건 측정 결과를 적습니다. 양식을 채우려고 새 언락 실험을 하지 않습니다.
+- 기존 capture마다 소스 commit·로컬 diff·컴파일러 버전·화면 연결과 BIOS 설정을 연결합니다. 진단 수집, transaction/정리, Windows 화면 복구, 성능 근거를 구분합니다. 기존 측정은 입력·누산 정밀도, 행렬 크기, 라이브러리·드라이버 버전과 반복 횟수를 기록하고 cold boot·재시작·절전·최대절전을 따로 표시합니다.
 
 펌웨어·VBIOS/PROM·BitLocker 복구 키·serial·UUID·원시 시스템 보고서를 첨부하지 않습니다. 기존 로그의 개인 경로도 확인합니다. 이 도구는 자동 업로드하지 않습니다.
 
 실제 지원 추가에는 카드·펌웨어·메모리 배치 검토, 사전 부팅 소유권과 실패 정리, Windows 인계 및 하드웨어 측정 근거가 필요합니다. [지원 확대 설계](PORTABILITY.en.md)를 참고하세요. 원본 API 근거는 [영문 안내](CONTRIBUTING.en.md)의 Microsoft 문서에 있습니다.
+
+[장비 검증 기록](VALIDATION.ko.md)으로 기존 관측·transaction·Windows 복구·계산·수명주기 근거를
+구분할 수 있습니다. 이 문서를 채우기 위한 새 실행은 필요하지 않습니다.

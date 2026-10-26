@@ -1,4 +1,4 @@
-# Issue #21 — Doug Sharp 인계 자료 검토와 첫 개선
+# Issue #21 — 독립 구현 인계 자료 검토와 첫 개선
 
 - 검토일: 2026-10-26
 - 원문: https://github.com/impacifist/Windows-GPU-UNLOCK/issues/21
@@ -69,6 +69,8 @@ ZIP 엔트리의 추출 대상 경계를 확인했다. archive는 빌드·실행
 
 ## 이번 변경의 검증 근거
 
+이하 검사는 최초 인계 시점의 결과다. 현재 main 전체의 통과 수로 해석하지 않는다.
+
 | 기준 | 결과 | 근거 | 한계 |
 |---|---|---|---|
 | 다운로드 원본 | pass | 원문/ZIP 크기와 SHA256 기록, archive 경계 검사, ignored 경로 확인 | 첨부 EFI 성공을 독립 검증하지 않음 |
@@ -83,6 +85,38 @@ runner 통합 테스트는 preflight 무작업, 정상 결과의 Python reader �
 telemetry 예외와 설정 변화 시 완료 기록 부재를 확인한다. 테스트 harness의
 초기 scope/mock 오류를 수정한 후 위 네 시나리오가 통과했다.
 `benchmark/build/runner-tests-*/`에는 ignored 합성 실행 파일·결과만 남긴다.
+
+## 후속 launcher 검토 — 2026-10-26
+
+[후속 댓글](https://github.com/impacifist/Windows-GPU-UNLOCK/issues/21#issuecomment-6406629980)의
+Google Drive 링크에서 추가 archive를 읽기 전용으로 내려받았다. 100293 bytes,
+SHA-256 `9b9e88de2195f5d8ff3d53c1359e0317d328af57afd3cecc2a3bdccb5571dc68`.
+ignored `research/results/issue21-launcher-review-20261026/launcher-download.txt`는
+확장자와 달리 ZIP이다. 압축 entry 경계를 확인하고 `src/gpuload.c`만 텍스트로 읽었다.
+EFI 세 개는 추출·실행·배포하지 않았다. 파일 형식은 확장자 대신 magic으로 판단하며,
+앞으로 archive/binary를 Get-Content로 직접 출력하지 않는다.
+
+`gpuload.c`는 GPL-2.0-only를 명시하며 SHA-256은
+`79e7187726eadebdb05683674c9da404fc1cde144b34eb8f3bad761e59f3a1c6`이다.
+누락된 소스는 확보됐지만 다음 이유로 설치 경로를 그대로 이식하지 않는다.
+
+- ESP의 NTFS EFI driver를 로드하고 모든 block device에 recursive ConnectController를
+  요청한다. 단순한 파일 읽기와 다른 firmware driver 실행·연결 효과다.
+- 정해진 경로의 파일이 있는 첫 볼륨을 선택하며, 여러 후보를 거부하지 않고
+  child/NTFS driver hash나 정확한 partition identity를 고정하지 않는다.
+- unlock 반환 결과를 확인하지 않고 Windows를 시작한다. child의 최종 실패나
+  containment 불확실성을 Windows 복귀 전에 구분하는 계약이 부족하다.
+- Windows 로드 실패도 최종 EFI_SUCCESS로 반환하고 파일 close 결과를 확인하지 않는다.
+- archive의 EFI/NTFS driver provenance·라이선스와 소스-바이너리 재현성은 별도 검토가 필요하다.
+
+따라서 추가 파티션 없는 방식은 설계 참고로 보존하되, 새 filesystem driver를 도입하거나
+현재 partition/hash/실패 정리 가드를 약화하지 않는다. 이번 개선은 기존 경로에서
+Log close 실패 시에도 Root close를 시도하고, 두 close 중 하나라도 실패하면 StartImage를
+막는 것으로 제한했다. RAM mock의 정상·각 실패·동시 실패를 검증했다.
+
+후속 sleep 유지/hibernation 초기화 및 다른 참여자의 binary 일치 보고는
+작성자들의 제보다. 현재 프로젝트에서 재현한 결과가 아니며 실제 측정은 보류한다.
+[한글 검증 기록](../VALIDATION.ko.md)에 future TF32와 전환별 근거 형식을 정리했다.
 원본 archive와 firmware source를 빌드하거나 실행하지 않았고, 실제 GEMM·실주문·
 부팅 설정 변경·ESP staging을 수행하지 않았다. 새로운 GPU 지원을 추가한 것이 아니다.
 
@@ -108,7 +142,7 @@ EFI·언락 코드는 실행하지 않았고 GPU 설정이나 부팅 설정을 �
 
 ## 이후 작성자에게 확인하면 좋은 질문 — 아직 전송하지 않음
 
-- 인계 문서의 `gpuload` 런처 소스와 정확한 빌드 revision을 제공할 수 있는가?
+- 후속 archive의 `gpuload` 소스에 대응하는 정확한 build revision과 GNU-EFI/binutils 버전·원본 EFI hash를 확인할 수 있는가? 소스 자체는 후속 검토에서 확보했다.
 - 정확한 미니PC/보드 모델과 BIOS 버전, 기존 sanitized transaction·cleanup 로그가 있는가?
 - 다섯 펌웨어 파일의 package origin, 추출 과정과 SHA256이 남아 있는가?
 - GNU-EFI 및 mod 소스의 upstream revision과 파일별 수정 이력을 확인할 수 있는가?

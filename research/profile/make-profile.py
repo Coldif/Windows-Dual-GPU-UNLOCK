@@ -251,11 +251,35 @@ def gu_hex(v):
     return '0' if v == 0 else f'{v:#x}'
 
 
+def probe_mmio(text):
+    """One observation per offset; failed reads remain unavailable, never zero.
+
+    Shared by the observational fingerprint tool and profile admission. Even
+    identical duplicate reads are ambiguous: these formats describe one snapshot.
+    """
+    values, statuses = {}, {}
+    for line in text.splitlines():
+        if not line.startswith('mmio '):
+            continue
+        row = re.fullmatch(r'mmio off=0x([0-9a-f]{1,8}) status=0x([0-9a-f]{1,16}) value=0x([0-9a-f]{1,8})', line)
+        if not row:
+            fail('malformed MMIO observation')
+        offset, status, value = (int(v, 16) for v in row.groups())
+        if offset in statuses:
+            fail(f'duplicate MMIO observation at {offset:#x}')
+        statuses[offset] = status
+        if status == 0:
+            values[offset] = value
+    return values, statuses
+
+
 def analyze(diag, image_dir, envelope):
     """Everything one capture yields. image_dir=None skips the driver code hashes."""
     raw = diag.read_bytes()
     text = raw.decode('utf-8-sig').replace('\r\n', '\n')
-    if text.count('capture-complete=1\n') != 1 or 'diagnostic-result status=0x0000000000000000' not in text:
+    complete = re.findall(r'^capture-complete=.*$', text, re.M)
+    results = re.findall(r'^diagnostic-result status=.*$', text, re.M)
+    if complete != ['capture-complete=1'] or results != ['diagnostic-result status=0x0000000000000000']:
         fail(f'{diag.name}: need exactly one complete, successful capture')
     if text.count('\nprobe-target ') != 1 or not single_probe_summary(text):
         fail(f'{diag.name}: need exactly one NVIDIA display controller (single-RTX topology only)')
@@ -278,8 +302,7 @@ def analyze(diag, image_dir, envelope):
     if bar0 & 0xf or bar0 & 0xffffff or not bar0:
         fail(f'BAR0 {bar0:#x} is not a 16 MiB aligned 32-bit non-prefetchable window')
 
-    mmio = {int(o, 16): int(v, 16) for o, v in
-            re.findall(r'^mmio off=0x([0-9a-f]+) status=0x0+ value=0x([0-9a-f]+)$', text, re.M)}
+    mmio, _ = probe_mmio(text)
     if any(o not in mmio for o in COLD):
         fail(f'{diag.name}: missing a cold-state register read')
     chip, plm, g1, g2, g3, wpr2, ss0, ss1, memory = (mmio[o] for o in COLD)

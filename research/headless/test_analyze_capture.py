@@ -95,6 +95,94 @@ class CaptureTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             analyze(b'x' * (8 * 1024 * 1024 + 1))
 
+    def test_mem_and_bme_are_observations_not_topology_or_authority(self):
+        for command in (0, 2, 6):
+            with self.subTest(command=command):
+                raw = fixture().replace(b'220410de 00000000', f'220410de {command:08x}'.encode())
+                report = analyze(raw)
+                row = report['pci_command_observations'][0]
+                self.assertEqual(row['memory_enabled'], bool(command & 2))
+                self.assertEqual(row['bus_master_enabled'], bool(command & 4))
+                self.assertTrue(report['single_rtx_display_topology_observed'])
+                self.assertFalse(report['authorizes_unlock'])
+                self.assertFalse(report['file_close_verified'])
+
+    def test_duplicate_pci_config_and_status_rejected(self):
+        base = fixture()
+        config = next(line for line in base.splitlines() if line.startswith(b'pci config-dwords='))
+        for extra in (config, b'pci config-status=0x0000000000000000',
+                      b'pci config-status=0x8000000000000007'):
+            with self.subTest(extra=extra), self.assertRaises(ValueError):
+                analyze(base.replace(config, config + b'\n' + extra))
+
+    def test_unknown_completion_and_duplicate_console_rejected(self):
+        base = fixture()
+        for raw in (base + b'capture-complete=2\n',
+                    base.replace(b'console out=0x1 error=0x1 input=0x1',
+                                 b'console out=0x1 error=0x1 input=0x1\nconsole out=0x1 error=0x1 input=0x1')):
+            with self.assertRaises(ValueError):
+                analyze(raw)
+
+    def test_literal_open_attributes_do_not_invent_detach_roles(self):
+        # No owner, GET_PROTOCOL, child-like 0x8, BY_DRIVER and multi-count
+        # exclusive opens are independent observations, never new authority.
+        for attributes, count in ((None, 0), (2, 1), (8, 1), (0x10, 1), (0x30, 3)):
+            snapshot = b'opens status=0x0 count=0x0\n'
+            if attributes is not None:
+                snapshot = (f'opens status=0x0 count=0x1\nopen agent=0x1 controller=0x3 attributes=0x{attributes:x} count=0x{count:x}\n').encode()
+            needle = ('protocol guid=' + GOP + '\n').encode()
+            raw = fixture().replace(needle, needle + snapshot)
+            report = analyze(raw)
+            observed = report['ownership_observations']
+            self.assertEqual(observed['snapshot_count'], 1)
+            self.assertFalse(observed['role_interpretation_performed'])
+            self.assertEqual(len(observed['attributes']), int(attributes is not None))
+            if attributes is not None:
+                self.assertEqual(observed['attributes'][0]['attributes'], f'{attributes:x}')
+                self.assertEqual(observed['attributes'][0]['reported_open_count'], count)
+            self.assertFalse(report['authorizes_driver_detach'])
+
+    def test_partial_ownership_cannot_be_summarized_as_complete(self):
+        needle = ('protocol guid=' + GOP + '\n').encode()
+        for snapshot in (b'opens status=0x0 count=0x1\n',
+                         b'opens status=0x7 count=0x0\n',
+                         b'opens status=0x0 count=0x0\nopens status=0x0 count=0x0\n',
+                         b'opens status=0x0 count=0x1\nopen agent=0x1 controller=0x3 attributes=0x8 count=0x1truncated\n'):
+            with self.subTest(snapshot=snapshot), self.assertRaises(ValueError):
+                analyze(fixture().replace(needle, needle + snapshot))
+
+    def test_duplicate_or_malformed_protocol_snapshot_rejected(self):
+        needle = ('protocol guid=' + GOP + '\n').encode()
+        for replacement in (needle + needle, b'protocol guid=invalid\n'):
+            with self.assertRaises(ValueError):
+                analyze(fixture().replace(needle, replacement))
+
+    def test_orphan_open_records_rejected(self):
+        for row in (b'opens status=0x7 count=0x0\n',
+                    b'open agent=0x1 controller=0x3 attributes=0x8 count=0x1\n'):
+            with self.subTest(row=row), self.assertRaisesRegex(ValueError, 'no protocol'):
+                analyze(fixture().replace(b'handle id=0x3\n', b'handle id=0x3\n' + row))
+
+    def test_same_agent_driver_and_shared_console_child_are_distinct_records(self):
+        # Abstract the #20 relationship, using only synthetic handles/identity:
+        # one agent opens a physical child as driver and names the shared
+        # console as its child controller. This is not two alternate agents.
+        snapshot = (('protocol guid=' + TEXT + '\n').encode() +
+                    b'opens status=0x0 count=0x2\n'
+                    b'open agent=0x4 controller=0x3 attributes=0x10 count=0x1\n'
+                    b'open agent=0x4 controller=0x1 attributes=0x8 count=0x1\n'
+                    b'handle id=0x4\n'
+                    b'protocol guid=18a031ab-b443-4d1a-a5c0-0c09261e9f71\n')
+        raw = fixture().replace(b'capture-complete=1\n', snapshot + b'capture-complete=1\n')
+        raw = raw.replace(b'handles status=0x0 count=0x3', b'handles status=0x0 count=0x4')
+        report = analyze(raw)
+        summary = report['ownership_observations']
+        self.assertEqual({row['attributes'] for row in summary['attributes']}, {'8', '10'})
+        self.assertEqual({row['protocol'] for row in summary['attributes']}, {TEXT})
+        self.assertEqual(sum(row['records'] for row in summary['attributes']), 2)
+        self.assertFalse(summary['role_interpretation_performed'])
+        self.assertFalse(report['authorizes_driver_detach'])
+
 
 if __name__ == '__main__':
     unittest.main()
