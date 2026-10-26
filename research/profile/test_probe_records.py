@@ -48,7 +48,9 @@ class ProbeRecordTests(unittest.TestCase):
         prefix = ('capture-complete=1\ndiagnostic-result status=0x0000000000000000\n'
                   'probe-target seg=0x0000 bus=0x0001 dev=0x0000 fun=0x0000\n'
                   'probe targets=0001 cfg-incomplete=0000\ncfg dwords=' +
-                  ' '.join(f'{word:08x}' for word in cfg) + '\n')
+                  ' '.join(f'{word:08x}' for word in cfg) + '\n' +
+                  # PciIo attribute cache matching command 0x3 (IO|MEM, no BME), as the probe records it.
+                  'pci-attributes status=0x0000000000000000 value=0x0000000000000300\n')
         envelope = {'probe_device_ids': ['220410de'], 'class_revision': '030000a1'}
         for missing in mp.COLD:
             for failed in (False, True):
@@ -59,6 +61,35 @@ class ProbeRecordTests(unittest.TestCase):
                     path.write_text(prefix + rows, encoding='ascii')
                     with self.assertRaisesRegex(mp.Refused, 'missing a cold-state'):
                         mp.analyze(path, None, envelope)
+
+    def test_pci_attribute_cache_must_match_the_command_register(self):
+        """full-release.c CapturePermit stops the release on a mismatch, after the console detach."""
+        envelope = {'probe_device_ids': ['220410de'], 'class_revision': '030000a1'}
+        record = 'pci-attributes status=0x{:016x} value=0x{:016x}\n'
+        cases = [
+            # command dword, attribute record or None, expected refusal (None: the attribute gate passes)
+            (3, None, 'no PciIo attribute record'),
+            (3, record.format(0x8000000000000003, 0), 'reading the PciIo attributes failed'),
+            (3, record.format(0, 0x700), 'disagree with the PCI command register'),  # BME in the cache
+            (3, record.format(0, 0x100), 'disagree with the PCI command register'),  # MEM missing
+            (2, record.format(0, 0x300), 'disagree with the PCI command register'),  # IO not in command
+            (3, record.format(0, 0x300) * 2, 'no PciIo attribute record'),           # ambiguous duplicate
+            (3, record.format(0, 0x300), None),
+            (2, record.format(0, 0x200), None),
+            (3, record.format(0, 0x300 | 0x4000), None),  # other cached attributes are not compared
+        ]
+        for command, attributes, refusal in cases:
+            cfg = [0x220410de, command, 0x030000a1, 0, 0xf5000000] + [0] * 59
+            text = ('capture-complete=1\ndiagnostic-result status=0x0000000000000000\n'
+                    'probe-target seg=0x0000 bus=0x0001 dev=0x0000 fun=0x0000\n'
+                    'probe targets=0001 cfg-incomplete=0000\ncfg dwords=' +
+                    ' '.join(f'{word:08x}' for word in cfg) + '\n' + (attributes or ''))
+            with self.subTest(command=command, attributes=attributes), tempfile.TemporaryDirectory() as folder:
+                path = Path(folder) / 'DIAG00.TXT'
+                path.write_text(text, encoding='ascii')
+                # With no cold-state reads in the text, a passing attribute gate reaches the next gate.
+                with self.assertRaisesRegex(mp.Refused, refusal or 'missing a cold-state'):
+                    mp.analyze(path, None, envelope)
 
 
 if __name__ == '__main__':

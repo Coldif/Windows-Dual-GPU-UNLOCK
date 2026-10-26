@@ -3,6 +3,9 @@
 #include "test_probe.c"
 #undef main
 #include <IndustryStandard/Acpi.h>
+#ifndef GU_PROBE_BUS
+#define GU_PROBE_BUS 1U /* must match probe.c; -DGU_PROBE_BUS=0x2bU exercises a non-default bus */
+#endif
 
 enum {G_OK,G_UNKNOWN,G_BME,G_MEM_OFF,G_BAD_BAR,G_BAD_RESOURCE,G_CHANGED,G_MULTI,
       G_SHORT_WRITE,G_FLUSH,G_CLOSE,G_OTHER_BDF,G_PROTOCOL_CHANGED,G_CFG_FAIL,G_BAD_CHECKSUM,
@@ -42,7 +45,7 @@ static EFI_STATUS EFIAPI GuardedMem(EFI_PCI_IO_PROTOCOL *io,EFI_PCI_IO_PROTOCOL_
   return MemRead(io,w,bar,at,n,data);
 }
 static EFI_STATUS EFIAPI GenericLocation(EFI_PCI_IO_PROTOCOL *io,UINTN *seg,UINTN *bus,UINTN *dev,UINTN *fun) {
-  EFI_STATUS s=Location(io,seg,bus,dev,fun);if(Mode==G_OTHER_BDF)*bus=2;return s;
+  EFI_STATUS s=Location(io,seg,bus,dev,fun);*bus=(Mode==G_OTHER_BDF)?GU_PROBE_BUS+1U:GU_PROBE_BUS;return s;
 }
 static EFI_STATUS EFIAPI Bar(EFI_PCI_IO_PROTOCOL *io,UINT8 index,UINT64 *supports,VOID **out) {
   (void)io;(void)index;(void)supports;
@@ -54,6 +57,12 @@ static EFI_STATUS EFIAPI Bar(EFI_PCI_IO_PROTOCOL *io,UINT8 index,UINT64 *support
   if(Mode==G_BAD_RESOURCE)d->AddrLen=0x800000;
   if(Mode==G_BAD_CHECKSUM){UINT8 sum=0;for(UINTN i=0;i<sizeof(*d)+1;i++)sum=(UINT8)(sum+p[i]);p[sizeof(*d)+1]=(UINT8)(1-sum);if(!p[sizeof(*d)+1])p[sizeof(*d)+1]=2;}
   *out=p;return EFI_SUCCESS;
+}
+static int AttributeGets,AttributeOthers;
+static EFI_STATUS EFIAPI Attr(EFI_PCI_IO_PROTOCOL *io,EFI_PCI_IO_PROTOCOL_ATTRIBUTE_OPERATION op,UINT64 mask,UINT64 *result) {
+  (void)io;
+  if(op!=EfiPciIoAttributeOperationGet || mask || !result){AttributeOthers++;return EFI_UNSUPPORTED;}
+  AttributeGets++;*result=0x300;return EFI_SUCCESS; /* IO|MEMORY, as on the MSI capture */
 }
 static EFI_STATUS EFIAPI GenericLocate(EFI_LOCATE_SEARCH_TYPE search,EFI_GUID *g,VOID *key,UINTN *n,EFI_HANDLE **out) {
   if(g && !memcmp(g,&WantSfs,sizeof(*g))){SfsSearches++;return EFI_DEVICE_ERROR;}
@@ -102,6 +111,7 @@ static void GenericSetup(int mode) {
   ActiveCapture=NULL;Drifted=ReadsAfterDrift=0;
   ExistingWriteAttempts=0;
   Pci.Pci.Read=GenericRead;Pci.GetBarAttributes=Bar;Pci.GetLocation=GenericLocation;
+  Pci.Attributes=Attr;AttributeGets=AttributeOthers=0;
   Bs.LocateHandleBuffer=GenericLocate;Bs.HandleProtocol=GenericHandle;
   memset(&Binding,0,sizeof(Binding));Binding.ImageHandle=ImageHandle;
   memset(&Image,0,sizeof(Image));Image.ImageBase=ImageBytes;Image.ImageSize=sizeof(ImageBytes);
@@ -124,10 +134,16 @@ int main(void) {
   Check(RootOpens==1 && Dumps==1,"hash-only profile writes images to validated launch root");
 #endif
   Check(Logged("capture-complete=1"),"complete generic capture recorded");
+  Check(AttributeGets==1 && !AttributeOthers,"PciIo attributes are read once, Get only; never set, enabled or disabled");
+  Check(Logged("pci-attributes status=0x0000000000000000 value=0x0000000000000300"),"PciIo attribute cache recorded for the generator");
+  GenericSetup(G_OK);Pci.Attributes=NULL;
+  Check(GuCaptureGraphOnVolume(&Table,&LogFile,&RootFile)==EFI_SUCCESS && Logged("pci-attributes status=0x8000000000000003"),
+        "a missing Attributes method is recorded as unsupported, not invented");
   const int refuse[]={G_UNKNOWN,G_BME,G_MEM_OFF,G_BAD_BAR,G_BAD_RESOURCE,G_CHANGED,G_MULTI,G_OTHER_BDF,G_PROTOCOL_CHANGED,G_CFG_FAIL,G_BAD_CHECKSUM};
   for(UINTN i=0;i<sizeof(refuse)/sizeof(refuse[0]);i++) {
     Check(GenericRun(refuse[i],TRUE)==EFI_NOT_READY,"unreviewed or changed state fails closed");
     Check(S.RegReads==0 && S.PromReads==0,"refused generic target performs no MMIO or PROM reads");
+    Check(!AttributeOthers,"a refused target never has its attributes changed");
     Check(!Logged("capture-complete=1"),"refusal cannot claim complete capture");
   }
   for(int m=G_SHORT_WRITE;m<=G_CLOSE;m++) {

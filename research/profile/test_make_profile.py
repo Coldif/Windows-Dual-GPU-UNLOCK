@@ -72,6 +72,16 @@ def main():
          lambda w, d: sub(d[-1], r'^(probe-target seg=0x0000 bus=0x)0001', lambda m: m[1] + '0002'))
     case('no integrated GPU', 'non-NVIDIA display controller',
          lambda w, d: sub(d[-1], r'^(pci config-dwords=(?!....10de)[0-9a-f]{8} [0-9a-f]{8} )03', lambda m: m[1] + '04'))
+    # full-release.c CapturePermit compares the PciIo attribute cache with the command register.
+    attributes = r'^(pci-attributes status=0x)([0-9a-f]{16})( value=0x)([0-9a-f]{16})$'
+    case('no PciIo attribute record', 'no PciIo attribute record',
+         lambda w, d: sub(d[-1], attributes + r'\n', ''))
+    case('PciIo attribute read failed', 'reading the PciIo attributes failed',
+         lambda w, d: sub(d[-1], attributes, lambda m: m[1] + '8000000000000003' + m[3] + m[4]))
+    case('PciIo attributes report bus mastering', 'disagree with the PCI command register',
+         lambda w, d: sub(d[-1], attributes, lambda m: m[1] + m[2] + m[3] + f'{int(m[4], 16) | 0x400:016x}'))
+    case('PciIo attributes lack memory decode', 'disagree with the PCI command register',
+         lambda w, d: sub(d[-1], attributes, lambda m: m[1] + m[2] + m[3] + f'{int(m[4], 16) & ~0x200:016x}'))
     case('aggregate console', 'ConOut',
          lambda w, d: sub(d[-1], r'^(variable name=ConOut .*\n(?:.*\n)*?path-node raw=0101060000)00', lambda m: m[1] + '1f'))
     case('incomplete capture', 'complete, successful',

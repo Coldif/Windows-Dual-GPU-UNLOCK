@@ -1,5 +1,21 @@
 # Changes
 
+## Unreleased — probe: non-01 PCI bus and PciIo attribute record
+
+- The generic probe takes its deep-read bus from `GU_PROBE_BUS` (`research/profile/build-probe.ps1
+  -TargetBus`, default 1). With the default the probe is unchanged; a non-default bus compiles
+  only into the read-only diagnostic build. Many AM4/B550 boards put the CPU x16 slot on another
+  bus (for example `0x2b`), where the probe could only inventory the card.
+- The checked probe records the PciIo attribute cache once, with `EfiPciIoAttributeOperationGet`,
+  before its final raw-state recheck (`pci-attributes status= value=`). `make-profile.py` requires
+  that record and refuses a capture whose IO/MEM/BME attribute bits differ from the PCI command
+  register: `full-release.c` `CapturePermit` would stop the release there, after the console was
+  already detached. Captures from an older probe must be taken again.
+- `benchmark/run-benchmark.ps1 -PciBus` (default `01`) for a card on another bus.
+- Host tests: the generic probe suite also runs at bus `0x2b`; a non-default bus is refused outside
+  the diagnostic build; the attributes mock fails on any operation other than Get. No reviewed
+  profile, release path or generator admission rule other than the attribute record changes.
+
 ## Unreleased — harden GA106 observation and integrate the fifth profile
 
 - Preserve current GA104/GA102 profiles, LOCAL gates, ownership checks and TF32 tools
