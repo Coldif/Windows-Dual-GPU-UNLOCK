@@ -292,7 +292,7 @@ static EFI_STATUS FullChoice(VOID *Context,BOOLEAN *Skip) {
   }
   return EFI_SUCCESS;
 }
-static EFI_STATUS FullCapture(VOID *Context) {(void)Context;return GuCaptureGraph(Table,Log);}
+static EFI_STATUS FullCapture(VOID *Context) {(void)Context;return GuCaptureGraphOnVolume(Table,Log,Root);}
 static BOOLEAN ReleaseStarted;
 static EFI_STATUS FullRelease(VOID *Context) {
   ReleaseStarted=TRUE;
@@ -376,7 +376,7 @@ static EFI_STATUS PrepareChoice(VOID *Context,BOOLEAN *Skip) {
 #endif
 }
 static EFI_STATUS CaptureConsole(VOID *Context) {
-  (void)Context;return GuCaptureGraph(Table,Log);
+  (void)Context;return GuCaptureGraphOnVolume(Table,Log,Root);
 }
 static EFI_STATUS DetachConsole(VOID *Context) {
 #ifdef GU_SINGLE_RTX_CONSOLE
@@ -406,7 +406,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE Image,EFI_SYSTEM_TABLE *St) {
   Say(L"GPU console diagnostic only. No unlock or driver detach. Collecting graph...\r\n");
   s=Prepare(NULL);
   if(s==EFI_SUCCESS) {
-    s=GuCaptureGraph(Table,Log);
+    s=GuCaptureGraphOnVolume(Table,Log,Root);
     /* Partial observations never authorize unlock. Normal Windows boot is
      * permitted because this separate image has not touched GPU state. */
     EFI_STATUS recorded=Record(NULL,"diagnostic-result",s);

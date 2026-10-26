@@ -52,6 +52,7 @@ EFI_RUNTIME_SERVICES_CODE = 5
 COLD = [0x0, 0x823804, 0x118128, 0x118234, 0x110100, 0x1fa828, 0x82381c, 0x823820, 0x1183a4]
 # Test expected-image buffer in test_efi_transaction.c.
 FWSEC_IMAGE_MAX = 0x10000
+IMAGE_MAX = 4 * 1024 * 1024  # Same loaded-image dump cap as probe.c.
 
 
 class Refused(ValueError):
@@ -146,32 +147,72 @@ def binding_for(bindings, agent):
 
 
 def pe_sections(image):
+    def span(at, size):
+        if at < 0 or size < 0 or at > len(image) or size > len(image) - at:
+            fail('PE header or section is outside the loaded image')
+    if not 64 <= len(image) <= IMAGE_MAX or image[:2] != b'MZ':
+        fail('invalid loaded PE image size or DOS signature')
     off = struct.unpack_from('<I', image, 0x3c)[0]
+    span(off, 24)
+    if off < 64:
+        fail('PE header overlaps DOS header')
     if image[off:off + 4] != b'PE\0\0':
         fail('no PE header in dump')
+    if struct.unpack_from('<H', image, off + 4)[0] != 0x8664:
+        fail('dump is not AMD64')
     count, opt_size = struct.unpack_from('<H', image, off + 6)[0], struct.unpack_from('<H', image, off + 20)[0]
     opt = off + 24
+    span(opt, opt_size)
+    if not 1 <= count <= 96 or opt_size < 112:
+        fail('invalid PE section count or optional header size')
     if struct.unpack_from('<H', image, opt)[0] != 0x20b:
         fail('dump is not PE32+')
-    reloc_rva, reloc_size = struct.unpack_from('<II', image, opt + 112 + 5 * 8)
+    image_size, headers_size = struct.unpack_from('<II', image, opt + 56)
+    directories = struct.unpack_from('<I', image, opt + 108)[0]
+    if image_size != len(image) or directories > 16 or 112 + directories * 8 > opt_size:
+        fail('inconsistent PE loaded size or directory table')
+    reloc_rva, reloc_size = (struct.unpack_from('<II', image, opt + 112 + 5 * 8)
+                             if directories > 5 else (0, 0))
+    if bool(reloc_rva) != bool(reloc_size):
+        fail('incomplete relocation directory')
+    span(reloc_rva, reloc_size)
     table = opt + opt_size
+    span(table, count * 40)
+    if not table + count * 40 <= headers_size <= image_size:
+        fail('section table is outside PE headers')
     sections = []
     for i in range(count):
         name, vsize, rva = struct.unpack_from('<8sII', image, table + 40 * i)
-        sections.append((name.rstrip(b'\0').decode('ascii', 'replace'), rva, vsize))
+        flags = struct.unpack_from('<I', image, table + 40 * i + 36)[0]
+        span(rva, vsize)
+        if vsize and (rva < headers_size or any(n and rva < a + n and a < rva + vsize
+                                                for _, a, n, _ in sections)):
+            fail('overlapping PE sections or section/header alias')
+        sections.append((name.rstrip(b'\0').decode('ascii', 'replace'), rva, vsize, flags))
     return sections, reloc_rva, reloc_size
 
 
 def relocations(image, rva, size):
+    if rva < 0 or size < 0 or bool(rva) != bool(size) or rva > len(image) or size > len(image) - rva:
+        fail('relocation directory is outside loaded image')
     out, at, end = [], rva, rva + size
     while at < end:
+        if end - at < 8:
+            fail('truncated relocation block header')
         page, block = struct.unpack_from('<II', image, at)
-        if block < 8:
-            break
+        if block < 8 or block > end - at or block % 2 or page % 4096:
+            fail('invalid relocation block bounds')
         for k in range(8, block, 2):
             entry = struct.unpack_from('<H', image, at + k)[0]
-            if entry >> 12:
-                out.append(page + (entry & 0xfff))
+            kind = entry >> 12
+            if not kind:
+                continue
+            if kind != 10:
+                fail('unsupported AMD64 relocation type')
+            target = page + (entry & 0xfff)
+            if target > len(image) or 8 > len(image) - target:
+                fail('relocation target is outside loaded image')
+            out.append((target, 8))
         at += block
     return out
 
@@ -187,11 +228,22 @@ def code_hash(image_dir, rec, rva):
     text = [s for s in sections if s[1] == rva]
     if len(text) != 1:
         fail(f'{dump.name}: no section at expected code RVA {rva:#x}: {sections}')
-    name, start, length = text[0]
-    inside = [r for r in relocations(image, reloc_rva, reloc_size) if start <= r < start + length]
+    name, start, length, flags = text[0]
+    if not length or not flags & 0x20000000:
+        fail('hash range is not nonempty executable code')
+    base, stop = rec.get('base'), rec.get('stop')
+    if type(base) is not int or type(stop) is not int or base < 0 or base > (1 << 64) - 1 - len(image) or not start <= stop - base < start + length:
+        fail('driver Stop is outside hashed code')
+    inside = [r for r, width in relocations(image, reloc_rva, reloc_size)
+              if r < start + length and start < r + width]
     if inside:
         fail(f'{dump.name}: {len(inside)} relocations inside {name}; loaded-code hash would vary by load address')
     return {'dump': dump.name, 'bytes': length, 'sha256': hashlib.sha256(image[start:start + length]).hexdigest()}
+
+
+def single_probe_summary(text):
+    rows = re.findall(r'^probe targets=([0-9a-f]{4})(?: cfg-incomplete=([0-9a-f]{4}))?$', text, re.M)
+    return len(rows) == 1 and rows[0][0] == '0001' and rows[0][1] in ('', '0000')
 
 
 def gu_hex(v):
@@ -205,7 +257,7 @@ def analyze(diag, image_dir, envelope):
     text = raw.decode('utf-8-sig').replace('\r\n', '\n')
     if text.count('capture-complete=1\n') != 1 or 'diagnostic-result status=0x0000000000000000' not in text:
         fail(f'{diag.name}: need exactly one complete, successful capture')
-    if text.count('\nprobe-target ') != 1 or 'probe targets=0001\n' not in text:
+    if text.count('\nprobe-target ') != 1 or not single_probe_summary(text):
         fail(f'{diag.name}: need exactly one NVIDIA display controller (single-RTX topology only)')
     target = re.search(r'^probe-target seg=0x([0-9a-f]+) bus=0x([0-9a-f]+) dev=0x([0-9a-f]+) fun=0x([0-9a-f]+)$', text, re.M)
     if not target or [int(x, 16) for x in target.groups()] != [0, 1, 0, 0]:
@@ -216,6 +268,8 @@ def analyze(diag, image_dir, envelope):
         fail(f'{diag.name}: expected one 64-dword probe config snapshot')
     cfg = [int(w, 16) for w in words]
     board, subsystem = cfg[0], cfg[11]
+    if f'{board:08x}' not in envelope.get('probe_device_ids', []):
+        fail('device ID is outside the reviewed deep-probe envelope')
     if cfg[2] != int(envelope['class_revision'], 16):
         fail(f'class/revision {cfg[2]:08x} is not the proven {envelope["class_revision"]}')
     if not cfg[1] & 2 or cfg[1] & 4:

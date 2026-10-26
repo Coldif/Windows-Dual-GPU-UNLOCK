@@ -13,7 +13,8 @@ $local=Join-Path $repo 'research/profile/local'
 $evidencePath=Join-Path $local 'test-results.json'
 if(Test-Path -LiteralPath $evidencePath){Remove-Item -LiteralPath $evidencePath} # never leave an earlier pass behind a failing run
 $hw=Get-LocalProfile $repo
-$report=Get-Content -LiteralPath (Join-Path $local 'profile.json') -Raw | ConvertFrom-Json
+$report=Get-LocalProfileReport $repo $hw
+$reportSha=Get-GuSha256 (Join-Path $local 'profile.json')
 if($report.HeaderSha256 -ne $hw.HeaderSha256){throw 'profile-local.h is not the header make-profile.py wrote; regenerate it'}
 $fx=Join-Path $local 'fixtures'
 foreach($f in $report.Fixtures.PSObject.Properties){if((Get-GuSha256 (Join-Path $fx $f.Name)) -ne $f.Value){throw "Fixture $($f.Name) changed since make-profile.py"}}
@@ -21,7 +22,8 @@ foreach($a in (Get-Content -LiteralPath (Join-Path $repo 'internal-boot/unlock/a
  $p=Join-Path $Assets $a.Name
  if(!(Test-Path -LiteralPath $p) -or (Get-Item -LiteralPath $p).Length -ne $a.Bytes -or (Get-GuSha256 $p) -ne $a.Sha256.ToLowerInvariant()){throw "Asset verification failed: $($a.Name)"}
 }
-$tree=Get-LocalTreeDigest $repo
+$inputManifest=@(Get-LocalTreeInputs $repo)
+$tree=Get-LocalInputDigest $inputManifest
 Import-GuHostCompiler $VcVars
 
 # A reviewed profile for another card must reject this machine's real config and console graph.
@@ -100,8 +102,13 @@ try {
 } finally {Pop-Location}
 
 if((Get-LocalTreeDigest $repo) -ne $tree -or (Get-LocalProfile $repo).HeaderSha256 -ne $hw.HeaderSha256){throw 'Sources or profile changed while the tests ran; rerun'}
-[ordered]@{Format=1;AllPassed=$true;HardwareAccess=$false;ProfileName=$hw.Name;HeaderSha256=$hw.HeaderSha256;PromSha256=$hw.Prom;
- Fixtures=$report.Fixtures;TreeSha256=$tree;TestedUtc=[DateTime]::UtcNow.ToString('o');Results=$results
+if((Get-GuSha256 (Join-Path $local 'profile.json')) -cne $reportSha){throw 'Profile report changed during tests'}
+Assert-LocalFixtures $repo $report.Fixtures
+$expectedJobs=Get-LocalExpectedJobs
+Assert-LocalKeys $results @($expectedJobs.Keys) 'Completed host jobs'
+foreach($jobName in $expectedJobs.Keys){if($results[$jobName].Exit -ne $expectedJobs[$jobName] -or $results[$jobName].Expected -ne $expectedJobs[$jobName]){throw 'Host result mismatch'}}
+[ordered]@{Format=2;AllPassed=$true;HardwareAccess=$false;ProfileName=$hw.Name;HeaderSha256=$hw.HeaderSha256;PromSha256=$hw.Prom;
+ Fixtures=$report.Fixtures;ProfileReportSha256=$reportSha;Inputs=$inputManifest;TreeSha256=$tree;TestedUtc=[DateTime]::UtcNow.ToString('o');Results=$results
 } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $evidencePath -Encoding utf8
 "All $($results.Count) local-profile host jobs matched expectations; mock/replay only, hardware untested."
 "Evidence: $evidencePath"

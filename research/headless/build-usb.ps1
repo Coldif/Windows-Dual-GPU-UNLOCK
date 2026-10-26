@@ -15,7 +15,11 @@ $boot=Join-Path $repo 'internal-boot/boot'
 $unlock=Join-Path $repo 'internal-boot/unlock'
 . (Join-Path $unlock 'local-profile.ps1')
 # 'local': this machine's generated profile; refused here and again in build.ps1 without passing evidence.
-if($HardwareProfile -eq 'local'){$local=Get-LocalProfile $repo;[void](Assert-LocalProfileEvidence $repo);$hw=@{Defines=@($local.Define);Name=$local.Name}}
+if($HardwareProfile -eq 'local'){
+ $local=Get-LocalProfile $repo;$localEvidence=Assert-LocalProfileEvidence $repo
+ $localEvidenceSha=Get-GuSha256 (Join-Path $repo 'research/profile/local/test-results.json')
+ $hw=@{Defines=@($local.Define);Name=$local.Name}
+}
 else{$hw=$profiles[$HardwareProfile]}
 function GuidC([guid]$Value){
  $b=$Value.ToByteArray();$tail=($b[8..15] | ForEach-Object {'0x{0:x2}' -f $_}) -join ','
@@ -52,7 +56,15 @@ try {
  $usbManifest=[ordered]@{Format=2;HardwareProfile=$hw.Name;Mode='single-rtx-headless-unlock-then-windows-usb';CanUnlock=$true;RequiresHumanKey=$false;HardwareTested=$false;
   ChildSha256=$hash;ChildBytes=(Get-Item $child).Length;EfiSha256=(Get-FileHash -LiteralPath build/headless/HEADLESS.EFI).Hash.ToLowerInvariant();EfiBytes=(Get-Item build/headless/HEADLESS.EFI).Length;
   BuiltUtc=[DateTime]::UtcNow.ToString('o')}
- if($HardwareProfile -eq 'local'){$usbManifest.LocalProfileHeaderSha256=(Get-LocalProfile $repo).HeaderSha256}
+ if($HardwareProfile -eq 'local'){
+  $currentEvidence=Assert-LocalProfileEvidence $repo
+  if($currentEvidence.TreeSha256 -cne $localEvidence.TreeSha256 -or
+     (Get-LocalProfile $repo).HeaderSha256 -cne $local.HeaderSha256 -or
+     (Get-GuSha256 (Join-Path $repo 'research/profile/local/test-results.json')) -cne $localEvidenceSha){throw 'Local build inputs or evidence changed while packaging; rerun tests and rebuild'}
+  $usbManifest.LocalProfileHeaderSha256=$local.HeaderSha256
+  $usbManifest.LocalProfileTreeSha256=$localEvidence.TreeSha256
+  $usbManifest.LocalProfileEvidenceSha256=$localEvidenceSha
+ }
  $usbManifest | ConvertTo-Json | Set-Content build/headless/usb-manifest.json -Encoding utf8
  Get-Content build/headless/usb-manifest.json
 } finally {Pop-Location}

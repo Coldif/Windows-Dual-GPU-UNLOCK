@@ -73,7 +73,13 @@ try {
   Headers=@(Get-ChildItem -LiteralPath . -Recurse -File -Filter '*.h' | Where-Object {$_.FullName.Substring($PSScriptRoot.Length+1) -notmatch '(^|[\\/])build([\\/]|$)'} | Sort-Object FullName | ForEach-Object {[ordered]@{Path=$_.FullName.Substring($PSScriptRoot.Length+1);Sha256=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash}});
   Sources=@($sources | ForEach-Object {[ordered]@{Path="$_.c";Sha256=(Get-FileHash -LiteralPath "$_.c" -Algorithm SHA256).Hash}})
   }
- if($HardwareProfile -eq 'local'){$manifest.LocalProfile=[ordered]@{HeaderSha256=$hw.HeaderSha256;Evidence=$(if($evidence){[ordered]@{TreeSha256=$evidence.TreeSha256;TestedUtc=$evidence.TestedUtc}}else{'none: diagnostic build'})}}
+ if($HardwareProfile -eq 'local'){
+  if($evidence){
+   $afterEvidence=Assert-LocalProfileEvidence $repo
+   if($afterEvidence.TreeSha256 -cne $evidence.TreeSha256 -or (Get-LocalProfile $repo).HeaderSha256 -cne $hw.HeaderSha256){throw 'Local inputs changed while building; rerun tests and rebuild'}
+  }
+  $manifest.LocalProfile=[ordered]@{HeaderSha256=$hw.HeaderSha256;Evidence=$(if($evidence){[ordered]@{TreeSha256=$evidence.TreeSha256;TestedUtc=$evidence.TestedUtc}}else{'none: diagnostic build'})}
+ }
  $manifest | ConvertTo-Json -Depth 5 | Set-Content -Encoding UTF8 -LiteralPath "$out/build-manifest.json"
  "Built $name.EFI; ExperimentalUnlock=$([bool]$ExperimentalUnlock); hardware untested."
 } finally {Pop-Location}

@@ -1,5 +1,20 @@
 # Changes
 
+## Unreleased — harden the per-machine pipeline before integration
+
+- Bind all diagnostic dumps to the wrapper's validated launch root. Preserve fixed-profile
+  hash-only PROM diagnostics; generic PROM dumping is limited to one reviewed GA102 PCI
+  identity, MEM1/BME0, BDF and BAR resource envelope with a final identity/config recheck.
+  Complete the MMIO batch before logging or file-service calls.
+- Reject malformed/truncated loaded PE headers, sections, relocation blocks and code/Stop
+  ranges; bound runtime code hashing as well as offline generation.
+- Require format-2 evidence with exactly 19 expected jobs, four fixtures, profile report
+  identity and an ordered build-input manifest including EFI runtime and EDK2 headers.
+- Archive earlier local captures when resuming. Describe the experimental local workflow
+  in both READMEs without adding a fourth hardware-verified profile.
+- The byte-identical wrapper claim below describes the original contribution's private
+  capture rebuild, not this hardened integration. No new physical boot is claimed.
+
 ## 2026-10-25 — per-machine pipeline: probe → local profile → tests → stick
 
 - `research/profile/new-machine.ps1`: one resumable command for a machine without a reviewed

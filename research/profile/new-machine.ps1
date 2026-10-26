@@ -48,7 +48,17 @@ if(!(Test-Path -LiteralPath $dir) -or (Captures).Count -lt $need) {
 
 "Using $((Captures).Count) probe captures from $dir."
 $capture=Join-Path $repo 'research/profile/local/capture'
-if(Test-Path -LiteralPath $capture){Remove-Item -LiteralPath $capture -Recurse -Force}
+if(Test-Path -LiteralPath $capture) {
+ # Preserve original captures when resuming; never recursively delete hardware evidence.
+ $sourceItem=Get-Item -LiteralPath $capture -Force
+ $parent=[IO.Path]::GetFullPath((Join-Path $repo 'research/profile/local'))
+ if(!$sourceItem.PSIsContainer -or ($sourceItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -or
+    [IO.Path]::GetDirectoryName($sourceItem.FullName) -ne $parent){throw 'Capture archive source is not the expected local directory'}
+ $archive=Join-Path $parent ('capture-archive-'+[DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss')+'-'+[Guid]::NewGuid().ToString('N'))
+ if([IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($archive)) -ne $parent){throw 'Invalid capture archive destination'}
+ Move-Item -LiteralPath $sourceItem.FullName -Destination $archive
+ "Previous local captures preserved in $archive"
+}
 [void][IO.Directory]::CreateDirectory($capture)
 # Complete probe captures only: an interrupted boot's partial log is left on the stick.
 Captures | Copy-Item -Destination $capture

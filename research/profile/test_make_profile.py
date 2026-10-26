@@ -67,7 +67,7 @@ def main():
          lambda w, d: sub(d[-1], r'^(mmio off=0x0082381c status=0x0+ value=0x)[0-9a-f]{8}', hexword(0x88888888)))
     case('WPR2 already set', 'power-on state',
          lambda w, d: sub(d[-1], r'^(mmio off=0x001fa828 status=0x0+ value=0x)[0-9a-f]{8}', hexword(0x10)))
-    case('second NVIDIA GPU', 'exactly one NVIDIA', lambda w, d: sub(d[-1], r'^probe targets=0001$', 'probe targets=0002'))
+    case('second NVIDIA GPU', 'exactly one NVIDIA', lambda w, d: sub(d[-1], r'^probe targets=0001(?: cfg-incomplete=0000)?$', 'probe targets=0002 cfg-incomplete=0000'))
     case('RTX not at 01:00.0', '0000:01:00.0',
          lambda w, d: sub(d[-1], r'^(probe-target seg=0x0000 bus=0x)0001', lambda m: m[1] + '0002'))
     case('no integrated GPU', 'non-NVIDIA display controller',
