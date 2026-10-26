@@ -122,6 +122,9 @@ topology before Windows entry. Windows display recovery was observed by the oper
 | FP16 Tensor / FP32 accumulation | 124.97 TFLOPS |
 | BF16 Tensor / FP32 accumulation | 128.93 TFLOPS |
 
+Future runs of the [benchmark tool](docs/BENCHMARK.en.md) also measure TF32 separately.
+The historical measurements above predate that addition and have no TF32 result.
+
 There is **no contemporary controlled locked baseline** for this headless boot,
 so these values do not establish an unlock percentage. They do not establish game
 or ComfyUI gains, long-term stability, sleep/hibernate resume or repeated automatic

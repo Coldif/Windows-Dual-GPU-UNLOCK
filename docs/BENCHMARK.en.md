@@ -2,7 +2,28 @@
 
 **English** | [한국어](BENCHMARK.ko.md)
 
-The benchmark uses the upstream 4096×4096 cuBLAS GEMM: FP32 pedantic, FP16/BF16 inputs with FP32 accumulation/output, two seconds of warmup per precision and 30 samples. Select the RTX 3090 (default), RTX 3090 Ti or RTX 3070 Ti with `-Card 3090|3090ti|3070ti` when building and running. Each binary requires its named GPU at PCI `0000:01:00.0`; this is a measurement target, not an EFI compatibility verdict. Result checking remains limited to the first and last output elements, as in upstream.
+The benchmark extends the upstream 4096×4096 cuBLAS GEMM with TF32. It measures
+these four modes in order, with two seconds of warmup and 30 samples per mode:
+
+| Result name | Arithmetic |
+|---|---|
+| `fp32_pedantic` | FP32 arithmetic control |
+| `fp16_tensor_fp32_accumulate` | FP16 input, Tensor operations, FP32 accumulation/output |
+| `bf16_tensor_fp32_accumulate` | BF16 input, Tensor operations, FP32 accumulation/output |
+| `tf32_tensor_fp32_accumulate` | FP32 input/output buffers, TF32 Tensor operations, FP32 accumulation |
+
+TF32 is appended after the existing three modes. It explicitly requests
+`CUBLAS_COMPUTE_32F_FAST_TF32`; this is not a pure FP32 precision measurement or
+instruction-level proof of a particular kernel. The benchmark and runner refuse
+any nonempty `NVIDIA_TF32_OVERRIDE` rather than silently changing the environment
+or reporting overridden FP32 work as TF32. `tf32_allowed` reports this environment
+policy, not a measured hardware unlock state.
+
+Select the RTX 3090 (default), RTX 3090 Ti or RTX 3070 Ti with
+`-Card 3090|3090ti|3070ti` when building and running. Each binary requires its named
+GPU at PCI `0000:01:00.0`; this is a measurement target, not an EFI compatibility
+verdict. Result checking remains limited to the first and last output elements,
+as in upstream.
 
 The setup script downloads CUDA 12.6 redistributables from NVIDIA's official server, verifies sizes/hashes and prepares them within the project. It does not change the driver, ComfyUI or system PATH. Downloads and disk space are required.
 
@@ -28,6 +49,8 @@ once, before executing even its metadata check. A different card's build manifes
 does not authenticate a stale executable. Rebuild for the selected card if needed.
 The manifest contains that card's source/executable/link artifacts and shared DLLs;
 building another card replaces the active manifest, so rebuild when switching back.
+Rebuild existing binaries to obtain the four-mode protocol; the updated runner
+rejects old three-mode executables before workload execution.
 
 Save and close ComfyUI, video, recording and other GPU workloads before measuring. Start limits are GPU utilization at most 5%, VRAM at most 2048 MiB and temperature at most 65°C. The runner records three runs in a new timestamped `benchmark/results/` directory. It does not forcibly terminate other processes.
 
@@ -61,6 +84,13 @@ trials. Missing provenance, partial runs, edited files, unavailable power/clock
 limits, non-finite values or protocol mismatches are refused with exit code 2.
 Old results without the new context/completion records cannot be compared by
 this tool; do not manufacture those records to upgrade historical evidence.
+
+Context schema 2 records the exact four-mode list and protocol/environment
+confirmation from inspection and every trial. Existing schema-1 three-mode
+results with valid provenance remain readable and comparable to each other.
+Four-mode results can only be compared with matching four-mode results; mixing
+old/new protocols or different mode sets within a run is refused. Historical
+results do not acquire a TF32 measurement.
 
 The offline reader supports these same three GPU names and requires each model's
 own executable hash. It rejects comparisons between different models and does not

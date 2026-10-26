@@ -2,6 +2,9 @@
 param([switch]$PreflightOnly,[ValidateSet('3090','3090ti','3070ti')][string]$Card='3090')
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
+$benchmarkNames = @('fp32_pedantic','fp16_tensor_fp32_accumulate','bf16_tensor_fp32_accumulate','tf32_tensor_fp32_accumulate')
+# Reject overrides before executable/GPU queries; metadata inspection alone never runs GEMM.
+if (![string]::IsNullOrEmpty($env:NVIDIA_TF32_OVERRIDE)) { throw 'Unset NVIDIA_TF32_OVERRIDE before running the four-mode benchmark' }
 $exe = Join-Path $root "bin\compute-benchmark-$Card.exe"
 $gpuName = @{'3090'='NVIDIA GeForce RTX 3090';'3090ti'='NVIDIA GeForce RTX 3090 Ti';'3070ti'='NVIDIA GeForce RTX 3070 Ti'}[$Card]
 if (-not (Test-Path -LiteralPath $exe)) { throw 'Build the benchmark first' }
@@ -15,6 +18,8 @@ if ($selectedArtifacts -ne 1) { throw 'Build manifest must identify the selected
 $inspect = & $exe --inspect-only
 if ($LASTEXITCODE -ne 0) { throw 'Runtime metadata check failed' }
 Write-Output $inspect
+$runtime = $inspect | ConvertFrom-Json
+if (($runtime.benchmark_protocol -isnot [int] -and $runtime.benchmark_protocol -isnot [long]) -or $runtime.benchmark_protocol -ne 2 -or $runtime.tf32_allowed -isnot [bool] -or !$runtime.tf32_allowed) { throw 'Rebuild the benchmark: four-mode TF32 protocol is required' }
 if ($PreflightOnly) { Write-Output 'Preflight only: no GPU workload run'; exit 0 }
 function Assert-GpuIdle {
     $rows = @(& nvidia-smi --query-gpu=name,pci.bus_id,driver_version,utilization.gpu,memory.used,temperature.gpu --format=csv,noheader,nounits)
@@ -41,9 +46,10 @@ $initialState | Set-Content -LiteralPath (Join-Path $resultRoot 'gpu-before.csv'
 # Snapshot provenance with the results, so a later rebuild cannot replace it.
 # These values do not prove physical machine identity or unchanged overclock settings.
 [pscustomobject]@{
-    schema_version = 1
+    schema_version = 2
+    benchmark_names = $benchmarkNames
     artifacts = @($manifest)
-    runtime = ($inspect | ConvertFrom-Json)
+    runtime = $runtime
     gpu_settings = $settings
 } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $resultRoot 'comparison-context.json') -Encoding utf8
 $measurements = @()
@@ -52,7 +58,12 @@ for ($trial = 1; $trial -le 3; $trial++) {
     $json = & $exe 2> (Join-Path $resultRoot "trial-$trial.stderr.txt")
     if ($LASTEXITCODE -ne 0) { throw "Benchmark failed in trial $trial; keep partial evidence in $resultRoot" }
     $parsed = $json | ConvertFrom-Json
-    if ($parsed.gpu -ne $gpuName -or $parsed.cuda_runtime -ne 12060 -or $parsed.cublas -ne 120600 -or $parsed.benchmarks.Count -ne 3) { throw 'Unexpected benchmark metadata' }
+    if ($parsed.gpu -ne $gpuName -or $parsed.cuda_runtime -ne 12060 -or $parsed.cublas -ne 120600 -or $parsed.benchmarks.Count -ne 4 -or
+        ($parsed.benchmark_protocol -isnot [int] -and $parsed.benchmark_protocol -isnot [long]) -or $parsed.benchmark_protocol -ne 2 -or $parsed.tf32_allowed -isnot [bool] -or !$parsed.tf32_allowed) { throw 'Unexpected benchmark metadata' }
+    foreach ($name in $benchmarkNames) {
+        $matched = @($parsed.benchmarks | Where-Object name -CEQ $name)
+        if ($matched.Count -ne 1 -or $matched[0].reference_checked -isnot [bool] -or !$matched[0].reference_checked) { throw 'Missing, duplicate or unchecked benchmark mode' }
+    }
     $json | Set-Content -LiteralPath (Join-Path $resultRoot "trial-$trial.json") -Encoding utf8
     $measurements += $parsed
     & nvidia-smi --query-gpu=timestamp,driver_version,clocks.sm,power.draw,temperature.gpu,clocks_event_reasons.sw_thermal_slowdown --format=csv |
@@ -62,7 +73,7 @@ for ($trial = 1; $trial -le 3; $trial++) {
     if (($settings -join "`n") -cne ($currentSettings -join "`n")) { throw 'GPU comparison settings changed; preserve partial results' }
 }
 $summary = @()
-foreach ($name in @('fp32_pedantic','fp16_tensor_fp32_accumulate','bf16_tensor_fp32_accumulate')) {
+foreach ($name in $benchmarkNames) {
     $values = @($measurements | ForEach-Object { $_.benchmarks | Where-Object name -EQ $name | ForEach-Object { [double]$_.gflops / 1000 } } | Sort-Object)
     $summary += [pscustomobject]@{Name=$name;MedianTflops=$values[1];MinTflops=$values[0];MaxTflops=$values[2]}
 }

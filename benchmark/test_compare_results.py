@@ -8,7 +8,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from compare_results import NAMES, compare, main
+from compare_results import LEGACY_NAMES, NAMES, compare, load_run, main
 
 
 def write_json(path, value):
@@ -24,7 +24,11 @@ def seal(directory):
             for name in names]})
 
 
-def fixture(directory, ratios=(1, 1, 1), gpu='NVIDIA GeForce RTX 3090', card='3090'):
+def fixture(directory, ratios=None, gpu='NVIDIA GeForce RTX 3090', card='3090',
+            four_modes=False):
+    names = NAMES if four_modes else LEGACY_NAMES
+    ratios = (1,) * len(names) if ratios is None else ratios
+    assert len(ratios) == len(names), 'Fixture must provide every benchmark mode'
     directory.mkdir()
     context = {
         'schema_version': 1,
@@ -35,11 +39,18 @@ def fixture(directory, ratios=(1, 1, 1), gpu='NVIDIA GeForce RTX 3090', card='30
         'gpu_settings': [gpu, '00000000:01:00.0',
                          '617.14', '350.00', '2100', '9751']}
     write_json(directory / 'comparison-context.json', context)
+    if four_modes:
+        context['schema_version'] = 2
+        context['benchmark_names'] = list(NAMES)
+        context['runtime'].update(benchmark_protocol=2, tf32_allowed=True)
+        write_json(directory / 'comparison-context.json', context)
     for trial_index in range(1, 4):
         trial = {'gpu': gpu, 'pci': '0000:01:00.0',
                  'compute_capability': '8.6', 'cuda_runtime': 12060,
                  'cuda_driver_api': 13000, 'cublas': 120600, 'benchmarks': []}
-        for name, base, ratio in zip(NAMES, (20000, 60000, 62000), ratios):
+        if four_modes:
+            trial.update(benchmark_protocol=2, tf32_allowed=True)
+        for name, base, ratio in zip(names, (20000, 60000, 62000, 30000), ratios):
             gflops = base * ratio * (1 + (trial_index - 2) * 0.01)
             ms = 2 * 4096 ** 3 / (gflops * 1e6)
             trial['benchmarks'].append({
@@ -74,6 +85,98 @@ class ComparisonTests(unittest.TestCase):
         self.assertAlmostEqual(result['benchmarks'][1]['ratio'], 1.65)
         self.assertAlmostEqual(result['fp32_control_change_percent'], 1)
         self.assertEqual(len(result['benchmarks'][0]['before_trials_tflops']), 3)
+
+    def test_legacy_three_mode_reader_stays_supported(self):
+        _, _, values = load_run(self.before)
+        self.assertEqual(tuple(values), LEGACY_NAMES)
+        self.assertEqual(len(self.compare()['benchmarks']), 3)
+
+    def test_four_modes_for_every_supported_card(self):
+        for card, gpu in [('3090', 'NVIDIA GeForce RTX 3090'),
+                          ('3090ti', 'NVIDIA GeForce RTX 3090 Ti'),
+                          ('3070ti', 'NVIDIA GeForce RTX 3070 Ti')]:
+            with self.subTest(card=card):
+                before = Path(self.temp.name) / f'new-{card}-before'
+                after = Path(self.temp.name) / f'new-{card}-after'
+                fixture(before, gpu=gpu, card=card, four_modes=True)
+                fixture(after, (1, 1.8, 1.9, 2), gpu=gpu, card=card, four_modes=True)
+                result = compare(before, after, same_machine_confirmed=True)
+                self.assertEqual(tuple(b['name'] for b in result['benchmarks']), NAMES)
+                self.assertAlmostEqual(result['benchmarks'][3]['ratio'], 2)
+                self.assertEqual(result['fp32_control_change_percent'], 0)
+
+    def test_legacy_and_four_mode_pair_refused(self):
+        after = Path(self.temp.name) / 'four'
+        fixture(after, four_modes=True)
+        with self.assertRaisesRegex(ValueError, 'protocol'):
+            compare(self.before, after, same_machine_confirmed=True)
+
+    def test_four_mode_missing_duplicate_and_mixed_trials_refused(self):
+        after = Path(self.temp.name) / 'four'
+        fixture(after, four_modes=True)
+        path = after / 'trial-2.json'
+        original = path.read_bytes()
+        for case in ('missing', 'duplicate', 'unknown', 'legacy-trial'):
+            with self.subTest(case=case):
+                trial = json.loads(original.decode('utf-8-sig'))
+                if case == 'missing':
+                    trial['benchmarks'].pop()
+                elif case == 'duplicate':
+                    trial['benchmarks'][-1] = trial['benchmarks'][0]
+                elif case == 'unknown':
+                    trial['benchmarks'][-1]['name'] = 'tf32'
+                else:
+                    trial.pop('benchmark_protocol')
+                    trial.pop('tf32_allowed')
+                    trial['benchmarks'].pop()
+                write_json(path, trial)
+                seal(after)
+                with self.assertRaises(ValueError):
+                    load_run(after)
+        path.write_bytes(original)
+        seal(after)
+        load_run(after)
+
+    def test_four_mode_strict_protocol_and_environment_flags(self):
+        after = Path(self.temp.name) / 'four'
+        fixture(after, four_modes=True)
+        for filename in ('comparison-context.json', 'trial-1.json'):
+            path = after / filename
+            original = path.read_bytes()
+            for key, values in [('benchmark_protocol', [None, True, '2', 1]),
+                                ('tf32_allowed', [None, False, 'true', 1])]:
+                for value in values:
+                    with self.subTest(file=filename, key=key, value=value):
+                        record = json.loads(original.decode('utf-8-sig'))
+                        target = record['runtime'] if filename.startswith('comparison') else record
+                        if value is None:
+                            target.pop(key)
+                        else:
+                            target[key] = value
+                        write_json(path, record)
+                        seal(after)
+                        with self.assertRaises(ValueError):
+                            load_run(after)
+            path.write_bytes(original)
+            seal(after)
+        load_run(after)
+
+    def test_four_mode_context_names_required(self):
+        after = Path(self.temp.name) / 'four'
+        fixture(after, four_modes=True)
+        path = after / 'comparison-context.json'
+        context = json.loads(path.read_text(encoding='utf-8-sig'))
+        context['benchmark_names'] = list(LEGACY_NAMES)
+        write_json(path, context)
+        seal(after)
+        with self.assertRaisesRegex(ValueError, 'four-mode'):
+            load_run(after)
+
+    def test_new_runtime_cannot_masquerade_as_legacy(self):
+        self.mutate('comparison-context.json',
+                    lambda c: c['runtime'].update(benchmark_protocol=2, tf32_allowed=True))
+        with self.assertRaisesRegex(ValueError, 'legacy'):
+            self.compare()
 
     def test_each_supported_card_uses_its_own_executable(self):
         for card, gpu in [('3090', 'NVIDIA GeForce RTX 3090'),

@@ -1,5 +1,17 @@
 # Changes
 
+## Unreleased — include TF32 in future benchmark runs
+
+- Add explicit TF32 Tensor GEMM with FP32 input/output buffers and FP32 accumulation
+  to the 3090 / 3090 Ti / 3070 Ti measurement sources, after the existing three modes.
+  Preserve 4096 matrices, two-second warmups and 30 samples per mode.
+- Require protocol-2 metadata and four distinct result modes in the runner. Refuse
+  nonempty NVIDIA_TF32_OVERRIDE rather than silently measuring overridden FP32 work.
+- Preserve reading/comparing completed legacy three-mode results; compare only matching
+  three-mode pairs or matching four-mode pairs, with existing provenance checks intact.
+- Update English/Korean benchmark guidance. This change prepares future measurements;
+  no new GEMM run or TF32 throughput result is claimed.
+
 ## Unreleased — integrate the fourth exact-machine profile
 
 - Preserve the local-profile evidence gates while adding the reviewed B660-PLUS /

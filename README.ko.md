@@ -117,6 +117,9 @@ Windows 우선순위 복구는 실험 EFI·빌드 산출물·저장된 상태 �
 | FP16 Tensor / FP32 누산 | 124.97 TFLOPS |
 | BF16 Tensor / FP32 누산 | 128.93 TFLOPS |
 
+앞으로 [벤치마크 도구](docs/BENCHMARK.ko.md)를 실행하면 TF32도 별도로 측정합니다.
+위 표는 TF32 추가 전의 과거 측정값이며, TF32 결과를 소급해 추가하지 않았습니다.
+
 이번 headless 부팅에는 **동시대의 통제된 잠금 상태 기준 측정이 없습니다.** 언락 증가율을
 계산하지 않습니다. 게임·ComfyUI 향상, 장기 안정성, 절전·최대 절전 복귀, 반복 자동 콜드
 부팅의 신뢰성을 입증하지도 않습니다. [공개 측정 요약](evidence/headless-handoff/summary.json)과

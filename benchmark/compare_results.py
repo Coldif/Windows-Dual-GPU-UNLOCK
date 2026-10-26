@@ -10,8 +10,9 @@ import statistics
 import sys
 
 
-NAMES = ('fp32_pedantic', 'fp16_tensor_fp32_accumulate',
-         'bf16_tensor_fp32_accumulate')
+LEGACY_NAMES = ('fp32_pedantic', 'fp16_tensor_fp32_accumulate',
+                'bf16_tensor_fp32_accumulate')
+NAMES = LEGACY_NAMES + ('tf32_tensor_fp32_accumulate',)
 IDENTITY = ('gpu', 'pci', 'compute_capability', 'cuda_runtime',
             'cuda_driver_api', 'cublas')
 CARDS = {'NVIDIA GeForce RTX 3090': '3090',
@@ -48,7 +49,7 @@ def pci_key(value):
 
 def context_key(context):
     require(isinstance(context, dict) and type(context.get('schema_version')) is int
-            and context['schema_version'] == 1,
+            and context['schema_version'] in (1, 2),
             'Missing or unsupported comparison context')
     artifacts = context.get('artifacts')
     require(isinstance(artifacts, list) and artifacts, 'Missing build artifacts')
@@ -86,7 +87,20 @@ def context_key(context):
     for key in ('cuda_runtime', 'cublas_major', 'cublas_minor', 'cublas_patch'):
         require(type(runtime.get(key)) is int and runtime[key] >= 0,
                 f'Invalid runtime field: {key}')
-    return {'artifacts': normalized, 'gpu_settings': settings, 'runtime': runtime}
+    names = LEGACY_NAMES
+    if context['schema_version'] == 2:
+        require(context.get('benchmark_names') == list(NAMES),
+                'Incomplete four-mode protocol')
+        require(type(runtime.get('benchmark_protocol')) is int
+                and runtime['benchmark_protocol'] == 2
+                and runtime.get('tf32_allowed') is True,
+                'Missing TF32 runtime protocol/environment confirmation')
+        names = NAMES
+    else:
+        require('benchmark_protocol' not in runtime and 'tf32_allowed' not in runtime,
+                'New runtime cannot use legacy context')
+    return {'artifacts': normalized, 'gpu_settings': settings, 'runtime': runtime,
+            'benchmark_names': names}
 
 
 def load_run(directory):
@@ -113,12 +127,21 @@ def load_run(directory):
     require({p.name for p in paths} == {'trial-1.json', 'trial-2.json', 'trial-3.json'},
             'Expected exactly trial-1.json, trial-2.json and trial-3.json')
     identity = None
-    values = {name: [] for name in NAMES}
+    names = context['benchmark_names']
+    values = {name: [] for name in names}
     for path in paths:
         trial = read_json(path)
         require(isinstance(trial, dict), f'{path.name}: invalid trial')
         require(all(key in trial for key in IDENTITY), 'Incomplete trial metadata')
         current = {key: trial[key] for key in IDENTITY}
+        if names == NAMES:
+            require(type(trial.get('benchmark_protocol')) is int
+                    and trial['benchmark_protocol'] == 2
+                    and trial.get('tf32_allowed') is True,
+                    'Missing TF32 trial protocol/environment confirmation')
+        else:
+            require('benchmark_protocol' not in trial and 'tf32_allowed' not in trial,
+                    'New trial cannot use legacy context')
         require(all(isinstance(current[key], str) and current[key]
                     for key in IDENTITY[:3]), 'Invalid GPU identity')
         require(all(type(current[key]) is int and current[key] > 0
@@ -134,13 +157,13 @@ def load_run(directory):
                 + runtime['cublas_minor'] * 100 + runtime['cublas_patch'],
                 'Trial libraries differ from runtime inspection')
         benchmarks = trial.get('benchmarks')
-        require(isinstance(benchmarks, list) and len(benchmarks) == len(NAMES),
+        require(isinstance(benchmarks, list) and len(benchmarks) == len(names),
                 'Incomplete benchmark set')
         seen = set()
         for benchmark in benchmarks:
             require(isinstance(benchmark, dict), 'Invalid benchmark record')
             name = benchmark.get('name')
-            require(isinstance(name, str) and name in NAMES and name not in seen,
+            require(isinstance(name, str) and name in names and name not in seen,
                     'Unknown or duplicate benchmark')
             seen.add(name)
             for key, expected in (('n', 4096), ('samples', 30), ('warmup_seconds', 2)):
@@ -166,10 +189,10 @@ def compare(before, after, *, same_machine_confirmed=False):
     require(before.resolve() != after.resolve(), 'Choose two distinct result directories')
     left, left_id, left_values = load_run(before)
     right, right_id, right_values = load_run(after)
-    require(left == right, 'Build, runtime, driver or GPU settings differ')
+    require(left == right, 'Build, benchmark protocol, runtime, driver or GPU settings differ')
     require(left_id == right_id, 'GPU or library metadata differ')
     rows = []
-    for name in NAMES:
+    for name in left['benchmark_names']:
         baseline = statistics.median(left_values[name])
         candidate = statistics.median(right_values[name])
         rows.append({'name': name, 'before_median_tflops': baseline,

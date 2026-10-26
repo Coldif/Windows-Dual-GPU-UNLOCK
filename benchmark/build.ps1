@@ -28,6 +28,7 @@ $inspect = & (Join-Path $bin "compute-benchmark-$Card.exe") --inspect-only
 if ($LASTEXITCODE -ne 0) { throw 'Metadata-only binary check failed' }
 $versions = $inspect | ConvertFrom-Json
 if ($versions.cuda_runtime -ne 12060 -or $versions.cublas_major -ne 12 -or $versions.cublas_minor -ne 6 -or $versions.cublas_patch -ne 0) { throw 'Unexpected CUDA/cuBLAS version' }
+if (($versions.benchmark_protocol -isnot [int] -and $versions.benchmark_protocol -isnot [long]) -or $versions.benchmark_protocol -ne 2 -or $versions.tf32_allowed -isnot [bool]) { throw 'Unexpected four-mode TF32 metadata protocol' }
 $inspect | Set-Content -LiteralPath (Join-Path $root 'runtime-verification.json') -Encoding utf8
 $selectedArtifactNames = @("compute-benchmark-$Card.exe","compute-benchmark-$Card.exp","compute-benchmark-$Card.lib")
 $artifactPaths = @((Join-Path $root "compute-benchmark-$Card.cu"),(Join-Path $root 'upstream-compute-benchmark.cu')) + @(Get-ChildItem -LiteralPath $bin -File | Where-Object { $_.Name -in $selectedArtifactNames -or $_.Extension -ieq '.dll' } | Select-Object -ExpandProperty FullName)
