@@ -141,9 +141,9 @@ static VOID Details(CAPTURE *c,EFI_HANDLE h,EFI_GUID *g) {
       Field(c," height=0x",gp->Mode->Info->VerticalResolution);
       Field(c," stride=0x",gp->Mode->Info->PixelsPerScanLine);End(c);
     } else {
-#if GU_CONSOLE_AGGREGATE
+#if GU_CONSOLE_AGGREGATE || defined(GU_PROBE_GENERIC)
       /* Aggregate/pathless GOPs legitimately lack Mode->Info on this firmware;
-         record it as an observation, not a capture failure. */
+         record it as an observation, not a capture failure (generic probe: topology unknown). */
       Field(c,"gop info-bytes=0x",gp->Mode->SizeOfInfo);End(c);
 #else
       Problem(c,"gop-info",EFI_NOT_READY);
@@ -163,11 +163,11 @@ static VOID Details(CAPTURE *c,EFI_HANDLE h,EFI_GUID *g) {
     } else Problem(c,"pci-read",s);
   }
 }
-EFI_STATUS GuCaptureGraph(EFI_SYSTEM_TABLE *t,EFI_FILE_PROTOCOL *file) {
+EFI_STATUS GuCaptureGraphOnVolume(EFI_SYSTEM_TABLE *t,EFI_FILE_PROTOCOL *file,EFI_FILE_PROTOCOL *root) {
   if(!t || !t->BootServices || !t->RuntimeServices || !file || !file->Write || !file->Flush)return EFI_INVALID_PARAMETER;
   /* Single-threaded EFI application; keep the file buffer off the EFI stack. */
   static CAPTURE c;
-  c.Table=t;c.File=file;c.Complete=TRUE;c.Io=EFI_SUCCESS;c.Used=0;c.Total=0;
+  c.Table=t;c.File=file;c.DumpRoot=root;c.Complete=TRUE;c.Io=EFI_SUCCESS;c.Used=0;c.Total=0;
   Text(&c,"gpu-console-graph-v1 observational-only; no-detach no-unlock no-nvram-write\r\n");
   Field(&c,"console out=0x",(UINTN)t->ConsoleOutHandle);Field(&c," error=0x",(UINTN)t->StandardErrorHandle);
   Field(&c," input=0x",(UINTN)t->ConsoleInHandle);End(&c);
@@ -229,4 +229,7 @@ EFI_STATUS GuCaptureGraph(EFI_SYSTEM_TABLE *t,EFI_FILE_PROTOCOL *file) {
   s=Flush(&c);if(s!=EFI_SUCCESS)return s;
   s=file->Flush(file);if(s!=EFI_SUCCESS)return s;
   return c.Complete?EFI_SUCCESS:EFI_NOT_READY;
+}
+EFI_STATUS GuCaptureGraph(EFI_SYSTEM_TABLE *t,EFI_FILE_PROTOCOL *file) {
+  return GuCaptureGraphOnVolume(t,file,NULL);
 }

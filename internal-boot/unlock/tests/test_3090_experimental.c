@@ -16,6 +16,10 @@ VOID GuLogText(const char *);
 #define GU_TEST_COLD_LINE "cold state: chip=0xb76000a1 plm=0xffffff8f gfw=0x8b8f/0x3ff/0x10 WPR2_HI=0 SS0=0x6204001 SS1=0x6" /* probe run 1 */
 #elif defined(GU_PROFILE_X870_3090TI)
 #define GU_TEST_COLD_LINE "cold state: chip=0xb72000a1 plm=0xffffff8f gfw=0x8b8f/0x3ff/0x10 WPR2_HI=0 SS0=0x40123070 SS1=0x7"
+#elif defined(GU_PROFILE_B660PLUS_3060)
+#define GU_TEST_COLD_LINE "cold state: chip=0xb74000a1 plm=0xffffff8f gfw=0x8b8f/0x3ff/0x10 WPR2_HI=0 SS0=0x60110006 SS1=0x7"
+#elif defined(GU_PROFILE_LOCAL)
+#define GU_TEST_COLD_LINE GU_LOCAL_TEST_COLD_LINE /* make-profile.py, from this machine's capture */
 #else
 #error Add this profile's captured cold-state line (app.c ColdCheck format)
 #endif
@@ -43,7 +47,7 @@ static void exact_setup(enum app_case mode) {
   bs.HandleProtocol=preflight_handle;bs.LocateDevicePath=resolve;bs.LocateHandleBuffer=preflight_locate;pci.GetBarAttributes=preflight_bar;
   infos[0].HorizontalResolution=infos[0].PixelsPerScanLine=2560;infos[0].VerticalResolution=1440;
   modes[0].Mode=0;modes[0].MaxMode=13;modes[0].FrameBufferBase=0xfce0000000ULL;modes[0].FrameBufferSize=0xe10000;
-  registers[0]=0xb72000a1;registers[SS0/4]=GU_STOCK_PROFILE_SS0;registers[SS1/4]=6;
+  registers[0]=GU_CHIP_ID;registers[SS0/4]=GU_STOCK_PROFILE_SS0;registers[SS1/4]=6;
   registers[0x1183a4/4]=GU_DEVICE_MEMORY_SIZE;
 }
 static EFI_STATUS EFIAPI changed_cold_disconnect(EFI_HANDLE h,EFI_HANDLE a,EFI_HANDLE c) {

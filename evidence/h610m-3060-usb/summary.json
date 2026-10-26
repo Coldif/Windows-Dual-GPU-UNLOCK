@@ -1,5 +1,8 @@
 {
   "profile": "h610m-3060",
+  "source_revision": "4b748f5e88344f1a1a1fa8d7b5788e528cb19dba",
+  "evidence_source": "contributor-reported; original build only",
+  "integrated_build_hardware_tested": false,
   "hardware": {
     "board": "Gigabyte H610M H",
     "bios": "FC",
@@ -17,7 +20,7 @@
   "efi": {
     "child_sha256": "82998f4875d8fb44f1841ef60f78b5df12998ddb9773425d5a3351dba776cd0b",
     "wrapper_sha256": "74c4d19a590cb0b2823c2849f29b3d02c5b06a6ec6aa327eca4e66bec5c919eb",
-    "reproducible": "research/headless/build-usb.ps1 -HardwareProfile h610m-3060 rebuilt both files byte-identically on the test machine; the wrapper embeds the builder's Windows ESP GUID, so its hash differs elsewhere"
+    "reproducible": "Contributor reports original revision 4b748f5 rebuilt both files byte-identically on the test machine with build-usb.ps1 -HardwareProfile h610m-3060; this is not a current-main hash claim. The wrapper embeds the builder's Windows ESP GUID."
   },
   "probe": {
     "captures": 4,

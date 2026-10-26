@@ -257,9 +257,11 @@ static const UINT8 Intel[] = {
   2,3,8,0, 0x11,0x43,1,0x80,
   0x7f,0xff,4,0
 };
+/* Root port 1 with the function this profile does not use: Pci(1,0) for root port 1.1
+   profiles (unchanged), Pci(1,1) for root port 1.0 profiles, whose real route is Pci(1,0). */
 static const UINT8 Rtx[] = {
   2,1,12,0, 0xd0,0x41,3,0x0a, 0,0,0,0,
-  1,1,6,0, 0,1,
+  1,1,6,0, GU_ROOT_PORT_FUNCTION ? 0 : 1,1,
   1,1,6,0, 0,0,
   0x7f,0xff,4,0
 };

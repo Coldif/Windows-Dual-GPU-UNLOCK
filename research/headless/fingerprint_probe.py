@@ -11,11 +11,17 @@ profile: identical results from several cold boots are still required.
 """
 import argparse
 import hashlib
+import importlib.util
 import json
 import re
 import struct
 import sys
 from pathlib import Path
+
+_spec = importlib.util.spec_from_file_location(
+    'gu_profile_pe', Path(__file__).resolve().parents[1] / 'profile' / 'make-profile.py')
+_profile = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_profile)
 
 # EFI file GUIDs the console release code matches (prepare-console.c / full-release.c).
 KNOWN_FILES = {
@@ -50,30 +56,18 @@ def describe_file(nodes):
 
 
 def text_section(dump: bytes):
-    """Return (rva, virtual_size) of .text from an in-memory PE image."""
-    if dump[:2] != b"MZ":
-        return None
-    pe = struct.unpack_from("<I", dump, 0x3C)[0]
-    if dump[pe:pe + 4] == b"PE\0\0":
-        count = struct.unpack_from("<H", dump, pe + 6)[0]
-        opt = struct.unpack_from("<H", dump, pe + 20)[0]
-        sections = pe + 24 + opt
-    elif dump[pe:pe + 2] == b"VZ":  # TE image (PI spec)
-        count = dump[pe + 5]
-        sections = pe + 40
-    else:
-        return None
-    for i in range(count):
-        s = sections + 40 * i
-        if dump[s:s + 8].rstrip(b"\0") == b".text":
-            vsize, rva = struct.unpack_from("<II", dump, s + 8)
-            return rva, vsize
-    return None
+    """Use the same bounded AMD64 loaded-PE policy as local-profile generation."""
+    sections, _, _ = _profile.pe_sections(dump)
+    text = [s for s in sections if s[0] == ".text"]
+    if len(text) != 1 or not text[0][2] or not text[0][3] & 0x20000000:
+        raise ValueError("missing, ambiguous or non-executable .text")
+    return text[0][1], text[0][2]
 
 
 def parse(capture: Path):
     lines = capture.read_text(encoding="ascii", errors="replace").splitlines()
     out = {"capture": capture.name, "sha256": hashlib.sha256(capture.read_bytes()).hexdigest()}
+    out['capture_complete'] = lines.count('capture-complete=1') == 1 and 'capture-complete=0' not in lines
     simple = {
         "subsystem": r"^subsystem=0x([0-9a-f]+)",
         "bar0": r"^probe-bar0 base=0x([0-9a-f]+)",
@@ -101,14 +95,18 @@ def parse(capture: Path):
         m = re.match(r"^mmio off=0x([0-9a-f]+) status=0x([0-9a-f]+) value=0x([0-9a-f]+)", line)
         if m and int(m.group(2), 16) == 0:
             mmio[int(m.group(1), 16)] = int(m.group(3), 16)
-    out["chip"] = f"{mmio.get(0, 0):08x}"
-    out["memory_mib"] = f"{mmio.get(0x1183a4, 0):x}"
+    def observed(offset, fmt='x'):
+        return format(mmio[offset], fmt) if offset in mmio else None
+    out["chip"] = observed(0, '08x')
+    out["memory_mib"] = observed(0x1183a4)
+    out["missing_mmio"] = [f'{offset:#x}' for offset in _profile.COLD if offset not in mmio]
+    gfw = [observed(offset) for offset in (0x118128, 0x118234, 0x110100)]
     out["cold"] = {
-        "plm": f"{mmio.get(0x823804, 0):08x}",
-        "gfw": f"{mmio.get(0x118128, 0):x}/{mmio.get(0x118234, 0):x}/{mmio.get(0x110100, 0):x}",
-        "wpr2_hi": f"{mmio.get(0x1fa828, 0):x}",
-        "ss0": f"{mmio.get(0x82381c, 0):08x}",
-        "ss1": f"{mmio.get(0x823820, 0):x}",
+        "plm": observed(0x823804, '08x'),
+        "gfw": '/'.join(gfw) if all(v is not None for v in gfw) else None,
+        "wpr2_hi": observed(0x1fa828),
+        "ss0": observed(0x82381c, '08x'),
+        "ss1": observed(0x823820),
     }
     # The probe's GOP list: path nodes follow each "gop handle" line.
     gop_paths = []
@@ -162,21 +160,27 @@ def fingerprint(info, root: Path):
         }
         kind = "nvgop" if role.startswith("nvgop") else "edid" if role.startswith("edid") else None
         if kind and "dump" in d:
-            path = root / ("IMG%02d.BIN" % (d["dump"] % 100))
-            if d["dump"] >= 100:
-                row["text_note"] = "dump index >= 100 wraps in probe.c; IMG file unreliable"
-            elif path.exists():
-                dump = path.read_bytes()
-                sec = text_section(dump)
-                if dump and len(dump) == d.get("size"):
-                    row["text_section"] = None if not sec else {"rva": f"{sec[0]:x}", "bytes": f"{sec[1]:x}"}
-                    rva = TEXT_RVA[kind]
-                    if sec and sec[0] == rva:
-                        row["text_sha256"] = hashlib.sha256(dump[rva:rva + sec[1]]).hexdigest()
-                    else:
-                        row["text_note"] = f".text not at the RVA full-release.c hashes (0x{rva:x})"
-                else:
+            if not 0 <= d["dump"] < 100:
+                row["text_note"] = "invalid dump index"
+            else:
+                path = root / ("IMG%02d.BIN" % d["dump"])
+                if not path.exists():
+                    row["text_note"] = "image dump missing"
+                elif path.stat().st_size != d.get("size"):
                     row["text_note"] = "dump size differs from loaded image size"
+                else:
+                    try:
+                        sec = text_section(path.read_bytes())
+                        rva = TEXT_RVA[kind]
+                        if sec[0] != rva:
+                            raise ValueError(f".text not at expected RVA {rva:#x}")
+                        rec = dict(d, handle=int(d["handle"], 16))
+                        code = _profile.code_hash(root, rec, rva)
+                        row["text_section"] = {"rva": f"{sec[0]:x}", "bytes": f"{sec[1]:x}"}
+                        row["text_sha256"] = code["sha256"]
+                    except (ValueError, KeyError, TypeError, struct.error) as error:
+                        row["text_note"] = "image refused: " + str(error)
+
         if role or kind:
             rows.append(row)
     return rows

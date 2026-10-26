@@ -9,19 +9,24 @@ param(
  [switch]$HeadlessResearch,
  [switch]$UsbMedia,
  [ValidateSet('original03100062','observed03000062','entryLatchedSs1Preserve','entryLatchedSs1Full')][string]$StockProfile,
- [ValidateSet('b650m-3090fe','b660m-3070ti','x870-3090ti','h610m-3060')][string]$HardwareProfile='b650m-3090fe'
+ [ValidateSet('b650m-3090fe','b660m-3070ti','x870-3090ti','b660plus-3060','h610m-3060','local')][string]$HardwareProfile='b650m-3090fe'
 )
 # Reviewed single-machine profiles; mirrors internal-boot/unlock/machine-profile.h.
 # A profile is fixed provenance: it selects constants compiled into the EFI,
-# never a user-editable switch.
+# never a user-editable switch. 'local' is this machine's generated profile-local.h,
+# write-eligible only with matching passing evidence (local-profile.ps1).
 $hwTable=@{
  'b650m-3090fe'=[ordered]@{Define='-DGU_PROFILE_B650M_3090FE';Name='ASUS-TUF-B650M-PLUS-WIFI-3057-RTX3090-FE';TargetPci='220410de';Subsystem='145410de';Chip='0xb72000a1';Prom='8ea297373e9e5d3600ff41ad9fae88f2d14c98c017d100669f7333981da673b4';Memory='0x6000';HeadlessOnly=$false}
  'b660m-3070ti'=[ordered]@{Define='-DGU_PROFILE_B660M_3070TI';Name='ASUS-TUF-GAMING-B660M-E-D4-4003-RTX3070TI';TargetPci='248210de';Subsystem='50521462';Chip='0xb74000a1';Prom='f429aa1d5f0f18d11ed9a19503683a674fe3541ae77e959df8e732652c2b4df0';Memory='0x2000';HeadlessOnly=$true}
- 'h610m-3060'=[ordered]@{Define='-DGU_PROFILE_H610M_3060';Name='GIGABYTE-H610M-H-FC-RTX3060-12GB';TargetPci='250410de';Subsystem='40961458';Chip='0xb76000a1';Prom='727dd8332f028783d3de2f81a707e4d9448c3238db6180271f3a8e9c03a808c9';Memory='0x3000';HeadlessOnly=$true}
+ 'h610m-3060'=[ordered]@{Define='-DGU_PROFILE_H610M_3060';Name='GIGABYTE-H610M-H-FC-RTX3060-12GB';TargetPci='250410de';Subsystem='40961458';Chip='0xb76000a1';Prom='727dd8332f028783d3de2f81a707e4d9448c3238db6180271f3a8e9c03a808c9';Memory='0x3000';HeadlessOnly=$true;UsbOnly=$true}
  'x870-3090ti'=[ordered]@{Define='-DGU_PROFILE_X870_3090TI';Name='GIGABYTE-X870-AORUS-ELITE-WIFI7-F13d-RTX3090TI';TargetPci='220310de';Subsystem='88701043';Chip='0xb72000a1';Prom='943565975885ee71a7e861265984c785f564f35272c32395ee7410b353d9bbc4';Memory='0x5ff4';HeadlessOnly=$true}
+ 'b660plus-3060'=[ordered]@{Define='-DGU_PROFILE_B660PLUS_3060';Name='ASUS-PRIME-B660-PLUS-D4-3010-RTX3060';TargetPci='248710de';Subsystem='153010de';Chip='0xb74000a1';Prom='7cc9018e80c63e4aec79c71cd4ed6bdeb5e147aeeb22b21b96efe90887ba8806';Memory='0x3000';HeadlessOnly=$true;UsbOnly=$true}
 }
-$hw=$hwTable[$HardwareProfile]
 $ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'local-profile.ps1')
+$repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
+$hw=if($HardwareProfile -eq 'local'){Get-LocalProfile $repo}else{$hwTable[$HardwareProfile]}
+$evidence=$null
 Push-Location -LiteralPath $PSScriptRoot
 try {
  if(!(Test-Path -LiteralPath $PSScriptRoot)){throw 'Missing output parent'}
@@ -32,6 +37,8 @@ try {
  $defines=@()
  if($HeadlessResearch -and (!$AutomaticBoot -or !$InternalBoot -or !$ExperimentalUnlock -or $StockProfile -ne 'entryLatchedSs1Full')){throw 'Headless research requires automatic internal exact full profile'}
  if($hw.HeadlessOnly -and $ExperimentalUnlock -and !$HeadlessResearch){throw ('Profile '+$HardwareProfile+' only ships a headless write path; non-headless builds are diagnostic-only')}
+ if($hw.UsbOnly -and $ExperimentalUnlock -and !$UsbMedia){throw ('Profile '+$HardwareProfile+' only ships the headless USB write path')}
+ if($HardwareProfile -eq 'local' -and $ExperimentalUnlock){$evidence=Assert-LocalProfileEvidence $repo}
  if($AutomaticBoot -and (!$InternalBoot -or !$ExperimentalUnlock -or $StockProfile -ne 'entryLatchedSs1Full')){throw 'Automatic boot requires internal full experimental profile'}
  if($InternalBoot) {
   if(!$ExperimentalUnlock -or $StockProfile -ne 'entryLatchedSs1Full'){throw 'Internal boot requires the validated full experimental profile'}
@@ -55,7 +62,7 @@ try {
  if($LASTEXITCODE -ne 0){throw 'EFI link failed'}
  & $Python verify_pe.py "$out/$name.EFI" "$out/$name.map" --output "$out/pe-verification.json"
  if($LASTEXITCODE -ne 0){throw 'PE verification failed'}
- [ordered]@{BuiltUtc=[DateTime]::UtcNow.ToString('o');HardwareProfile=$hw.Name;TargetPci=$hw.TargetPci;Subsystem=$hw.Subsystem;
+ $manifest=[ordered]@{BuiltUtc=[DateTime]::UtcNow.ToString('o');HardwareProfile=$hw.Name;TargetPci=$hw.TargetPci;Subsystem=$hw.Subsystem;
   Mode=$(if($HeadlessResearch){'headless-research-automatic-internal-exact-card-unlock'}elseif($AutomaticBoot){'automatic-internal-exact-card-unlock'}elseif($ExperimentalUnlock){'experimental-exact-card-manual-unlock'}else{'diagnostic-preflight-only'});
   CanArm=[bool]$ExperimentalUnlock;Defines=$defines;ManualConfirmation=$(if($AutomaticBoot){'none; Esc within 3 seconds cancels'}else{'U once; Esc or 30-second timeout cancels'});
   StockProfile=$(if($ExperimentalUnlock){$StockProfile}else{$null});ColdChipExpected=$hw.Chip;ColdSS0Expected=$(if($StockProfile -like 'entryLatchedSs1*'){'first fully validated cold entry; immutable'}elseif($ExperimentalUnlock){if($StockProfile -eq 'original03100062'){'0x03100062'}else{'0x03000062'}}else{'unknown'});ColdSS1Expected=$(if($StockProfile -like 'entryLatchedSs1*'){'first fully validated cold entry <= 0xf; immutable'}else{'0x6'});
@@ -67,6 +74,14 @@ try {
   EfiSha256=(Get-FileHash -LiteralPath "$out/$name.EFI" -Algorithm SHA256).Hash;
   Headers=@(Get-ChildItem -LiteralPath . -Recurse -File -Filter '*.h' | Where-Object {$_.FullName.Substring($PSScriptRoot.Length+1) -notmatch '(^|[\\/])build([\\/]|$)'} | Sort-Object FullName | ForEach-Object {[ordered]@{Path=$_.FullName.Substring($PSScriptRoot.Length+1);Sha256=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash}});
   Sources=@($sources | ForEach-Object {[ordered]@{Path="$_.c";Sha256=(Get-FileHash -LiteralPath "$_.c" -Algorithm SHA256).Hash}})
-  } | ConvertTo-Json -Depth 5 | Set-Content -Encoding UTF8 -LiteralPath "$out/build-manifest.json"
+  }
+ if($HardwareProfile -eq 'local'){
+  if($evidence){
+   $afterEvidence=Assert-LocalProfileEvidence $repo
+   if($afterEvidence.TreeSha256 -cne $evidence.TreeSha256 -or (Get-LocalProfile $repo).HeaderSha256 -cne $hw.HeaderSha256){throw 'Local inputs changed while building; rerun tests and rebuild'}
+  }
+  $manifest.LocalProfile=[ordered]@{HeaderSha256=$hw.HeaderSha256;Evidence=$(if($evidence){[ordered]@{TreeSha256=$evidence.TreeSha256;TestedUtc=$evidence.TestedUtc}}else{'none: diagnostic build'})}
+ }
+ $manifest | ConvertTo-Json -Depth 5 | Set-Content -Encoding UTF8 -LiteralPath "$out/build-manifest.json"
  "Built $name.EFI; ExperimentalUnlock=$([bool]$ExperimentalUnlock); hardware untested."
 } finally {Pop-Location}

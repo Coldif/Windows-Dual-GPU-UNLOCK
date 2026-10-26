@@ -3,22 +3,23 @@
 [English](README.md) | **한국어**
 
 커뮤니티 기여로 확장하는 실험용 UEFI GPU 언락과 Windows 직접 인계 구현입니다.
-현재 소스에는 **실기기 결과가 기록된 정확한 장비 프로필 네 개**가 있습니다.
-내부 headless 두 구성과 headless USB 두 구성입니다. GPU 모델명만으로 지원을
-판단하지 말고 빌드 전에 [호환성](docs/COMPATIBILITY.ko.md)을 확인하세요.
 
-| 빌드 프로필 | 정확한 GPU / 메인보드 / BIOS / CPU | 기록된 경로와 근거 |
+## GPU별 지원 현황
+
+**성공 보고는 특정 카드와 장비 구성에 해당하며, 같은 GPU 모델 전체의 지원을 뜻하지 않습니다.**
+빌드 전에 상세 조건에서 메인보드·BIOS·카드 변형을 확인하세요.
+
+| GPU | 현재 상태 | 상세 조건 |
 |---|---|---|
-| `b650m-3090fe` (기본값) | RTX 3090 FE / ASUS TUF GAMING B650M-PLUS WIFI / 3057 / Ryzen 7 7800X3D | 내부 headless; [최초 유지관리자의 실기기 근거](evidence/headless-handoff/README.md) |
-| `b660m-3070ti` | MSI RTX 3070 Ti / ASUS TUF GAMING B660M-E D4 / 4003 / **iGPU 없는** Core i7-12700F | 내부 headless, aggregate console; [기여자의 보고·구현 PR #5](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/5) |
-| `x870-3090ti` | ASUS RTX 3090 Ti / Gigabyte X870 AORUS ELITE WIFI7 / F13d / Ryzen 7 9800X3D | **Headless USB 전용**; [기여자 PR #10](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/10), [공개 근거](evidence/x870-3090ti-usb/README.md) |
-| `h610m-3060` | Gigabyte RTX 3060 12GB(GA106) / Gigabyte H610M H / FC / Core i5-14400(iGPU 켜짐, GOP 없음) | **Headless USB 전용**; 기여자 보고, [공개 근거](evidence/h610m-3060-usb/README.md) |
+| **RTX 3060 12GB (GA104 / GA106)** | 실기기 성공 보고 · headless USB 전용 | [GA104](docs/COMPATIBILITY.ko.md#프로필-4-asus-prime-b660-plus-d4--rtx-3060-12gbheadless-usb) · [GA106](docs/COMPATIBILITY.ko.md#프로필-5-gigabyte-h610m-h--rtx-3060-12gb-ga106headless-usb) |
+| **RTX 3070 Ti 8GB** | 실기기 성공 보고 · 내부 headless | [지원 구성](docs/COMPATIBILITY.ko.md#프로필-2-asus-tuf-b660m-e-d4--rtx-3070-tiaggregate-console) |
+| **RTX 3080** | 이 포트의 전용 프로필 없음 · 상위 프로젝트 대상 | [프로젝트 출처](THIRD_PARTY_NOTICES.md) |
+| **RTX 3090 FE 24GB** | 실기기 성공 기록 · 내부 headless · 기본 프로필 | [지원 구성](docs/COMPATIBILITY.ko.md#프로필-1-asus-tuf-b650m--rtx-3090-fe최초-검증) |
+| **RTX 3090 Ti 24GB** | 실기기 성공 보고 · headless USB 전용 | [지원 구성](docs/COMPATIBILITY.ko.md#프로필-3-gigabyte-x870-aorus-elite-wifi7--rtx-3090-tiheadless-usb) |
 
-실기기 결과는 각 보고서의 정확한 빌드와 장비에 해당합니다. 현재 cold 사전검사 보강은
-host·빌드 검증을 거쳤으며, **이 변경으로 새 실기기 부팅·복구 시험을 한 것은 아닙니다.**
-기여자의 보고와 최초 유지관리자의 시험을 구분합니다. 같은 GPU 모델의 모든 카드나
-다른 BIOS까지 지원한다는 뜻은 아닙니다. 표의 Ryzen CPU에는 iGPU가 있지만 기록된
-headless 경로에서는 활성 AMD GOP를 사용하지 않았습니다.
+정확한 빌드 프로필과 유지관리자·기여자의 시험 근거는 [호환성 문서](docs/COMPATIBILITY.ko.md)에
+정리했습니다. 실기기 결과는 보고 당시의 빌드에 해당합니다. 이후 main의 보강은
+host·빌드 검증을 거쳤으며, **새 실기기 부팅·복구 시험을 한 것은 아닙니다.**
 
 최신 태그 **v0.3.1은 소스 전용 사전 릴리스**입니다. 현재 소스는 그 태그 이후의
 USB 경로와 X870 프로필 등을 포함하며, 이를 새 릴리스가 발행됐다는 뜻으로 읽지 마세요.
@@ -30,11 +31,11 @@ EFI 바이너리는 포함하지 않습니다.
 | 경로 | 화면·입력 조건 | 안내 |
 |---|---|---|
 | **내부 headless** | B650M/3090 FE 또는 B660M/3070 Ti 프로필; 모니터는 RTX, 도중 화면 제거, T/U/Enter 불필요 | [내부 headless 안내](docs/HEADLESS.ko.md) |
-| **Headless USB** | 기여자가 시험한 X870/3090 Ti 경로; FAT32 USB에 프로필별 wrapper·child 배치 | [Headless USB 안내 — 영어](docs/HEADLESS-USB.en.md) |
+| **Headless USB** | 성공 보고가 있는 RTX 3060 / 3090 Ti 구성; FAT32 USB에 프로필별 wrapper·child 배치 | [Headless USB 안내 — 영어](docs/HEADLESS-USB.en.md) |
 | 기존 내부 AMD 화면 manual / Auto | 최초 B650M 프로필, 메인보드/iGPU 화면 유지, manual은 U 필요 | [기존 내부 부팅 안내](docs/INTERNAL-BOOT.ko.md) |
 | 기존 USB manual | 최초 AMD/iGPU 화면 프로필, U 한 번, 리셋 없이 Boot Override로 Windows | [기존 USB 안내](docs/GUIDE.ko.md) |
 
-X870은 `Configure.ps1`·`Headless.ps1`에 연결하지 않았으므로 USB 안내를 사용하세요.
+X870·B660-PLUS·H610M은 `Configure.ps1`·`Headless.ps1`에 연결하지 않았으므로 USB 안내를 사용하세요.
 첫 두 프로필도 USB 패키지 빌드는 가능하지만, 기록된 내부 부팅이 USB 경로까지 검증하지는
 않습니다. 기존 USB EFI에는 AMD 출력 조건이 있습니다. BIOS를 `USB → Windows`로
 설정하는 것만으로 직접 인계가 구현되지는 않습니다.
@@ -116,13 +117,18 @@ Windows 우선순위 복구는 실험 EFI·빌드 산출물·저장된 상태 �
 | FP16 Tensor / FP32 누산 | 124.97 TFLOPS |
 | BF16 Tensor / FP32 누산 | 128.93 TFLOPS |
 
+앞으로 [벤치마크 도구](docs/BENCHMARK.ko.md)를 실행하면 TF32도 별도로 측정합니다.
+위 표는 TF32 추가 전의 과거 측정값이며, TF32 결과를 소급해 추가하지 않았습니다.
+
 이번 headless 부팅에는 **동시대의 통제된 잠금 상태 기준 측정이 없습니다.** 언락 증가율을
 계산하지 않습니다. 게임·ComfyUI 향상, 장기 안정성, 절전·최대 절전 복귀, 반복 자동 콜드
 부팅의 신뢰성을 입증하지도 않습니다. [공개 측정 요약](evidence/headless-handoff/summary.json)과
 [이전 결과](docs/RESULTS.ko.md)는 서로 다른 실험입니다.
 
-다른 장비의 측정값은 [호환성 문서의 프로필 2](docs/COMPATIBILITY.ko.md)와
-[X870 USB 근거](evidence/x870-3090ti-usb/README.md)를 참고하세요. 각 결과는 보고한
+다른 장비의 측정값은 [호환성 문서의 프로필 2](docs/COMPATIBILITY.ko.md),
+[X870 USB 근거](evidence/x870-3090ti-usb/README.md),
+[B660-PLUS / 3060 USB 근거](evidence/b660plus-3060-usb/README.md)(같은 장비의 잠금 상태 기준선 대비 두 차례 부팅에서
+FP16 1.88–1.92배, BF16 1.92–1.95배, TF32 1.93–1.94배)를 참고하세요. 각 결과는 보고한
 빌드에 해당하며, 이후 빌드·host 시험 통과가 실기기 시험 기록을 확장하지는 않습니다.
 
 ## 구현과 경계
@@ -143,6 +149,12 @@ VBIOS 플래싱이나 Windows 드라이버 교체는 절차에 포함하지 않�
 617.14 드라이버는 그대로였습니다. Host mock 시험이 지원 하드웨어를 추가하지는 않습니다.
 새 시스템은 [호환성 보고](docs/CONTRIBUTING.ko.md)와
 [포팅 기준](docs/PORTABILITY.en.md)을 참고하세요.
+검증된 하드웨어 범위 안의 새 PC는 [로컬 프로필 생성 절차](docs/NEW-MACHINE.en.md)를
+이용할 수 있습니다. 이 실험적 절차는 NVIDIA 디스플레이 장치 정보를 수집하되,
+상세 GPU 읽기는 검토된 PCI·BAR 상태의 단일 RTX 3090 / 3090 Ti로 제한합니다.
+로컬 프로필 생성만으로 실기기 검증 프로필이 추가되지는 않습니다. USB 쓰기 빌드에는
+host 작업 19개 통과와 프로필·시험 자료·빌드 입력 일치가 필요하며, 실기기 검증은 별도입니다.
+언락 패키지를 USB에 복사하려면 `-StageUnlock`을 명시해야 합니다.
 
 ## 라이선스와 출처
 

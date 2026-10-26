@@ -5,9 +5,14 @@
 These results come from one machine, reported by the contributor, on 2026-10-26. The
 maintainer has not run a hardware test for them. The EFI hashes in
 [summary.json](summary.json) are the files that were booted. They were built from
-this branch with `research/headless/build-usb.ps1 -HardwareProfile h610m-3060`.
+original PR #30 revision `4b748f5e88344f1a1a1fa8d7b5788e528cb19dba` with
+`research/headless/build-usb.ps1 -HardwareProfile h610m-3060`.
 The wrapper embeds the builder's Windows ESP GUID, so its hash differs on other
 machines.
+Later integration preserves current ownership/local-profile checks and hardens
+observation. It has no new physical boot result; historical hashes below are not
+expected hashes for a new main build. Private-PROM transaction and app-level
+tests have not been independently rerun by the maintainer.
 
 Hardware: Gigabyte H610M H (BIOS FC), Core i5-14400 (UHD 730 iGPU enabled, no GOP)
 and Gigabyte RTX 3060 12 GiB (GA106, `10de:2504` / `1458:4096`, VBIOS
@@ -49,8 +54,9 @@ at `0x2ffe000`–`0x2ffee00` pages. See [report-excerpt.txt](report-excerpt.txt)
 The locked baseline was measured on the same machine, driver (610.88), power limit
 and script, after a read-only probe boot. This method differs from the cuBLAS n=4096
 benchmark used for the other profiles. When unlocked, the card reaches its power
-limit: the SM clock drops from about 1950 to about 1785 MHz, which explains the
-slightly lower FP32 result.
+limit: the reported SM clock drops from about 1950 to about 1785 MHz. That is a
+plausible contributor explanation for the slightly lower FP32 result, not an
+independently controlled attribution.
 
 Excluded: the PROM image, the raw probe and graph logs, driver image dumps and
 partition identifiers. Not established: repeated cold-boot reliability (one

@@ -78,6 +78,42 @@ static void RejectBeforeMmio(EFI_STATUS expected,const char *name) {
   UINT32 zero[9]={0};Check(Bytes(Values,zero,sizeof(zero)),"pre-MMIO rejection has no cold-state evidence");
 }
 int main(void){
+  /* The decode-restore gate must observe exactly one held exclusive claim,
+   * for aggregate and direct-console profiles alike. RAM graph only. */
+  static GRAPH originalOwnership,currentOwnership;
+  PreparedGraph=&originalOwnership;PreparedPlan.RtxPci=(EFI_HANDLE)(UINTN)1;
+  Full.Image=(EFI_HANDLE)(UINTN)2;
+  originalOwnership.Count=1;
+  originalOwnership.Edges[0]=(EDGE){.Handle=(EFI_HANDLE)(UINTN)3,.Agent=(EFI_HANDLE)(UINTN)4,
+    .Controller=(EFI_HANDLE)(UINTN)3,.Protocol=PciGuid,.Attributes=EFI_OPEN_PROTOCOL_BY_DRIVER,.Count=1};
+  currentOwnership=originalOwnership;
+  Check(FullExpected(&currentOwnership,4),"unclaimed graph accepted before exclusive acquisition");
+  Full.Owned=TRUE;
+  Check(!FullExpected(&currentOwnership,4),"missing held exclusive claim rejected");
+  currentOwnership.Count=2;
+  currentOwnership.Edges[1]=(EDGE){.Handle=PreparedPlan.RtxPci,.Agent=Full.Image,
+    .Protocol=PciGuid,.Attributes=EFI_OPEN_PROTOCOL_EXCLUSIVE,.Count=1};
+  Check(FullExpected(&currentOwnership,4),"exactly one held exclusive claim accepted");
+  currentOwnership.Count=3;currentOwnership.Edges[2]=currentOwnership.Edges[1];
+  Check(!FullExpected(&currentOwnership,4),"duplicate exclusive claim rejected");
+  currentOwnership.Count=2;currentOwnership.Edges[1].Count=2;
+  Check(!FullExpected(&currentOwnership,4),"exclusive claim open count drift rejected");
+  currentOwnership.Edges[1].Count=1;currentOwnership.Edges[1].Controller=(EFI_HANDLE)(UINTN)3;
+  Check(!FullExpected(&currentOwnership,4),"exclusive claim controller drift rejected");
+  currentOwnership.Edges[1].Controller=NULL;currentOwnership.Edges[1].Agent=(EFI_HANDLE)(UINTN)4;
+  Check(!FullExpected(&currentOwnership,4),"foreign exclusive claim rejected");
+  currentOwnership.Edges[1].Agent=Full.Image;Full.Owned=FALSE;
+  Check(!FullExpected(&currentOwnership,4),"unexpected exclusive claim before acquisition rejected");
+  Full=(FULL){0};PreparedPlan=(PLAN){0};PreparedGraph=NULL;
+  Check(CodeRange(0x100000,0x3000,0x280,0x400,0x300),"bounded driver code accepted");
+  Check(!CodeRange(0,0x3000,0x280,0x400,0x300),"null image rejected before hashing");
+  Check(!CodeRange(0x100000,0x3000,0x280,0,0x300),"empty code rejected before hashing");
+  Check(!CodeRange(0x100000,0x200,0x280,0x400,0x300),"code RVA past image rejected");
+  Check(!CodeRange(0x100000,0x300,0x280,0x400,0x300),"truncated code rejected before hashing");
+  Check(!CodeRange(0x100000,0x3000,0x280,0x400,0x27f),"Stop before code rejected");
+  Check(!CodeRange(0x100000,0x3000,0x280,0x400,0x680),"Stop at code end rejected");
+  Check(!CodeRange(~(UINTN)0-0x100,0x3000,0x280,0x400,0x300),"image pointer overflow rejected");
+  Check(!CodeRange(0x100000,0x3000,0x280,~(UINTN)0,0x300),"code length overflow rejected");
   DevCount=1;Card(&Devs[0]);Check(Run()==EFI_SUCCESS,"profile cold state with valid decoding and BAR accepted");
   Check(Reads==9 && BarQueries==1 && ConfigReads==3,"valid target checked around resource lifetime before nine reads");
   for(UINT32 ss1=0;ss1<=15;ss1++){Card(&Devs[0]);Devs[0].regs[7]=ss1;Check(Run()==EFI_SUCCESS,"any power-on SS1 0..15 accepted");}

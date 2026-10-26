@@ -2,18 +2,22 @@
 # boot file. Files only: no partitioning, formatting, firmware assets, boot entries or settings.
 param([Parameter(Mandatory)][ValidatePattern('^[D-Zd-z]$')][string]$Drive)
 $ErrorActionPreference='Stop'
+$repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
+. (Join-Path $PSScriptRoot 'observe-manifest.ps1')
 $part=Get-Partition -DriveLetter $Drive;$disk=Get-Disk -Number $part.DiskNumber;$vol=Get-Volume -DriveLetter $Drive
 if($disk.BusType -ne 'USB' -or $vol.FileSystem -ne 'FAT32' -or $part.IsSystem -or $disk.IsBoot){throw "$($Drive): is not a FAT32 USB data stick"}
-$usb="$($Drive.ToUpperInvariant()):"
+$usb="$($Drive.ToUpperInvariant()):\"
 function Sha([string]$p){(Get-FileHash -LiteralPath $p -Algorithm SHA256).Hash.ToLowerInvariant()}
 $m=Get-Content (Join-Path $PSScriptRoot 'build/usb-observe/manifest.json') -Raw | ConvertFrom-Json
-if($m.Mode -ne 'usb-observation-only' -or $m.CanUnlock -ne $false -or $m.CanDetach -ne $false){throw 'Build with research/headless/build-observe-usb.ps1 first'}
-$src=Join-Path $PSScriptRoot 'build/usb-observe/OBSERVE-USB.EFI';$hash=$m.EfiSha256.ToLowerInvariant()
-if((Sha $src) -ne $hash){throw 'Observation EFI does not match its manifest'}
+$src=Join-Path $PSScriptRoot 'build/usb-observe/OBSERVE-USB.EFI'
+Assert-ObservationManifest $repo $m 'usb-observation-only' $src
+Assert-ObservationCaptureEmpty (Join-Path $usb 'RTX3090-UNLOCK')
+$hash=$m.EfiSha256
 $boot=Join-Path $usb 'EFI\BOOT\BOOTX64.EFI'
 if(Test-Path -LiteralPath $boot) {
  $bak=Join-Path $usb ('RTX3090-UNLOCK\backup\BOOTX64-'+(Sha $boot).Substring(0,12)+'.EFI')
  if(!(Test-Path -LiteralPath $bak)){[void][IO.Directory]::CreateDirectory((Split-Path $bak));Copy-Item -LiteralPath $boot -Destination $bak}
+ if((Sha $bak) -ne (Sha $boot)){throw 'Existing boot loader backup verification failed'}
  "previous BOOTX64.EFI kept as $bak"
 }
 [void][IO.Directory]::CreateDirectory((Split-Path $boot))

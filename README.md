@@ -3,24 +3,25 @@
 **English** | [한국어](README.ko.md)
 
 Experimental UEFI GPU unlock and direct Windows handoff, expanded through
-community contributions. This source tree contains **four exact-machine
-profiles with recorded hardware results**: two internal headless configurations
-and two headless USB configurations. Read [compatibility](docs/COMPATIBILITY.en.md)
-before choosing a build; a GPU model name alone does not establish support.
+community contributions.
 
-| Build profile | Exact GPU / motherboard / BIOS / CPU | Recorded route and evidence |
+## GPU support
+
+**Success reports apply to specific cards and systems, not every card of the same
+GPU model.** Check the linked motherboard, BIOS and card requirements before building.
+
+| GPU | Current status | Details |
 |---|---|---|
-| `b650m-3090fe` (default) | RTX 3090 FE / ASUS TUF GAMING B650M-PLUS WIFI / 3057 / Ryzen 7 7800X3D | Internal headless; [original maintainer's hardware evidence](evidence/headless-handoff/README.md) |
-| `b660m-3070ti` | MSI RTX 3070 Ti / ASUS TUF GAMING B660M-E D4 / 4003 / Core i7-12700F **without iGPU** | Internal headless, aggregate console; [contributor's report and implementation, PR #5](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/5) |
-| `x870-3090ti` | ASUS RTX 3090 Ti / Gigabyte X870 AORUS ELITE WIFI7 / F13d / Ryzen 7 9800X3D | **Headless USB only**; [contributor's PR #10](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/10), [sanitized evidence](evidence/x870-3090ti-usb/README.md) |
-| `h610m-3060` | Gigabyte RTX 3060 12GB (GA106) / Gigabyte H610M H / FC / Core i5-14400 (iGPU enabled, no GOP) | **Headless USB only**; contributor report, [sanitized evidence](evidence/h610m-3060-usb/README.md) |
+| **RTX 3060 12GB (GA104 / GA106)** | Hardware success reported; headless USB only | [GA104](docs/COMPATIBILITY.en.md#profile-4-asus-prime-b660-plus-d4--rtx-3060-12gb-headless-usb) · [GA106](docs/COMPATIBILITY.en.md#profile-5-gigabyte-h610m-h--rtx-3060-12gb-ga106-headless-usb) |
+| **RTX 3070 Ti 8GB** | Hardware success reported; internal headless | [Supported configuration](docs/COMPATIBILITY.en.md#profile-2-asus-tuf-b660m-e-d4--rtx-3070-ti-aggregate-console) |
+| **RTX 3080** | No dedicated profile in this port; upstream project target | [Project origins](THIRD_PARTY_NOTICES.md) |
+| **RTX 3090 FE 24GB** | Hardware success recorded; internal headless; default profile | [Supported configuration](docs/COMPATIBILITY.en.md#profile-1-asus-tuf-b650m--rtx-3090-fe-original) |
+| **RTX 3090 Ti 24GB** | Hardware success reported; headless USB only | [Supported configuration](docs/COMPATIBILITY.en.md#profile-3-gigabyte-x870-aorus-elite-wifi7--rtx-3090-ti-headless-usb) |
 
-These results concern the exact builds and systems in their reports. The current
-cold-precheck hardening has host/build verification, **not a new physical boot or
-recovery test** on those machines. Contributor reports are identified separately
-from the original maintainer's run; they do not establish support for every card
-of the same model or every BIOS. The Ryzen CPUs in the table have iGPUs, but their
-reported headless routes used no active AMD GOP.
+The [compatibility guide](docs/COMPATIBILITY.en.md) lists exact build profiles and
+distinguishes maintainer tests from contributor reports. Results concern their
+recorded builds; later main-branch hardening has host/build checks, **not a new
+physical boot or recovery test**.
 
 The latest tagged release, **v0.3.1, is a source-only pre-release**. This source
 tree has changes beyond that tag, including the USB route and X870 profile; those
@@ -32,11 +33,11 @@ Firmware assets and private, partition-specific EFI binaries are not bundled.
 | Path | Display and input | Instructions |
 |---|---|---|
 | **Internal headless** | B650M/3090 FE or B660M/3070 Ti profile; monitors on RTX; display temporarily removed; no T/U/Enter | [Internal headless guide](docs/HEADLESS.en.md) |
-| **Headless USB** | X870/3090 Ti contributor-tested route; profile-specific wrapper and child on a FAT32 USB stick | [Headless USB guide](docs/HEADLESS-USB.en.md) |
+| **Headless USB** | Reported RTX 3060 / 3090 Ti configurations; profile-specific wrapper and child on a FAT32 USB stick | [Headless USB guide](docs/HEADLESS-USB.en.md) |
 | Internal AMD-display manual / Auto | Original B650M profile, motherboard/iGPU display preserved; manual variant requires U | [Existing internal guide](docs/INTERNAL-BOOT.en.md) |
 | Legacy USB manual | Original AMD/iGPU display profile; U once, then Boot Override to Windows without reset | [Legacy USB guide](docs/GUIDE.en.md) |
 
-X870 is not wired into `Configure.ps1` or `Headless.ps1`; use its USB guide.
+X870, B660-PLUS and H610M are not wired into `Configure.ps1` or `Headless.ps1`; use the USB guide.
 USB packages can also be built for the first two profiles, but their recorded
 internal boots do not validate those USB routes. The legacy USB EFI retains its
 AMD display requirement. BIOS priority `USB → Windows` alone does not implement
@@ -121,14 +122,19 @@ topology before Windows entry. Windows display recovery was observed by the oper
 | FP16 Tensor / FP32 accumulation | 124.97 TFLOPS |
 | BF16 Tensor / FP32 accumulation | 128.93 TFLOPS |
 
+Future runs of the [benchmark tool](docs/BENCHMARK.en.md) also measure TF32 separately.
+The historical measurements above predate that addition and have no TF32 result.
+
 There is **no contemporary controlled locked baseline** for this headless boot,
 so these values do not establish an unlock percentage. They do not establish game
 or ComfyUI gains, long-term stability, sleep/hibernate resume or repeated automatic
 cold-boot reliability. [Sanitized measurements](evidence/headless-handoff/summary.json)
 and [earlier results](docs/RESULTS.en.md) describe separate experiments.
 
-For the other machines' measurements, see [B660M Profile 2](docs/COMPATIBILITY.en.md)
-and [X870 USB evidence](evidence/x870-3090ti-usb/README.md). Those results are tied
+For the other machines' measurements, see [B660M Profile 2](docs/COMPATIBILITY.en.md),
+[X870 USB evidence](evidence/x870-3090ti-usb/README.md) and
+[B660-PLUS / 3060 USB evidence](evidence/b660plus-3060-usb/README.md) (controlled locked
+baseline: FP16 1.88–1.92×, BF16 1.92–1.95×, TF32 1.93–1.94× over two boots). Those results are tied
 to their reported builds; a later successful build or host test does not extend
 the physical test record.
 
@@ -150,7 +156,13 @@ Do not remove checks or substitute a PROM hash to force another machine through.
 No VBIOS flashing or Windows driver replacement is part of the procedure.
 Driver 617.14 was unchanged in the documented run. Host mock tests do not add hardware
 support. New systems require [compatibility reporting](docs/CONTRIBUTING.en.md) and
-[portability validation](docs/PORTABILITY.en.md).
+[portability validation](docs/PORTABILITY.en.md). A machine inside the hardware-proven envelope
+can build and test its own local profile with the [new-machine pipeline](docs/NEW-MACHINE.en.md).
+This experimental workflow inventories NVIDIA display devices, but deep capture is
+limited to one RTX 3090 / 3090 Ti in the reviewed PCI/BAR state. A generated local
+profile does not add another verified machine profile. USB write builds require all
+19 host jobs and unchanged profile, fixtures and build inputs; hardware validation
+is still required. Staging the unlock package needs `-StageUnlock`.
 
 ## License and attribution
 
