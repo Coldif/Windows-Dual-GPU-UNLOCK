@@ -4,6 +4,14 @@
 
 커뮤니티 기여로 확장하는 실험용 UEFI GPU 언락과 Windows 직접 인계 구현입니다.
 
+## 커뮤니티
+
+[Discord 커뮤니티](https://discord.gg/WjKsjEqxF)에서 편하게 대화하고,
+진행 중인 작은 발견을 공유하며 개발·연구를 함께해요.
+중요한 연구 결과, 재현 가능한 테스트 보고서, 코드 검토와 프로젝트 결정은
+누구나 찾아보고 검토할 수 있도록 [GitHub 이슈](https://github.com/impacifist/Windows-GPU-UNLOCK/issues)와
+PR에 남겨주세요. [커뮤니티 룰 — English](docs/DISCORD-RULES.en.md)도 확인해 주세요.
+
 ## GPU별 지원 현황
 
 **성공 보고는 특정 카드와 장비 구성에 해당하며, 같은 GPU 모델 전체의 지원을 뜻하지 않습니다.**

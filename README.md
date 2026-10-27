@@ -5,6 +5,15 @@
 Experimental UEFI GPU unlock and direct Windows handoff, expanded through
 community contributions.
 
+## Community
+
+Join our [Discord community](https://discord.gg/WjKsjEqxF) for conversations,
+work-in-progress findings, and collaborative development and research.
+Keep substantial research results, reproducible test reports, code reviews,
+and project decisions in [GitHub issues](https://github.com/impacifist/Windows-GPU-UNLOCK/issues)
+and pull requests so everyone can find and review them. Please read the
+[community rules](docs/DISCORD-RULES.en.md).
+
 ## GPU support
 
 **Success reports apply to specific cards and systems, not every card of the same
