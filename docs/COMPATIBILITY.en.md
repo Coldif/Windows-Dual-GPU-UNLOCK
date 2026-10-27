@@ -2,13 +2,14 @@
 
 **English** | [한국어](COMPATIBILITY.ko.md)
 
-The current source contains five exact-machine profiles with recorded hardware
-results: two internal headless configurations and three headless USB configurations.
+The current source contains six exact-machine profiles with recorded hardware
+results: three internal headless configurations and three headless USB configurations.
 The original B650M run was performed by the maintainer; B660M, X870 and B660-PLUS evidence
 comes from contributors ([PR #5](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/5),
 [PR #10](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/10),
 [PR #24](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/24),
-[PR #30](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/30)). Builds compile
+[PR #30](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/30),
+[PR #77](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/77)). Builds compile
 for exactly one reviewed profile selected at build time in
 [internal-boot/unlock/machine-profile.h](../internal-boot/unlock/machine-profile.h);
 other GPUs or platforms remain unsupported.
@@ -20,6 +21,7 @@ other GPUs or platforms remain unsupported.
 | `x870-3090ti` | Gigabyte X870 AORUS ELITE WIFI7 BIOS F13d / Ryzen 7 9800X3D / ASUS RTX 3090 Ti | USB only; contributor report |
 | `b660plus-3060` | ASUS PRIME B660-PLUS D4 BIOS 3010 / i5-12600KF (no iGPU) / GA104 RTX 3060 12GB | USB only, two display children, CSM off; contributor report |
 | `h610m-3060` | Gigabyte H610M H BIOS FC / i5-14400 (iGPU enabled, no GOP) / Gigabyte GA106 RTX 3060 12GB | USB only, two display children; contributor report |
+| `b660m-3090ti` | ASUS TUF GAMING B660M-E D4 BIOS 4003 / i7-12700F (no iGPU) / Colorful RTX 3090 Ti | Internal; one contributor-reported cold boot |
 
 The latest tag is the source-only pre-release v0.3.1; this source tree includes
 later work, including the USB route and X870 profile. Hardware reports describe
@@ -167,6 +169,27 @@ torch.mm n=8192 medians were FP16 27.06 → 46.61, BF16 27.18 → 46.28, TF32 13
 24.02, FP32 9.58 → 9.34 TFLOPS. This is not the repository's cuBLAS n=4096 protocol.
 These reports and hashes identify original revision `4b748f5`, not a physical test
 of the later hardened integration. [Evidence and limits](../evidence/h610m-3060-usb/README.md).
+
+## Profile 6: ASUS TUF B660M-E D4 / Colorful RTX 3090 Ti (internal)
+
+Build profile `b660m-3090ti` selects PCI `10de:2203`, subsystem `7377:1301`,
+GA102 `0xb72000a1`, `0x5ff4` MiB and the exact PROM hash from the
+[contributor's record](../evidence/b660m-3090ti-internal/README.md).
+The board and BIOS 4003 share the console/EDID/nvgop fingerprints with Profile 2;
+runtime ownership, code, cold-state and cleanup checks remain unchanged.
+
+One internal-ESP cold boot reports a clean transaction, direct Windows entry and
+display recovery. Repeated boots, restart, sleep, stability and a controlled
+performance baseline are not established. This is contributor-reported evidence,
+not a maintainer hardware test of the integrated build. The USB selector is not
+offered for this profile because its USB route has no hardware record.
+
+On main, pass `-HardwareProfile b660m-3090ti` to both `internal-boot/Configure.ps1`
+and `research/headless/build-unlock.ps1`; the v0.3.1 tag does not contain it.
+Cold/full-flow tests and compile regressions are available. Full private-fixture
+transaction replay through `test-all.ps1` is not wired for this profile; the public
+evidence does not provide its exact FWSEC image offset/size or private inputs.
+Those tests remain blocked rather than accepting an inferred firmware layout.
 
 ## Scope beyond the recorded configurations
 

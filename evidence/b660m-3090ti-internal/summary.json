@@ -1,0 +1,54 @@
+{
+  "profile": "b660m-3090ti",
+  "evidence_source": "contributor-reported; one hardware run on the internal-ESP route",
+  "integrated_build_hardware_tested": false,
+  "hardware": {
+    "board": "ASUS TUF GAMING B660M-E D4",
+    "bios": "4003",
+    "cpu": "Intel Core i7-12700F (no iGPU)",
+    "gpu": "Colorful RTX 3090 Ti 24 GiB (GA102) 10de:2203 / 1301:7377",
+    "vbios": "94.02.a0.00.0b",
+    "display": "all monitors on the RTX; AMI aggregate console (same topology as B660M_3070TI)"
+  },
+  "software": {
+    "windows": "Windows 11 Pro build 22000",
+    "nvidia_driver": "616.92"
+  },
+  "route": "internal dedicated ESP (GU_INTERNAL_BOOT); firmware bootsequence one-shot then first in displayorder",
+  "efi": {
+    "child_sha256": "a75d57dcc4acfb04402b178af8dd713fd3c69f49b4c46e205a35537008063bb9",
+    "wrapper_sha256": "14a59f36e84c6965ea54ce9d89c8f84f6abeb622480a9bed36cb47189e3f3ef5",
+    "reproducible": "research/headless/build-unlock.ps1 -HardwareProfile b660m-3090ti rebuilds child and wrapper; the wrapper embeds the builder's Windows ESP GUID so its hash differs on other machines"
+  },
+  "derivation": {
+    "machine_fingerprints": "console text-out, graphics console, combo, EDID and nvgop drivers byte-identical to the B660M_3070TI profile",
+    "gpu_constants": "board 10de:2203, subsystem 1301:7377, chip 0xb72000a1, memory 0x5ff4 MiB, BAR0 0x82000000-0x82ffffff, PROM sha256 22b77e84..., FRTS 0x5ff200000"
+  },
+  "probe": {
+    "captures": 1,
+    "note": "one cold boot of the read-only generic internal-ESP probe (DIAG03.TXT); the constants matched the sibling-reviewed B660M_3070TI machine fingerprints and the GA102 layout exactly"
+  },
+  "runs": [
+    {
+      "log": "AUTO000024",
+      "boot": "full shutdown",
+      "precheck": "passed (cold)",
+      "entry_ss0": "0x2165162",
+      "entry_ss1": "0x7",
+      "final": "status=0 clean=1 FLR=1",
+      "windows": "direct start, display recovered"
+    }
+  ],
+  "selectors_after": {
+    "ss0": "0x88888888",
+    "ss1": "0x8"
+  },
+  "not_established": [
+    "repeated cold-boot reliability (one transaction)",
+    "Windows restart behaviour and the pre-check skip branch on hardware",
+    "sleep/hibernate resume",
+    "long-term stability, games/applications",
+    "a controlled locked baseline and post-unlock TFLOPS on this card",
+    "the USB headless route for this profile"
+  ]
+}

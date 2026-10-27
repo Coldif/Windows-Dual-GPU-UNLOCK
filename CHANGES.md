@@ -10,6 +10,17 @@
   machine, not generic compatibility. The collector is compiled, not executed,
   during maintainer integration checks; no new hardware evidence is added.
 
+## Unreleased — B660M / Colorful RTX 3090 Ti internal profile
+
+- Integrate PR #77's exact GA102 profile on the existing BIOS 4003 aggregate
+  console path; preserve all runtime release/ownership/firmware checks.
+- Keep the profile internal-only at the wrapper selector: the contributor reports
+  one internal-ESP cold boot and no USB run. No new USB staging identity is admitted.
+- Update EN/KO GPU support and exact configuration guides. Hardware evidence is
+  contributor-reported; current host/build checks are not a maintainer hardware run.
+- Full private-fixture transaction replay is not available for this profile until
+  its captured FWSEC image pin and private inputs are supplied; no layout is inferred.
+
 ## Unreleased — offline compatibility reports and comparison
 
 - Add a Python-only, read-only checker for existing probe captures. Reuse the

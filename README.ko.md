@@ -27,7 +27,7 @@ PR에 남겨주세요. [커뮤니티 룰 — English](docs/DISCORD-RULES.en.md)�
 | **RTX 3070 Ti 8GB** | 실기기 성공 보고 · 내부 headless | [지원 구성](docs/COMPATIBILITY.ko.md#프로필-2-asus-tuf-b660m-e-d4--rtx-3070-tiaggregate-console) |
 | **RTX 3080** | 전용 프로필 없음 · Windows 화면 연결 연구 자료 제공 | [연구 관측](research/rtx3080/README.md) · [프로젝트 출처](THIRD_PARTY_NOTICES.md) |
 | **RTX 3090 FE 24GB** | 실기기 성공 기록 · 내부 headless · 기본 프로필 | [지원 구성](docs/COMPATIBILITY.ko.md#프로필-1-asus-tuf-b650m--rtx-3090-fe최초-검증) |
-| **RTX 3090 Ti 24GB** | 실기기 성공 보고 · headless USB 전용 | [지원 구성](docs/COMPATIBILITY.ko.md#프로필-3-gigabyte-x870-aorus-elite-wifi7--rtx-3090-tiheadless-usb) |
+| **RTX 3090 Ti 24GB** | 실기기 성공 보고 · 정확한 장비별 경로 확인 | [X870 USB](docs/COMPATIBILITY.ko.md#프로필-3-gigabyte-x870-aorus-elite-wifi7--rtx-3090-tiheadless-usb) · [B660M 내부](docs/COMPATIBILITY.ko.md#프로필-6-asus-tuf-b660m-e-d4--colorful-rtx-3090-ti내부) |
 
 정확한 빌드 프로필과 유지관리자·기여자의 시험 근거는 [호환성 문서](docs/COMPATIBILITY.ko.md)에
 정리했습니다. 실기기 결과는 보고 당시의 빌드에 해당합니다. 이후 main의 보강은
@@ -42,7 +42,7 @@ EFI 바이너리는 포함하지 않습니다.
 
 | 경로 | 화면·입력 조건 | 안내 |
 |---|---|---|
-| **내부 headless** | B650M/3090 FE 또는 B660M/3070 Ti 프로필; 모니터는 RTX, 도중 화면 제거, T/U/Enter 불필요 | [내부 headless 안내](docs/HEADLESS.ko.md) |
+| **내부 headless** | B650M/3090 FE 또는 B660M/3070 Ti·3090 Ti 프로필; 모니터는 RTX, 도중 화면 제거, T/U/Enter 불필요 | [내부 headless 안내](docs/HEADLESS.ko.md) |
 | **Headless USB** | 성공 보고가 있는 RTX 3060 / 3090 Ti 구성; FAT32 USB에 프로필별 wrapper·child 배치 | [Headless USB 안내 — 영어](docs/HEADLESS-USB.en.md) |
 | 기존 내부 AMD 화면 manual / Auto | 최초 B650M 프로필, 메인보드/iGPU 화면 유지, manual은 U 필요 | [기존 내부 부팅 안내](docs/INTERNAL-BOOT.ko.md) |
 | 기존 USB manual | 최초 AMD/iGPU 화면 프로필, U 한 번, 리셋 없이 Boot Override로 Windows | [기존 USB 안내](docs/GUIDE.ko.md) |
