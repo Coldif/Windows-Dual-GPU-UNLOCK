@@ -43,6 +43,10 @@ function Run-Job([string]$name,[string[]]$compile,[string[]]$run,[int]$expect=0)
  if($code -ne $expect){throw "Unexpected result: $name"}
 }
 
+foreach($test in @('test_probe_records.py','test_local_topology.py')) {
+ & $Python -I (Join-Path $PSScriptRoot $test)
+ if($LASTEXITCODE -ne 0){throw "Capture-free generator regression failed: $test"}
+}
 & $Python -I (Join-Path $PSScriptRoot 'test_make_profile.py') (Join-Path $local 'capture') (Build-GuFwsecLocate $repo $Clang)
 if($LASTEXITCODE -ne 0){throw 'Generator refusal tests failed'};$results['generator refusals']=[ordered]@{Exit=0;Expected=0}
 
@@ -76,7 +80,7 @@ try {
  # A machine without an integrated GPU has no second display adapter to replay.
  if($r.IgpuId){$fixtureArgs+="--amd-id=$($r.IgpuId)"}else{$fixtureArgs+='--no-igpu'}
  # A firmware that binds no EDID driver (GU_NO_EDID_DRIVER) has no EDID consumer to replay.
- if($r.NoEdidDriver){$fixtureArgs+='--no-edid-driver'}
+ if($hw.NoEdidDriver){$fixtureArgs+='--no-edid-driver'}
  & $Python -I make-console-fixture.py (Join-Path $fx 'console/DIAG.TXT') @fixtureArgs
  if($LASTEXITCODE -ne 0){throw 'Replay fixture failed'}
  $d=@('-std=c11','-O1','-Wall','-Wextra','-Werror','-D_CRT_SECURE_NO_WARNINGS','-DGU_SINGLE_RTX_CONSOLE','-DGU_DIAGNOSTIC_ONLY','-DGU_CONSOLE_PREPARE','-I','../../deps/edk2/MdePkg/Include','-I','../../deps/edk2/MdePkg/Include/X64')
@@ -87,7 +91,7 @@ try {
  $w=@('-std=c11','-O1','-Wall','-Wextra','-Werror','-D_CRT_SECURE_NO_WARNINGS','-I','build/cold/include','-I','../../deps/edk2/MdePkg/Include','-I','../../deps/edk2/MdePkg/Include/X64')
  Run-Job 'cold pre-check (read-only)' ($w+$profile+@('-DGU_HEADLESS_RESEARCH','-DGU_SINGLE_RTX_CONSOLE','-DGU_FULL_UNLOCK','-DGU_AUTOMATIC_BOOT','test_cold_precheck.c','console-flow.c','../unlock/checks.c','../unlock/sha256.c','-o','build/cold/test-cold-local.exe')) @('./build/cold/test-cold-local.exe')
  Run-Job 'full flow gates' ($w+@('test_full_flow.c','full-flow.c','-o','build/cold/test-full-flow.exe')) @('./build/cold/test-full-flow.exe')
- if($r.NoEdidDriver) {
+ if($hw.NoEdidDriver) {
   # No reviewed profile releases the GPU without an EDID stage, so replay the whole driver release
   # on this machine's own graph, driver image, PROM and PCI config, and require it in the evidence.
   $words=[regex]::Matches([IO.File]::ReadAllText($probe),'value=0x([0-9a-f]{8})') | ForEach-Object {[Convert]::ToUInt32($_.Groups[1].Value,16)}
@@ -122,7 +126,7 @@ try {
 if((Get-LocalTreeDigest $repo) -ne $tree -or (Get-LocalProfile $repo).HeaderSha256 -ne $hw.HeaderSha256){throw 'Sources or profile changed while the tests ran; rerun'}
 if((Get-GuSha256 (Join-Path $local 'profile.json')) -cne $reportSha){throw 'Profile report changed during tests'}
 Assert-LocalFixtures $repo $report.Fixtures
-$expectedJobs=Get-LocalExpectedJobs ([bool]$report.Replay.NoEdidDriver)
+$expectedJobs=Get-LocalExpectedJobs $hw.NoEdidDriver
 Assert-LocalKeys $results @($expectedJobs.Keys) 'Completed host jobs'
 foreach($jobName in $expectedJobs.Keys){if($results[$jobName].Exit -ne $expectedJobs[$jobName] -or $results[$jobName].Expected -ne $expectedJobs[$jobName]){throw 'Host result mismatch'}}
 [ordered]@{Format=2;AllPassed=$true;HardwareAccess=$false;ProfileName=$hw.Name;HeaderSha256=$hw.HeaderSha256;PromSha256=$hw.Prom;

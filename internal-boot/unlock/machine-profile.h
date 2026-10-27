@@ -285,6 +285,9 @@
 #ifndef GU_TARGET_BUS
 #define GU_TARGET_BUS 1U
 #endif
+#if GU_TARGET_BUS < 1 || GU_TARGET_BUS > 255
+#error GU_TARGET_BUS must be in 1..255
+#endif
 #if GU_TARGET_BUS != 1U && !defined(GU_PROFILE_LOCAL)
 #error A non-default GU_TARGET_BUS is only for a generated local profile
 #endif
@@ -296,6 +299,9 @@
  * aggregate paths were not adapted and refuse it at compile time. */
 #ifndef GU_NO_EDID_DRIVER
 #define GU_NO_EDID_DRIVER 0
+#endif
+#if GU_NO_EDID_DRIVER != 0 && GU_NO_EDID_DRIVER != 1
+#error GU_NO_EDID_DRIVER must be 0 or 1
 #endif
 #if GU_NO_EDID_DRIVER && !defined(GU_PROFILE_LOCAL)
 #error A firmware without an EDID driver is only for a generated local profile

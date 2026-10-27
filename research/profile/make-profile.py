@@ -26,6 +26,7 @@ Usage: python -I make-profile.py CAPTURE_DIR FWSEC_LOCATE_EXE
 """
 import argparse
 import hashlib
+import importlib.util
 import json
 import re
 import struct
@@ -36,6 +37,9 @@ from pathlib import Path
 
 GENERATOR_VERSION = 1
 REPO = Path(__file__).resolve().parents[2]
+_graph_spec = importlib.util.spec_from_file_location('profile_capture_graph', Path(__file__).with_name('capture_graph.py'))
+_graph = importlib.util.module_from_spec(_graph_spec)
+_graph_spec.loader.exec_module(_graph)
 TEXT_OUT = '387477c2-69c7-11d2-8e39-00a0c969723b'
 GOP = '9042a9de-23dc-4a38-96fb-7aded080516a'
 EDID_DISCOVERED = '1c0c34f6-d380-41fa-a049-8ad06c1a66aa'
@@ -108,38 +112,48 @@ def parse_bindings(lines):
 
 
 def parse_handles(text):
-    blocks = {}
-    for m in re.finditer(r'^handle id=0x([0-9a-f]+)\n(.*?)(?=^handle id=|^capture-complete=|\Z)', text, re.M | re.S):
-        h = int(m[1], 16)
-        if h in blocks:
-            fail(f'duplicate handle record {h:#x}')
-        edges, protocols, protocol = [], set(), None
-        for line in m[2].splitlines():
-            if line.startswith('protocol guid='):
-                protocol = line.removeprefix('protocol guid=')
-                protocols.add(protocol)
-            e = re.fullmatch(r'open agent=0x([0-9a-f]+) controller=0x([0-9a-f]+) attributes=0x([0-9a-f]+) count=0x([0-9a-f]+)', line)
-            if e:
-                edges.append((protocol, int(e[1], 16), int(e[2], 16), int(e[3], 16), int(e[4], 16)))
-        blocks[h] = {'raw': m[2], 'edges': edges, 'protocols': protocols}
-    return blocks
+    try:
+        return _graph.parse_handles(text)
+    except ValueError as error:
+        fail(str(error))
 
 
 def path_of(block):
-    rows = re.findall(r'^path-node raw=([0-9a-f]+)$', block, re.M)
-    return b''.join(bytes.fromhex(r) for r in rows) if rows else None
+    rows = [line for line in block.splitlines() if line.startswith('path-node')]
+    if not rows:
+        return None
+    nodes = []
+    for line in rows:
+        row = re.fullmatch(r'path-node raw=([0-9a-f]+)', line)
+        if not row or len(row[1]) % 2:
+            fail('Malformed device path record')
+        node = bytes.fromhex(row[1])
+        if len(node) < 4 or int.from_bytes(node[2:4], 'little') != len(node):
+            fail('Malformed device path node')
+        nodes.append(node)
+    if nodes[-1] != b'\x7f\xff\x04\x00' or any(node[0] == 127 for node in nodes[:-1]):
+        fail('Incomplete or ambiguous device path termination')
+    return b''.join(nodes)
 
 
 def pci_config(block):
-    m = re.search(r'^pci config-dwords=([^\n]+)$', block, re.M)
-    return [int(w, 16) for w in m[1].split()] if m else None
+    rows = re.findall(r'^pci config-dwords=.*$', block, re.M)
+    statuses = re.findall(r'^pci config-status=.*$', block, re.M)
+    if not rows and not statuses:
+        return None
+    if len(rows) != 1 or statuses != ['pci config-status=0x0000000000000000']:
+        fail('Incomplete or ambiguous graph PCI configuration')
+    words = rows[0].split('=', 1)[1].split()
+    if len(words) != 16 or any(not re.fullmatch(r'[0-9a-f]{1,8}', word) for word in words):
+        fail('Graph PCI configuration requires 16 DWORDs')
+    return [int(word, 16) for word in words]
 
 
 def sole_driver(blocks, handle, protocol):
-    agents = [a for p, a, c, attrs, n in blocks[handle]['edges'] if p == protocol and attrs == BY_DRIVER and c == handle]
-    if len(agents) != 1:
-        fail(f'expected one BY_DRIVER opener of {protocol} on {handle:#x}, found {len(agents)}')
-    return agents[0]
+    owners = [(a, c, n) for p, a, c, attrs, n in blocks[handle]['edges'] if p == protocol and attrs == BY_DRIVER]
+    if len(owners) != 1 or owners[0][1] != handle or owners[0][2] != 1:
+        fail(f'expected one count-1 BY_DRIVER opener of {protocol} on {handle:#x}, found {len(owners)}')
+    return owners[0][0]
 
 
 def binding_for(bindings, agent):
@@ -316,10 +330,15 @@ def analyze(diag, image_dir, envelope):
         fail(f'BAR0 {bar0:#x} is not a 16 MiB aligned 32-bit non-prefetchable window')
     # full-release.c CapturePermit: the PciIo attribute cache must equal the raw IO/MEM command
     # bits, with no bus mastering, or the release stops after the console was already detached.
-    rows = re.findall(r'^pci-attributes status=0x([0-9a-f]{16}) value=0x([0-9a-f]{16})$', text, re.M)
-    if len(rows) != 1:
+    rows = [line for line in text.splitlines() if line.startswith('pci-attributes')]
+    if not rows:
         fail(f'{diag.name}: no PciIo attribute record; capture again with the current probe')
-    attr_status, attributes = (int(v, 16) for v in rows[0])
+    if len(rows) != 1:
+        fail(f'{diag.name}: ambiguous PciIo attribute records')
+    record = re.fullmatch(r'pci-attributes status=0x([0-9a-f]{16}) value=0x([0-9a-f]{16})', rows[0])
+    if not record:
+        fail(f'{diag.name}: malformed PciIo attribute record')
+    attr_status, attributes = (int(v, 16) for v in record.groups())
     if attr_status:
         fail(f'{diag.name}: reading the PciIo attributes failed with status {attr_status:#x}')
     expected_attributes = (PCI_ATTRIBUTE_IO if cfg[1] & 1 else 0) | (PCI_ATTRIBUTE_MEMORY if cfg[1] & 2 else 0)
@@ -353,6 +372,10 @@ def analyze(diag, image_dir, envelope):
     rtx_pci = nvidia[0]
     if pci_config(blocks[rtx_pci]['raw'])[11] != subsystem:
         fail('graph and probe disagree on the RTX subsystem')
+    locations = re.findall(r'^pci location-status=.*$', blocks[rtx_pci]['raw'], re.M)
+    location = re.fullmatch(r'pci location-status=0x([0-9a-f]{1,16}) segment=0x([0-9a-f]{1,16}) bus=0x([0-9a-f]{1,16}) device=0x([0-9a-f]{1,16}) function=0x([0-9a-f]{1,16})', locations[0]) if len(locations) == 1 else None
+    if not location or [int(value, 16) for value in location.groups()] != [0, segment, target_bus, device, function]:
+        fail('graph and probe disagree on the RTX PCI location')
     other = [h for h, b in blocks.items() if (c := pci_config(b['raw'])) and c[0] & 0xffff != 0x10de and c[2] >> 24 == 3]
     # The single-RTX console path never uses a second display adapter: prepare-console.c refuses
     # any AMD GOP in this topology, so an installed iGPU is optional. Two or more are unreviewed.
@@ -401,9 +424,18 @@ def analyze(diag, image_dir, envelope):
                      if any(p == EDID_DISCOVERED and attrs not in (1, 2, 4) for p, a, c, attrs, n in b['edges'])]
         if live_edid:
             fail(f'no BY_DRIVER EDID owner on the RTX GOP, yet {len(live_edid)} handle(s) have an active EdidDiscovered opener')
-        children = {c for p, a, c, attrs, n in blocks[rtx_pci]['edges'] if p == PATH and attrs == BY_CHILD_CONTROLLER}
-        if rtx not in children or any(EDID_DISCOVERED not in blocks[c]['protocols'] for c in children if c in blocks):
+        nv_agent = sole_driver(blocks, rtx_pci, PCI_IO)
+        child_edges = [(a, c, n) for p, a, c, attrs, n in blocks[rtx_pci]['edges'] if p == PATH and attrs == BY_CHILD_CONTROLLER]
+        children = [c for a, c, n in child_edges]
+        if not 1 <= len(children) <= 2 or len(set(children)) != len(children) or \
+                any(a != nv_agent or n != 1 for a, c, n in child_edges):
+            fail('no-EDID topology requires one or two unique NVIDIA-owned display children')
+        if rtx not in children or any(c not in blocks or EDID_DISCOVERED not in blocks[c]['protocols'] for c in children):
             fail('without an EDID driver every RTX display child must carry the EdidDiscovered interface')
+        child_paths = [path_of(blocks[c]['raw']) for c in children]
+        if any(path is None or len(path) != 36 or path[:24] != pci_path or
+               path[24:28] != b'\x02\x03\x08\x00' for path in child_paths) or len(set(child_paths)) != len(child_paths):
+            fail('no-EDID display children require unique complete paths under the target PCI controller')
     roles = {
         'out': binding_for(bindings, sole_driver(blocks, rtx, TEXT_OUT)),
         'gfx': binding_for(bindings, sole_driver(blocks, rtx, GOP)),
@@ -430,7 +462,8 @@ def analyze(diag, image_dir, envelope):
         ('GU_BOARD_ID', f'0x{board:08x}U'),
         ('GU_BOARD_SUBSYSTEM', f'0x{subsystem:08x}U'),
         ('GU_TARGET_BUS', f'0x{target_bus:x}U'),
-    ] + ([('GU_NO_EDID_DRIVER', '1')] if no_edid_driver else []) + [
+        ('GU_NO_EDID_DRIVER', '1' if no_edid_driver else '0'),
+    ] + [
         ('GU_BAR0_BASE', f'0x{bar0:08x}ULL'),
         ('GU_BAR0_END', f'0x{bar0 + 0xffffff:08x}ULL'),
         ('GU_DEVICE_MEMORY_SIZE', f'0x{memory:x}U'),

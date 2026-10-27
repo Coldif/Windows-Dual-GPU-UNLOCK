@@ -1,5 +1,15 @@
 /* GPL-2.0-only. Two-child exact-profile headless release host replay. */
 #include "test_full.c"
+static VOID PostUnlockStatusTest(VOID) {
+  Check(RunFull(0)==EFI_SUCCESS,"new session for post-unlock status policy");
+  UINT32 original=MockConfig[32];
+  MockConfig[32]&=~0x00090000U;
+  BOOLEAN permitted=MockConfig[32]==original || InitialFullConfig[0x78/4]==0x0012b410U;
+  Check((GuVerifyReleased(LastTable,FALSE)==EFI_SUCCESS)==permitted,"old status clearing is limited to the reviewed capability layout");
+  MockConfig[32]=original^0x00020000U;
+  Check(GuVerifyReleased(LastTable,FALSE)!=EFI_SUCCESS,"other status drift is never waived");
+  MockConfig[32]=original;
+}
 #if GU_NO_EDID_DRIVER
 /* Firmware that binds no EDID driver: the release is the console detach plus one NVIDIA GOP stop.
  * The driver image is accepted either as a PE file or as a loaded-image dump of exactly the
@@ -23,7 +33,7 @@ int main(int argc,char **argv) {
   Check(Run(31)!=EFI_SUCCESS && !Calls,"missing Reset rejected before any device detach");
   Check(RunFull(0)==EFI_SUCCESS && Calls==3 && Full.EdidDetached==0 && !Full.EdidAgent && EnableCalls==1 && ClaimCalls==1 && CloseCalls==1,"NV stop only after the console detach, then bounded IO/MEM-only restore; no EDID stage");
   Check(GuVerifyReleased(LastTable,TRUE)==EFI_SUCCESS,"zero physical GOP and protected graph verified");
-  Check(Live.Count+6==sizeof(FixtureEdges)/sizeof(FixtureEdges[0]),"three console edges and three NV edges removed only");
+  Check(Live.Count+4+Full.ChildCount==sizeof(FixtureEdges)/sizeof(FixtureEdges[0]),"only three console edges, NV PCI owner and exact display children removed");
   /* Scenarios 1, 2, 17, 28, 29 and 32 exercise the EDID stage, which does not exist here. */
   const int refuse[]={3,4,5,6,7,8,9,10,11,12,13,14,15,16,18,19,20};
   for(UINTN i=0;i<sizeof(refuse)/sizeof(refuse[0]);i++) {
@@ -45,8 +55,7 @@ int main(int argc,char **argv) {
   Phase=3;Check(GuVerifyReleased(LastTable,FALSE)!=EFI_SUCCESS,"reappeared physical GOP blocks unlock/Windows");Phase=4;
   Check(RunFull(0)==EFI_SUCCESS,"new session for late input change");
   Keys.WaitForKey=NULL;Check(GuVerifyReleased(LastTable,FALSE)!=EFI_SUCCESS,"late input protocol drift blocks handoff");
-  Check(RunFull(0)==EFI_SUCCESS,"new session for post-unlock status policy");
-  MockConfig[32]=0x00002930;Check(GuVerifyReleased(LastTable,FALSE)==EFI_SUCCESS,"only observed old status clear permitted after unlock");
+  PostUnlockStatusTest();
   MockConfig[1]|=4;Check(GuVerifyReleased(LastTable,FALSE)!=EFI_SUCCESS,"BME remaining set blocks handoff");
   printf("PASS headless no-EDID-driver release checks: %d; real graph/code/PROM fixtures, no GPU access\n",Checks);
   return 0;
@@ -78,8 +87,7 @@ int main(int argc,char **argv) {
   Phase=3;Check(GuVerifyReleased(LastTable,FALSE)!=EFI_SUCCESS,"reappeared physical GOP blocks unlock/Windows");Phase=4;
   Check(RunFull(0)==EFI_SUCCESS,"new session for late input change");
   Keys.WaitForKey=NULL;Check(GuVerifyReleased(LastTable,FALSE)!=EFI_SUCCESS,"late input protocol drift blocks handoff");
-  Check(RunFull(0)==EFI_SUCCESS,"new session for post-unlock status policy");
-  MockConfig[32]=0x00002930;Check(GuVerifyReleased(LastTable,FALSE)==EFI_SUCCESS,"only observed old status clear permitted after unlock");
+  PostUnlockStatusTest();
   MockConfig[1]|=4;Check(GuVerifyReleased(LastTable,FALSE)!=EFI_SUCCESS,"BME remaining set blocks handoff");
   printf("PASS headless full-release checks: %d; real graph/code/PROM fixtures, no GPU access\n",Checks);
   return 0;

@@ -9,7 +9,8 @@
 
 enum {G_OK,G_UNKNOWN,G_BME,G_MEM_OFF,G_BAD_BAR,G_BAD_RESOURCE,G_CHANGED,G_MULTI,
       G_SHORT_WRITE,G_FLUSH,G_CLOSE,G_OTHER_BDF,G_PROTOCOL_CHANGED,G_CFG_FAIL,G_BAD_CHECKSUM,
-      G_EXISTING_PROM,G_EXISTING_IMG,G_DUMP_READ_ERROR};
+      G_EXISTING_PROM,G_EXISTING_IMG,G_DUMP_READ_ERROR,
+      G_ATTR_FAIL,G_ATTR_MEM,G_ATTR_BME,G_ATTR_CONFIG,G_ATTR_BDF,G_ATTR_INTERFACE};
 static int Mode,RootCloses,RootOpens,ForeignOpens,SfsSearches,Dumps,ExistingWriteAttempts;
 static EFI_FILE_PROTOCOL DumpFile,ForeignRoot;
 static EFI_HANDLE BindingHandle=(VOID *)50,ImageHandle=(VOID *)51;
@@ -18,6 +19,9 @@ static EFI_LOADED_IMAGE_PROTOCOL Image;
 static UINT8 ImageBytes[512];
 static CAPTURE *ActiveCapture;
 static int Drifted,ReadsAfterDrift;
+static BOOLEAN AttributeReturned;
+static int AttributeConfigReads;
+static EFI_PCI_IO_PROTOCOL ChangedPci;
 
 static EFI_STATUS EFIAPI GenericRead(EFI_PCI_IO_PROTOCOL *io,EFI_PCI_IO_PROTOCOL_WIDTH w,UINT32 at,UINTN n,VOID *data) {
   if(w==EfiPciIoWidthUint32 && at==8 && n==1){*(UINT32 *)data=0x030000a1;return EFI_SUCCESS;}
@@ -31,6 +35,11 @@ static EFI_STATUS EFIAPI GenericRead(EFI_PCI_IO_PROTOCOL *io,EFI_PCI_IO_PROTOCOL
       if(Mode==G_BAD_BAR)v[4]|=4U;
       if(Mode==G_CHANGED && S.CfgReads>1)v[11]^=1U;
       if(Mode==G_CFG_FAIL && S.CfgReads>1)return EFI_DEVICE_ERROR;
+      if(AttributeReturned) {
+        if(Mode==G_ATTR_MEM)v[1]&=~2U;
+        if(Mode==G_ATTR_BME)v[1]|=4U;
+        if(Mode==G_ATTR_CONFIG)v[63]^=1U;
+      }
       if(ActiveCapture && S.CfgReads>1){memset(ActiveCapture->Buffer,'x',sizeof(ActiveCapture->Buffer)-1);ActiveCapture->Used=sizeof(ActiveCapture->Buffer)-1;}
     }
   }
@@ -45,7 +54,9 @@ static EFI_STATUS EFIAPI GuardedMem(EFI_PCI_IO_PROTOCOL *io,EFI_PCI_IO_PROTOCOL_
   return MemRead(io,w,bar,at,n,data);
 }
 static EFI_STATUS EFIAPI GenericLocation(EFI_PCI_IO_PROTOCOL *io,UINTN *seg,UINTN *bus,UINTN *dev,UINTN *fun) {
-  EFI_STATUS s=Location(io,seg,bus,dev,fun);*bus=(Mode==G_OTHER_BDF)?GU_PROBE_BUS+1U:GU_PROBE_BUS;return s;
+  EFI_STATUS s=Location(io,seg,bus,dev,fun);
+  *bus=(Mode==G_OTHER_BDF || (Mode==G_ATTR_BDF && AttributeReturned))?GU_PROBE_BUS+1U:GU_PROBE_BUS;
+  return s;
 }
 static EFI_STATUS EFIAPI Bar(EFI_PCI_IO_PROTOCOL *io,UINT8 index,UINT64 *supports,VOID **out) {
   (void)io;(void)index;(void)supports;
@@ -62,7 +73,9 @@ static int AttributeGets,AttributeOthers;
 static EFI_STATUS EFIAPI Attr(EFI_PCI_IO_PROTOCOL *io,EFI_PCI_IO_PROTOCOL_ATTRIBUTE_OPERATION op,UINT64 mask,UINT64 *result) {
   (void)io;
   if(op!=EfiPciIoAttributeOperationGet || mask || !result){AttributeOthers++;return EFI_UNSUPPORTED;}
-  AttributeGets++;*result=0x300;return EFI_SUCCESS; /* IO|MEMORY, as on the MSI capture */
+  AttributeGets++;AttributeConfigReads=S.CfgReads;AttributeReturned=TRUE;
+  *result=0x300; /* Even a failed read may leave a plausible output value. */
+  return Mode==G_ATTR_FAIL?EFI_DEVICE_ERROR:EFI_SUCCESS;
 }
 static EFI_STATUS EFIAPI GenericLocate(EFI_LOCATE_SEARCH_TYPE search,EFI_GUID *g,VOID *key,UINTN *n,EFI_HANDLE **out) {
   if(g && !memcmp(g,&WantSfs,sizeof(*g))){SfsSearches++;return EFI_DEVICE_ERROR;}
@@ -82,6 +95,9 @@ static EFI_STATUS EFIAPI GenericHandle(EFI_HANDLE h,EFI_GUID *g,VOID **out) {
   if(h==ImageHandle && !memcmp(g,&wantImage,sizeof(*g))){*out=&Image;return EFI_SUCCESS;}
   if(h==(VOID *)4 && !memcmp(g,&WantPci,sizeof(*g))){*out=&Pci;return EFI_SUCCESS;}
   if(Mode==G_PROTOCOL_CHANGED && h==PciHandle && S.PromAllocs){*out=NULL;return EFI_NOT_FOUND;}
+  if(Mode==G_ATTR_INTERFACE && AttributeReturned && h==PciHandle && !memcmp(g,&WantPci,sizeof(*g))) {
+    *out=&ChangedPci;return EFI_SUCCESS;
+  }
   return Handle(h,g,out);
 }
 static EFI_STATUS EFIAPI DumpWrite(EFI_FILE_PROTOCOL *f,UINTN *n,VOID *data) {
@@ -112,6 +128,7 @@ static void GenericSetup(int mode) {
   ExistingWriteAttempts=0;
   Pci.Pci.Read=GenericRead;Pci.GetBarAttributes=Bar;Pci.GetLocation=GenericLocation;
   Pci.Attributes=Attr;AttributeGets=AttributeOthers=0;
+  AttributeReturned=FALSE;AttributeConfigReads=0;
   Bs.LocateHandleBuffer=GenericLocate;Bs.HandleProtocol=GenericHandle;
   memset(&Binding,0,sizeof(Binding));Binding.ImageHandle=ImageHandle;
   memset(&Image,0,sizeof(Image));Image.ImageBase=ImageBytes;Image.ImageSize=sizeof(ImageBytes);
@@ -136,6 +153,17 @@ int main(void) {
   Check(Logged("capture-complete=1"),"complete generic capture recorded");
   Check(AttributeGets==1 && !AttributeOthers,"PciIo attributes are read once, Get only; never set, enabled or disabled");
   Check(Logged("pci-attributes status=0x0000000000000000 value=0x0000000000000300"),"PciIo attribute cache recorded for the generator");
+  Check(S.CfgReads>AttributeConfigReads,"raw configuration is rechecked after Attributes returns");
+  const int attributeDrifts[]={G_ATTR_MEM,G_ATTR_BME,G_ATTR_CONFIG,G_ATTR_BDF,G_ATTR_INTERFACE};
+  for(UINTN i=0;i<sizeof(attributeDrifts)/sizeof(attributeDrifts[0]);i++) {
+    Check(GenericRun(attributeDrifts[i],TRUE)==EFI_NOT_READY,"Attributes callback drift fails closed");
+    Check(AttributeGets==1 && !AttributeOthers,"drift follows exactly one Get and no attribute writes");
+    Check(S.RegReads==0 && S.PromReads==0,"Attributes callback drift prevents all MMIO and PROM reads");
+    Check(!Logged("capture-complete=1"),"drifted capture is never complete");
+  }
+  Check(GenericRun(G_ATTR_FAIL,TRUE)==EFI_SUCCESS,"failed attribute observation does not fabricate an overall probe failure");
+  Check(Logged("pci-attributes status=0x8000000000000007 value=0x0000000000000300"),
+        "failed Get retains its status despite a plausible partial result; generator must reject it");
   GenericSetup(G_OK);Pci.Attributes=NULL;
   Check(GuCaptureGraphOnVolume(&Table,&LogFile,&RootFile)==EFI_SUCCESS && Logged("pci-attributes status=0x8000000000000003"),
         "a missing Attributes method is recorded as unsupported, not invented");

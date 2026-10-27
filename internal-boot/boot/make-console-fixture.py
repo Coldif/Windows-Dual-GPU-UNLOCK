@@ -4,6 +4,7 @@ No firmware or GPU access. Actual addresses are replaced by ordinal handles.
 The source log stays private/local; it is not copied into tracked source.
 """
 import hashlib
+import importlib.util
 import re
 import sys
 import uuid
@@ -22,22 +23,17 @@ amd_id = option('amd-id', '164e1002')
 rtx_fb = option('rtx-fb', '0x000000fcc0000000')
 raw = source.read_bytes()
 text = raw.decode().replace('\r\n', '\n')
-if 'capture-complete=1\n' not in text or 'diagnostic-result status=0x0000000000000000' not in text:
-    raise ValueError('Need a successful complete diagnostic')
-blocks = {m[1]: m[2] for m in re.finditer(
-    r'^handle id=(0x[0-9a-f]+)\n(.*?)(?=^handle id=|^capture-complete=|\Z)', text, re.M | re.S)}
+graph_spec = importlib.util.spec_from_file_location('fixture_capture_graph', Path(__file__).resolve().parents[2] / 'research/profile/capture_graph.py')
+graph = importlib.util.module_from_spec(graph_spec)
+graph_spec.loader.exec_module(graph)
+parsed = graph.parse_handles(text)
+blocks = {hex(h): block['raw'] for h, block in parsed.items()}
 indices = {h: i + 1 for i, h in enumerate(blocks)}
 edges = []
-for handle, block in blocks.items():
-    protocol = None
-    for line in block.splitlines():
-        if line.startswith('protocol guid='):
-            protocol = uuid.UUID(line.removeprefix('protocol guid='))
-        match = re.fullmatch(r'open agent=(0x[0-9a-f]+) controller=(0x[0-9a-f]+) attributes=(0x[0-9a-f]+) count=(0x[0-9a-f]+)', line)
-        if match and int(match[3], 16) not in (1, 2, 4):
-            if protocol is None or match[1] not in indices or match[2] not in indices:
-                raise ValueError('Unresolved active graph reference')
-            edges.append((indices[handle], indices[match[1]], indices[match[2]], protocol, int(match[3], 16), int(match[4], 16)))
+for handle, block in parsed.items():
+    for protocol, agent, controller, attrs, count in block['edges']:
+        if attrs not in (1, 2, 4):
+            edges.append((indices[hex(handle)], indices[hex(agent)], indices[hex(controller)] if controller else 0, uuid.UUID(protocol), attrs, count))
 def one(predicate):
     values = [h for h, block in blocks.items() if predicate(block)]
     if len(values) != 1:
@@ -46,6 +42,13 @@ def one(predicate):
 no_igpu = '--no-igpu' in sys.argv[2:]
 if no_igpu and not single:
     raise ValueError('--no-igpu is only for the single-RTX console replay')
+if no_igpu:
+    for block in blocks.values():
+        config = re.search(r'^pci config-dwords=([^\n]+)$', block, re.M)
+        if config:
+            words = [int(word, 16) for word in config[1].split()]
+            if words[0] & 0xffff != 0x10de and words[2] >> 24 == 3:
+                raise ValueError('--no-igpu disagrees with the display inventory')
 # This firmware binds no EDID/mouse driver to the RTX display handles (GU_NO_EDID_DRIVER).
 no_edid_driver = '--no-edid-driver' in sys.argv[2:]
 if no_edid_driver and not single:
@@ -70,6 +73,8 @@ if single:
         raise ValueError('Expected one additional RTX EDID-only child')
     if child_records:
         roles['EdidChild'] = child_records[0][2]
+    else:
+        roles['EdidChild'] = 0  # No physical second child; tests must not invent one.
 for role, protocol, controller in [
     ('OutAgent', '387477c2-69c7-11d2-8e39-00a0c969723b', roles['Rtx']),
     ('GfxAgent', '9042a9de-23dc-4a38-96fb-7aded080516a', roles['Rtx']),
@@ -83,12 +88,20 @@ for role, protocol, controller in [
         raise ValueError('Expected a unique consumer')
     roles[role] = records[0][1]
     block = blocks[next(h for h, i in indices.items() if i == roles[role])]
-    roles[role.removesuffix('Agent') + 'Image'] = indices[re.search(r'driver image=(0x[0-9a-f]+)', block)[1]]
+    roles[role.removesuffix('Agent') + 'Image'] = indices[hex(int(re.search(r'driver image=(0x[0-9a-f]+)', block)[1], 16))]
 console = re.search(r'console out=(0x[0-9a-f]+) error=(0x[0-9a-f]+) input=(0x[0-9a-f]+)', text)
 for role, value in zip(['Console', 'Error', 'Input'], console.groups()):
-    roles[role] = indices[value]
+    roles[role] = indices[hex(int(value, 16))]
 lines = [f'/* Local diagnostic sha256 {hashlib.sha256(raw).hexdigest()} */', f'#define FX_HANDLES {len(blocks)}',
-         f'#define FX_NO_EDID_DRIVER {1 if no_edid_driver else 0}']
+         f'#define FX_NO_EDID_DRIVER {1 if no_edid_driver else 0}',
+         f'#define FX_EXTRA_DISPLAY_CHILD {1 if roles.get("EdidChild") else 0}']
+if roles.get('EdidChild'):
+    child_block = blocks[next(h for h, index in indices.items() if index == roles['EdidChild'])]
+    path_rows = re.findall(r'^path-node raw=([0-9a-f]+)$', child_block, re.M)
+    child_path = b''.join(bytes.fromhex(row) for row in path_rows)
+    if len(child_path) != 36:
+        raise ValueError('Additional display child requires its recorded 36-byte path')
+    lines.append('#define FX_EDID_CHILD_PATH_BYTES ' + ','.join(str(byte) for byte in child_path))
 for role, value in roles.items():
     lines.append(f'#define FX_{role} ((EFI_HANDLE){value})')
 lines.append('static const EDGE FixtureEdges[]={')
@@ -106,7 +119,8 @@ for role in ['Rtx', 'Amd']:
     if len(cfg) != 16:
         raise ValueError('Incomplete PCI snapshot')
     lines.append('static const UINT32 Fixture' + role + 'Config[16]={' + ','.join('0x' + x for x in cfg) + '};')
-target = Path(__file__).parent / ('build/r2/replay-fixture.h' if single else 'build/console/replay-fixture.h')
+default_target = Path(__file__).parent / ('build/r2/replay-fixture.h' if single else 'build/console/replay-fixture.h')
+target = Path(option('output', str(default_target)))
 target.parent.mkdir(parents=True, exist_ok=True)
 target.write_text('\n'.join(lines) + '\n')
 print(f'Local replay fixture: {len(blocks)} handles, {len(edges)} active ownership records; ordinal addresses only')

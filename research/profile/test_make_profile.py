@@ -69,8 +69,29 @@ def add_edid_open(path, attributes):
     if len(agents) != 1 or line not in block[2]:
         raise AssertionError(f'{path.name}: RTX GOP has no unique TextOut owner or no EdidDiscovered interface')
     at = block.start(2) + block[2].index(line) + len(line)
-    new = text[:at] + f'open agent=0x{agents[0]:016x} controller=0x{handle:016x} attributes=0x{attributes:x} count=0x1\n' + text[at:]
+    header = re.match(r'opens status=0x0+ count=0x([0-9a-f]+)\n', text[at:])
+    if not header:
+        raise AssertionError('Missing complete EDID open snapshot')
+    replacement = f'opens status=0x0000000000000000 count=0x{int(header[1],16)+1:016x}\n'
+    replacement += f'open agent=0x{agents[0]:016x} controller=0x{handle:016x} attributes=0x{attributes:x} count=0x1\n'
+    new = text[:at] + replacement + text[at + header.end():]
     path.write_bytes(new.encode())
+
+
+def shift_bus(path):
+    """Move both independently recorded target BDFs together for a synthetic test."""
+    text = path.read_bytes().decode('utf-8-sig').replace('\r\n', '\n')
+    target = re.search(r'^probe-target seg=0x[0-9a-f]+ bus=0x([0-9a-f]+)', text, re.M)
+    old = int(target[1], 16)
+    new = old + 1 if old < 255 else 254
+    text = re.sub(r'^(probe-target seg=0x[0-9a-f]+ bus=0x)[0-9a-f]+', lambda m: m[1] + f'{new:x}', text, count=1, flags=re.M)
+    blocks = list(re.finditer(r'^handle id=0x[0-9a-f]+\n(.*?)(?=^handle id=|^capture-complete=|\Z)', text, re.M | re.S))
+    block = next(m for m in blocks if (c := mp.pci_config(m[1])) and c[0] & 0xffff == 0x10de and c[2] >> 24 == 3)
+    changed, count = re.subn(r'^(pci location-status=0x[0-9a-f]+ segment=0x[0-9a-f]+ bus=0x)[0-9a-f]+',
+                             lambda m: m[1] + f'{new:x}', block[1], count=1, flags=re.M)
+    if count != 1:
+        raise AssertionError('Missing target graph PCI location')
+    path.write_text(text[:block.start(1)] + changed + text[block.end(1):], encoding='utf-8')
 
 
 def main():
@@ -97,11 +118,10 @@ def main():
          lambda w, d: [sub(p, r'^(probe-target seg=0x[0-9a-f]+ bus=0x[0-9a-f]+ dev=0x)[0-9a-f]+', lambda m: m[1] + '1') for p in d])
     # The bus is a per-machine constant: moving it in every capture is a different, still valid
     # machine; moving it in one capture only is a capture that does not describe the same boot.
-    shift_bus = lambda m: m[1] + f'{int(m[2], 16) + 1:x}'
     case('captures disagree on bus', 'disagree on GU_TARGET_BUS',
-         lambda w, d: sub(d[-1], r'^(probe-target seg=0x[0-9a-f]+ bus=0x)([0-9a-f]+)', shift_bus))
+         lambda w, d: shift_bus(d[-1]))
     case('RTX on another bus in every capture', None,
-         lambda w, d: [sub(p, r'^(probe-target seg=0x[0-9a-f]+ bus=0x)([0-9a-f]+)', shift_bus) for p in d])
+         lambda w, d: [shift_bus(p) for p in d])
     try:
         info = mp.analyze(sorted(CAPTURES.glob('DIAG[0-9][0-9].TXT'))[-1], None, ENVELOPE)
     except (mp.Refused, IndexError):

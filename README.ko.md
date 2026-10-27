@@ -4,6 +4,18 @@
 
 커뮤니티 기여로 확장하는 실험용 UEFI GPU 언락과 Windows 직접 인계 구현입니다.
 
+[![Discord 커뮤니티 참여](https://img.shields.io/badge/Join%20Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/WjKsjEqxF)
+[![지원 구성과 호환성 확인](https://img.shields.io/badge/Compatibility-455A64?style=for-the-badge)](docs/COMPATIBILITY.ko.md)
+[![연구와 개선에 기여하기](https://img.shields.io/badge/Contribute-37474F?style=for-the-badge&logo=github&logoColor=white)](docs/CONTRIBUTING.ko.md)
+
+## 커뮤니티
+
+[Discord 커뮤니티](https://discord.gg/WjKsjEqxF)에서 편하게 대화하고,
+진행 중인 작은 발견을 공유하며 개발·연구를 함께해요.
+중요한 연구 결과, 재현 가능한 테스트 보고서, 코드 검토와 프로젝트 결정은
+누구나 찾아보고 검토할 수 있도록 [GitHub 이슈](https://github.com/impacifist/Windows-GPU-UNLOCK/issues)와
+PR에 남겨주세요. [커뮤니티 룰 — English](docs/DISCORD-RULES.en.md)도 확인해 주세요.
+
 ## GPU별 지원 현황
 
 **성공 보고는 특정 카드와 장비 구성에 해당하며, 같은 GPU 모델 전체의 지원을 뜻하지 않습니다.**
@@ -153,7 +165,10 @@ VBIOS 플래싱이나 Windows 드라이버 교체는 절차에 포함하지 않�
 이용할 수 있습니다. 이 실험적 절차는 NVIDIA 디스플레이 장치 정보를 수집하되,
 상세 GPU 읽기는 검토된 PCI·BAR 상태의 단일 RTX 3090 / 3090 Ti로 제한합니다.
 로컬 프로필 생성만으로 실기기 검증 프로필이 추가되지는 않습니다. USB 쓰기 빌드에는
-host 작업 19개 통과와 프로필·시험 자료·빌드 입력 일치가 필요하며, 실기기 검증은 별도입니다.
+host 작업 19개(EDID 드라이버가 없으면 해제 재현을 포함한 20개) 통과와
+프로필·시험 자료·빌드 입력 일치가 필요하며, 실기기 검증은 별도입니다.
+이 범위 안에서 PCI 버스 위치를 장비별로 고정하고, 내장 그래픽이나 별도 EDID 드라이버가
+없는 단일 RTX 구성을 처리합니다. aggregate 콘솔과 여러 NVIDIA GPU 구성은 생성하지 않습니다.
 언락 패키지를 USB에 복사하려면 `-StageUnlock`을 명시해야 합니다.
 
 ## 라이선스와 출처

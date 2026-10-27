@@ -5,8 +5,8 @@
 - `GU_TARGET_BUS` (default `1U`) replaces the literal bus `1` in `GuCheckConfig`, `GuTargetConfig`,
   `full-release.c` and `prepare-console.c`. A non-default value compiles only with
   `GU_PROFILE_LOCAL`. For all five reviewed profiles, headless and manual builds, the objects of
-  `full-release.c`, `prepare-console.c`, `checks.c`, `port.c` and `diagnostic.c` are byte-identical
-  to before.
+  `full-release.c`, `prepare-console.c`, `checks.c`, `port.c` and `diagnostic.c` match the
+  current main baseline byte for byte except for COFF creation timestamps.
 - `make-profile.py` accepts any nonzero bus at segment 0, device 0, function 0 and writes
   `GU_TARGET_BUS`. It no longer requires an integrated GPU: none or one is accepted; with none the
   RTX must own the only GOP in the graph, and a capture set that gains or loses an iGPU between
@@ -22,11 +22,19 @@
   the machine in [evidence/b550m-3090-usb](evidence/b550m-3090-usb/README.md): MSI B550M PRO-VDH
   WIFI, Ryzen 7 5700X (no iGPU), MSI RTX 3090 at `0000:2b:00.0`, no EDID driver, headless USB.
   Locked to unlocked at n=4096: FP16 64.3 to 110.9, BF16 66.2 to 115.9 TFLOPS, FP32 unchanged.
+- Preserve the merged strict probe-record parser, callback drift tests and PROM allocation-return
+  checks. Benchmark selection stays at bus `01`; its unfinished bus option is not restored.
+- Admission and fixture generation share strict graph completeness checks; target probe/graph BDFs
+  must agree. No-EDID children require unique complete paths, replayed from their recorded bytes.
+- Bind the no-EDID report flag and required release replay to one exact boolean header define.
+  Reject missing/ambiguous defines, malformed observations and header/report disagreement.
+- Capture-free generator and release regressions cover bus/iGPU/EDID variants and one/two children,
+  IO off/on and both admitted VRAM sizes. These tests are not additional hardware evidence.
 
 ## Unreleased — probe: non-01 PCI bus and PciIo attribute record
 
 - The generic probe takes its deep-read bus from `GU_PROBE_BUS` (`research/profile/build-probe.ps1
-  -TargetBus`, default 1). With the default the probe is unchanged; a non-default bus compiles
+  -TargetBus`, default 1). The default keeps the same deep-read BDF check; a non-default bus compiles
   only into the read-only diagnostic build. Many AM4/B550 boards put the CPU x16 slot on another
   bus (for example `0x2b`), where the probe could only inventory the card.
 - The checked probe records the PciIo attribute cache once, with `EfiPciIoAttributeOperationGet`,
@@ -34,10 +42,25 @@
   that record and refuses a capture whose IO/MEM/BME attribute bits differ from the PCI command
   register: `full-release.c` `CapturePermit` would stop the release there, after the console was
   already detached. Captures from an older probe must be taken again.
-- `benchmark/run-benchmark.ps1 -PciBus` (default `01`) for a card on another bus.
+- Benchmark selection is unchanged: the native benchmark still requires bus `01`.
+- Refuse malformed or ambiguous PciIo attribute records, including a damaged record beside a valid one.
 - Host tests: the generic probe suite also runs at bus `0x2b`; a non-default bus is refused outside
-  the diagnostic build; the attributes mock fails on any operation other than Get. No reviewed
+  the diagnostic build; the attributes mock fails on any operation other than Get. Attribute
+  callbacks that change MEM/BME/configuration/BDF/interface prevent all dependent reads; a
+  failed Get with a plausible partial value retains its failure status. No reviewed
   profile, release path or generator admission rule other than the attribute record changes.
+
+## Unreleased — recheck PROM read state after allocation
+
+- Recheck the exact PCI interface, identity, all 64 configuration DWORDs and MEM1/BME0
+  after PROM buffer allocation, before dependent reads. Preserve both IO-enabled and
+  IO-disabled reference configurations. A later buffer-free error no longer replaces
+  an earlier read/hash/configuration error.
+- Extracted the shared safety idea from PR #53 without its MSI profile, proposed
+  attribute policy or the #49 support expansion. No hardware support is added.
+- `internal-boot/boot/test-prom-boundary.ps1` uses synthetic RAM and the real SHA-256
+  implementation for all five reference profiles, manual and headless configurations.
+  Tests cover service-return drift, partial reads and combined read/cleanup failures.
 
 ## Unreleased — harden GA106 observation and integrate the fifth profile
 

@@ -26,7 +26,7 @@ static int FullScenario,EnableCalls,ClaimCalls,CloseCalls,Phase,ColdCalls;
 static UINT8 SecondChildPath[36];
 static BOOLEAN PhaseForHeadlessTest(VOID) {return Phase>=4;}
 #endif
-static const UINT32 MockCold[]={0xb72000a1,0x8b8f,0x3ff,0x10,0,0xffffff8f,0x03000062,6,0x6000};
+static const UINT32 MockCold[]={GU_CHIP_ID,0x8b8f,0x3ff,0x10,0,0xffffff8f,0x03000062,6,GU_DEVICE_MEMORY_SIZE};
 
 static VOID LoadMapped(const char *path,UINT8 *memory,UINTN size) {
   FILE *f=fopen(path,"rb");Check(f!=NULL,"driver fixture exists");
@@ -173,18 +173,27 @@ static EFI_STATUS FullLog(VOID *ctx,const char *event,EFI_STATUS status) {
   if(status!=EFI_SUCCESS)fprintf(stderr,"full event=%s status=%llx scenario=%d\n",event,(unsigned long long)status,FullScenario);
   if(!strcmp(event,"headless-console-pre-release-verification")) {
     if(FullScenario==23)Live.Edges[Live.Count++]=(EDGE){FX_RtxPci,FX_NvAgent,FX_Input,PathGuid,8,1};
-    if(FullScenario==24)Live.Edges[Live.Count++]=(EDGE){FX_EdidChild,FX_OutAgent,FX_EdidChild,TextGuid,16,1};
+    if(FullScenario==24) {
+      EFI_HANDLE child=FX_EdidChild?FX_EdidChild:FX_Rtx;
+      Live.Edges[Live.Count++]=(EDGE){child,FX_OutAgent,child,TextGuid,16,1};
+    }
     if(FullScenario==27)return EFI_WARN_UNKNOWN_GLYPH;
 #if GU_NO_EDID_DRIVER
     /* An EDID driver that appears on a display child after the console was prepared is unreviewed. */
     if(FullScenario==33)Live.Edges[Live.Count++]=(EDGE){FX_Rtx,FX_OutAgent,FX_Rtx,EdidGuid,EFI_OPEN_PROTOCOL_BY_DRIVER,1};
-    if(FullScenario==34)Live.Edges[Live.Count++]=(EDGE){FX_EdidChild,FX_OutAgent,FX_EdidChild,EdidGuid,EFI_OPEN_PROTOCOL_BY_DRIVER,1};
+    if(FullScenario==34) {
+      EFI_HANDLE child=FX_EdidChild?FX_EdidChild:FX_Rtx;
+      Live.Edges[Live.Count++]=(EDGE){child,FX_OutAgent,child,EdidGuid,EFI_OPEN_PROTOCOL_BY_DRIVER,1};
+    }
 #else
     if(FullScenario==28)Drop(FX_EdidChild,FX_EdidAgent,&EdidGuid);
 #endif
   }
   if(!strcmp(event,"detach-nvidia-gop-intent")) {
-    if(FullScenario==25)SecondChildPath[28]^=1;
+    if(FullScenario==25) {
+      if(FX_EdidChild)SecondChildPath[28]^=1;
+      else TestRtxPath[28]^=1;
+    }
     if(FullScenario==26)NvMemory[0x280]^=1;
   }
 #endif
@@ -205,9 +214,15 @@ static EFI_STATUS RunFull(int scenario) {
   FullMode=FALSE;Check(Run(scenario==21?23:scenario==22?24:0)==EFI_SUCCESS,"hardware-validated Stage2A replay prerequisite");
   FullScenario=scenario;EnableCalls=ClaimCalls=CloseCalls=0;Phase=2;ColdCalls=0;
 #ifdef GU_HEADLESS_RESEARCH
+#ifdef FX_EDID_CHILD_PATH_BYTES
+  const UINT8 recordedChildPath[36]={FX_EDID_CHILD_PATH_BYTES};
+  memcpy(SecondChildPath,recordedChildPath,sizeof(recordedChildPath));
+#else
   memcpy(SecondChildPath,TestRtxPath,36);SecondChildPath[28]^=0x50;
 #endif
-  memcpy(MockConfig,InitialFullConfig,sizeof(MockConfig));MockAttributes=0x300;
+#endif
+  memcpy(MockConfig,InitialFullConfig,sizeof(MockConfig));
+  MockAttributes=(MockConfig[1]&1U?EFI_PCI_IO_ATTRIBUTE_IO:0U)|(MockConfig[1]&2U?EFI_PCI_IO_ATTRIBUTE_MEMORY:0U);
 #if GU_NO_EDID_DRIVER
   NvBinding=(EFI_DRIVER_BINDING_PROTOCOL){0};
   NvBinding.Version=GU_NVGOP_VERSION;NvBinding.DriverBindingHandle=NvBinding.ImageHandle=FX_NvAgent;NvBinding.Stop=(EFI_DRIVER_BINDING_STOP)(NvMemory+GU_NVGOP_STOP);
@@ -241,11 +256,12 @@ static EFI_STATUS RunFull(int scenario) {
 static VOID DecodeTests(VOID) {
   UINT32 after[64];UINT64 mask=0;
   memcpy(after,InitialFullConfig,sizeof(after));after[1]&=~3U;
-  Check(GuDecodeRestoreMask(InitialFullConfig,after,&mask) && mask==0x300,"exact missing IO/MEM accepted");
+  UINT64 expected=(InitialFullConfig[1]&1U?EFI_PCI_IO_ATTRIBUTE_IO:0U)|(InitialFullConfig[1]&2U?EFI_PCI_IO_ATTRIBUTE_MEMORY:0U);
+  Check(GuDecodeRestoreMask(InitialFullConfig,after,&mask) && mask==expected,"exact missing IO/MEM accepted");
   for(UINTN word=0;word<64;word++)for(UINTN bit=0;bit<32;bit++) {
     memcpy(after,InitialFullConfig,sizeof(after));after[word]^=1U<<bit;
     BOOLEAN ok=GuDecodeRestoreMask(InitialFullConfig,after,&mask);
-    Check(ok==(word==1 && bit<2),"every other config bit rejected");
+    Check(ok==(word==1 && bit<2 && (InitialFullConfig[1]&(1U<<bit))!=0),"every other config bit rejected");
   }
 }
 #if !GU_NO_EDID_DRIVER /* the legacy suite replays the EDID stage; test_headless_full.c has the no-EDID suite */

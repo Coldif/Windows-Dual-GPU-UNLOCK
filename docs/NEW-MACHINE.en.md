@@ -46,6 +46,18 @@ profile must also pass a replay of the whole driver release on its own graph, dr
 and PCI config (a 20th job). Only the non-aggregate headless build supports the flag; other builds
 refuse it at compile time. The probe needs `build-probe.ps1 -TargetBus` for a card off bus `01`.
 
+Admission and replay share a strict parser: incomplete/ambiguous handle, protocol,
+open and PCI snapshots cannot establish absence of an adapter or EDID owner. The
+no-EDID path admits one or two unique NVIDIA-owned display children. The generated
+header explicitly records `GU_NO_EDID_DRIVER 0/1`; the report must contain the same
+boolean, and this header-bound value selects the required release replay. Regenerate
+older local profiles that lack this flag from their existing valid captures.
+
+Maintainers can run capture-free regression checks with
+`python -I research/profile/test_local_topology.py` and
+`research/profile/test-local-release.ps1`. These use synthetic data only and do not
+replace the actual machine's required capture/asset replay or hardware evidence.
+
 ## Steps
 
 Needs: LLVM (`clang`, `lld-link`), MSVC build tools, Python 3.10+, the five firmware assets
@@ -65,7 +77,7 @@ Run the same command repeatedly; each run does the next step.
    boot menu, and let it start Windows. Do this twice. The probe only reads: PCI config,
    loaded driver images, and for a single eligible RTX 3090 / 3090 Ti only,
    16 BAR0 registers and the 1 MiB PROM window. The deep read requires MEM1/BME0,
-   the reviewed class/revision, `0000:01:00.0`, a 32-bit aligned 16 MiB BAR resource
+   the reviewed class/revision, the selected segment-0/device-0/function-0 bus, a 32-bit aligned 16 MiB BAR resource
    and unchanged handle/interface/config after resource queries and allocation. A card on
    another bus can be captured with `build-probe.ps1 -TargetBus 0x2b` (diagnostic build only);
    the generator then records that bus as `GU_TARGET_BUS`. The probe also records the PciIo

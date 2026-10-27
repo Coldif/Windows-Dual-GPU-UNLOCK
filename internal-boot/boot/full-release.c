@@ -161,10 +161,16 @@ static EFI_STATUS Prom(VOID) {
   EFI_BOOT_SERVICES *bs=Full.Table->BootServices;EFI_PCI_IO_PROTOCOL *io=PreparedPlan.RtxIo;
   UINT8 *data=NULL;EFI_STATUS s=bs->AllocatePool(EfiBootServicesData,1048576,(VOID **)&data);
   if(s!=EFI_SUCCESS || !data)return EFI_OUT_OF_RESOURCES;
-  if(!io->Mem.Read)s=EFI_UNSUPPORTED;
+  /* Allocation is a firmware callback boundary. Revalidate the same interface,
+   * identity and complete baseline before the first dependent PROM read. */
+  if(!io || io!=PreparedPlan.RtxIo || !io->Mem.Read)s=EFI_UNSUPPORTED;
+  UINT32 cfg[64];
+  if(s==EFI_SUCCESS)s=ReadConfigFull(cfg);
+  if(s==EFI_SUCCESS && (io!=PreparedPlan.RtxIo || (cfg[1]&6U)!=2U || !Bytes(cfg,Full.Config,sizeof(cfg))))s=EFI_NOT_READY;
   for(UINTN at=0;s==EFI_SUCCESS && at<1048576;at+=65536)s=io->Mem.Read(io,EfiPciIoWidthUint8,0,0x300000+at,65536,data+at);
   if(s==EFI_SUCCESS && !GuHashMatches(data,1048576,GU_PROM_SHA256))s=EFI_CRC_ERROR;
-  if(bs->FreePool(data)!=EFI_SUCCESS)s=EFI_DEVICE_ERROR;
+  EFI_STATUS freed=bs->FreePool(data);
+  if(s==EFI_SUCCESS)s=freed;
   return s;
 }
 static BOOLEAN CodeRange(UINTN base,UINT64 size,UINTN rva,UINTN bytes,UINTN stop) {
