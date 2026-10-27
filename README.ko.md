@@ -143,6 +143,22 @@ Windows 우선순위 복구는 실험 EFI·빌드 산출물·저장된 상태 �
 FP16 1.88–1.92배, BF16 1.92–1.95배, TF32 1.93–1.94배)를 참고하세요. 각 결과는 보고한
 빌드에 해당하며, 이후 빌드·host 시험 통과가 실기기 시험 기록을 확장하지는 않습니다.
 
+## 기존 진단 자료 확인
+
+[오프라인 호환성 검사기](docs/CHECK-COMPATIBILITY.ko.md)로 기존 캡처가 자동 로컬
+프로필 조건에 맞는지와 누락 자료를 확인할 수 있습니다. Python 3.10+만 필요하며
+진단 도구나 언락을 실행하지 않습니다.
+
+```powershell
+python -I research/profile/check-compatibility.py "D:\RTX3090-UNLOCK" --lang ko
+```
+
+후보 판정 후에도 프로필 생성·호스트 시험·실기기 검증이 필요합니다.
+자동 처리 범위 밖이라는 결과가 기존 고정 프로필까지 미지원이라는 뜻은 아닙니다.
+`--json`으로 제한된 모델·구성 정보가 담긴 보고서를 만들고 검토 후
+[호환성 이슈](https://github.com/impacifist/Windows-GPU-UNLOCK/issues/new?template=compatibility.yml)의
+선택 항목에 붙여 넣을 수 있습니다. 안내에는 보고서 두 개의 차이를 비교하는 방법도 있습니다.
+
 ## 구현과 경계
 
 Headless는 별도 컴파일 프로필입니다. 정확한 GPU·PROM·PCI 상태·펌웨어 드라이버 코드·

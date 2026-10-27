@@ -1,5 +1,22 @@
 # Changes
 
+## Unreleased — offline compatibility reports and comparison
+
+- Add a Python-only, read-only checker for existing probe captures. Reuse the
+  generator's structural, driver-code and PROM checks without profile generation,
+  FWSEC execution, host-test evidence changes or hardware operations.
+- Explain candidate, missing-data, out-of-scope and invalid-data results in English
+  or Korean. Automatic local-profile scope is separate from exact fixed profiles;
+  a candidate is not hardware verification or write-build eligibility.
+- Format-2 JSON reports include typed model/topology observations for issue review,
+  preserving unknown values and graph completeness. Exclude private paths, serials,
+  memory addresses, PROM/capture hashes and firmware contents. Upload nothing.
+- Add bounded, schema-validated comparison of two checker reports, distinguishing
+  different observations from unavailable data and deferring across checker/policy
+  versions. No report can authorize an unlock or cause a command to be executed.
+- Connect the optional report to the existing compatibility issue form and EN/KO
+  guides. Windows inventory and manually entered model reports remain welcome.
+
 ## Unreleased — local profiles: per-machine PCI bus, optional iGPU, optional EDID driver; MSI B550M / RTX 3090 evidence
 
 - `GU_TARGET_BUS` (default `1U`) replaces the literal bus `1` in `GuCheckConfig`, `GuTargetConfig`,

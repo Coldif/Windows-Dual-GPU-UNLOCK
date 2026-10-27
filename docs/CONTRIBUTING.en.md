@@ -28,6 +28,12 @@ Exit code `0` means the selected Windows inventory sections were collected, **no
 
 ## Share a report manually
 
+Already have probe captures? The [offline checker](CHECK-COMPATIBILITY.en.md) produces
+a reviewed-shareable JSON report with refusal reasons and limited model/topology
+observations. Paste it into the form's optional offline report field. Its comparison
+tool helps identify differences between two checker reports. Neither tool runs an
+unlock; no new capture or experiment is required to submit an issue.
+
 Open a [compatibility report issue](https://github.com/impacifist/Windows-GPU-UNLOCK/issues/new?template=compatibility.yml), or a plain issue if the form is unavailable. Include:
 
 - The reviewed inventory, or the motherboard, CPU, GPU and Windows/driver models manually.

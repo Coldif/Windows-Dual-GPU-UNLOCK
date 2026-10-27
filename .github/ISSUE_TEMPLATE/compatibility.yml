@@ -28,6 +28,12 @@ body:
     validations:
       required: true
   - type: textarea
+    id: offline_check
+    attributes:
+      label: Offline compatibility report (optional)
+      description: If you already have probe captures, run python -I research/profile/check-compatibility.py "YOUR-CAPTURE-FOLDER" --json and paste the reviewed JSON here. See docs/CHECK-COMPATIBILITY.en.md. No captures? Leave this blank; inventory-only reports are welcome. Do not boot an EFI or run unlock just to complete this field.
+      render: json
+  - type: textarea
     id: board_and_vbios
     attributes:
       label: Physical GPU and VBIOS history

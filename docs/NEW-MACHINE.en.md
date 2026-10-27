@@ -58,6 +58,13 @@ Maintainers can run capture-free regression checks with
 `research/profile/test-local-release.ps1`. These use synthetic data only and do not
 replace the actual machine's required capture/asset replay or hardware evidence.
 
+## Check existing captures first
+
+The [offline compatibility checker](CHECK-COMPATIBILITY.en.md) reports missing data
+and local-profile refusal reasons without generating a profile, launching an external
+firmware parser or touching hardware. It is optional and does not replace any step or evidence gate
+below. Passing this check is not proof of hardware compatibility.
+
 ## Steps
 
 Needs: LLVM (`clang`, `lld-link`), MSVC build tools, Python 3.10+, the five firmware assets

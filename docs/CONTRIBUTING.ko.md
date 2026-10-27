@@ -28,6 +28,11 @@ Secure Boot 상태, 실제 모니터 연결, PCI BDF/BAR, PROM, cold 상태와 �
 
 ## 직접 제보하기
 
+이미 진단 캡처가 있다면 [오프라인 검사기](CHECK-COMPATIBILITY.ko.md)로 거부 사유와
+제한된 모델·구성 정보가 담긴 JSON을 만들고, 검토 후 양식의 선택 항목에 붙여 넣을 수
+있습니다. 비교 도구로 검사 보고서 두 개의 차이도 확인할 수 있습니다. 두 도구 모두
+언락을 실행하지 않으며, 제보를 위해 새 캡처나 실험을 할 필요는 없습니다.
+
 [호환성 이슈 양식](https://github.com/impacifist/Windows-GPU-UNLOCK/issues/new?template=compatibility.yml)을 이용합니다. 양식이 없으면 일반 이슈도 가능합니다.
 
 - 검토한 보고서 또는 보드·CPU·GPU·Windows·드라이버 정보를 수동으로 적습니다.
