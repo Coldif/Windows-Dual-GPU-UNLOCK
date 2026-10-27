@@ -73,7 +73,9 @@ class ProbeRecordTests(unittest.TestCase):
             (3, record.format(0, 0x700), 'disagree with the PCI command register'),  # BME in the cache
             (3, record.format(0, 0x100), 'disagree with the PCI command register'),  # MEM missing
             (2, record.format(0, 0x300), 'disagree with the PCI command register'),  # IO not in command
-            (3, record.format(0, 0x300) * 2, 'no PciIo attribute record'),           # ambiguous duplicate
+            (3, record.format(0, 0x300) * 2, 'ambiguous PciIo attribute records'),
+            (3, record.format(0, 0x300) + record.format(7, 0), 'ambiguous PciIo attribute records'),
+            (3, record.format(7, 0x300), 'reading the PciIo attributes failed'),
             (3, record.format(0, 0x300), None),
             (2, record.format(0, 0x200), None),
             (3, record.format(0, 0x300 | 0x4000), None),  # other cached attributes are not compared
@@ -90,6 +92,34 @@ class ProbeRecordTests(unittest.TestCase):
                 # With no cold-state reads in the text, a passing attribute gate reaches the next gate.
                 with self.assertRaisesRegex(mp.Refused, refusal or 'missing a cold-state'):
                     mp.analyze(path, None, envelope)
+
+    def test_malformed_attribute_records_are_never_ignored(self):
+        cfg = [0x220410de, 3, 0x030000a1, 0, 0xf5000000] + [0] * 59
+        prefix = ('capture-complete=1\ndiagnostic-result status=0x0000000000000000\n'
+                  'probe-target seg=0x0000 bus=0x0001 dev=0x0000 fun=0x0000\n'
+                  'probe targets=0001 cfg-incomplete=0000\ncfg dwords=' +
+                  ' '.join(f'{word:08x}' for word in cfg) + '\n')
+        good = 'pci-attributes status=0x0000000000000000 value=0x0000000000000300\n'
+        malformed = [
+            'pci-attributes',
+            'pci-attributes\tstatus=0x0000000000000000 value=0x0000000000000300',
+            'pci-attributes status=0x',
+            'pci-attributes status=0x0000000000000000',
+            'pci-attributes status=0x0000000000000000 value=0x10000000000000300',
+            'pci-attributes status=0x10000000000000000 value=0x0000000000000300',
+            'pci-attributes status=0x0000000000000000 value=0x-000000000000300',
+            'pci-attributes status=0x0000000000000000 value=0x0000000000000xyz',
+            'pci-attributes status=0x8000000000000003 value=0x0000000000000000 trailing',
+        ]
+        envelope = {'probe_device_ids': ['220410de'], 'class_revision': '030000a1'}
+        for bad in malformed:
+            for rows in (bad + '\n', good + bad + '\n', bad + '\n' + good):
+                expected = 'ambiguous' if good in rows else 'malformed'
+                with self.subTest(rows=rows), tempfile.TemporaryDirectory() as folder:
+                    path = Path(folder) / 'DIAG00.TXT'
+                    path.write_text(prefix + rows, encoding='ascii')
+                    with self.assertRaisesRegex(mp.Refused, expected + ' PciIo attribute'):
+                        mp.analyze(path, None, envelope)
 
 
 if __name__ == '__main__':

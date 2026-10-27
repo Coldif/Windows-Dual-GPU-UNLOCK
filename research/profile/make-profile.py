@@ -305,10 +305,15 @@ def analyze(diag, image_dir, envelope):
         fail(f'BAR0 {bar0:#x} is not a 16 MiB aligned 32-bit non-prefetchable window')
     # full-release.c CapturePermit: the PciIo attribute cache must equal the raw IO/MEM command
     # bits, with no bus mastering, or the release stops after the console was already detached.
-    rows = re.findall(r'^pci-attributes status=0x([0-9a-f]{16}) value=0x([0-9a-f]{16})$', text, re.M)
-    if len(rows) != 1:
+    rows = [line for line in text.splitlines() if line.startswith('pci-attributes')]
+    if not rows:
         fail(f'{diag.name}: no PciIo attribute record; capture again with the current probe')
-    attr_status, attributes = (int(v, 16) for v in rows[0])
+    if len(rows) != 1:
+        fail(f'{diag.name}: ambiguous PciIo attribute records')
+    record = re.fullmatch(r'pci-attributes status=0x([0-9a-f]{16}) value=0x([0-9a-f]{16})', rows[0])
+    if not record:
+        fail(f'{diag.name}: malformed PciIo attribute record')
+    attr_status, attributes = (int(v, 16) for v in record.groups())
     if attr_status:
         fail(f'{diag.name}: reading the PciIo attributes failed with status {attr_status:#x}')
     expected_attributes = (PCI_ATTRIBUTE_IO if cfg[1] & 1 else 0) | (PCI_ATTRIBUTE_MEMORY if cfg[1] & 2 else 0)
