@@ -1,5 +1,15 @@
 # Changes
 
+## Unreleased — RTX 3080 display-routing observations
+
+- Integrate PR #39's contributor research and bounded read-only Windows
+  QueryDisplayConfig/DXGI collector. Preserve the original unlock, probe and
+  inventory collector paths.
+- Display routing observed in Windows does not establish pre-boot GOP ownership
+  or unlock support. The device-ID match flag refers to this recorded research
+  machine, not generic compatibility. The collector is compiled, not executed,
+  during maintainer integration checks; no new hardware evidence is added.
+
 ## Unreleased — B660M / Colorful RTX 3090 Ti internal profile
 
 - Integrate PR #77's exact GA102 profile on the existing BIOS 4003 aggregate
