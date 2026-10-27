@@ -29,7 +29,7 @@ GPU model.** Check the linked motherboard, BIOS and card requirements before bui
 | **RTX 3070 Ti 8GB** | Hardware success reported; internal headless | [Supported configuration](docs/COMPATIBILITY.en.md#profile-2-asus-tuf-b660m-e-d4--rtx-3070-ti-aggregate-console) |
 | **RTX 3080** | No dedicated profile in this port; upstream project target | [Project origins](THIRD_PARTY_NOTICES.md) |
 | **RTX 3090 FE 24GB** | Hardware success recorded; internal headless; default profile | [Supported configuration](docs/COMPATIBILITY.en.md#profile-1-asus-tuf-b650m--rtx-3090-fe-original) |
-| **RTX 3090 Ti 24GB** | Hardware success reported; headless USB only | [Supported configuration](docs/COMPATIBILITY.en.md#profile-3-gigabyte-x870-aorus-elite-wifi7--rtx-3090-ti-headless-usb) |
+| **RTX 3090 Ti 24GB** | Hardware success reported; route depends on exact system | [X870 USB](docs/COMPATIBILITY.en.md#profile-3-gigabyte-x870-aorus-elite-wifi7--rtx-3090-ti-headless-usb) · [B660M internal](docs/COMPATIBILITY.en.md#profile-6-asus-tuf-b660m-e-d4--colorful-rtx-3090-ti-internal) |
 
 The [compatibility guide](docs/COMPATIBILITY.en.md) lists exact build profiles and
 distinguishes maintainer tests from contributor reports. Results concern their
@@ -45,7 +45,7 @@ Firmware assets and private, partition-specific EFI binaries are not bundled.
 
 | Path | Display and input | Instructions |
 |---|---|---|
-| **Internal headless** | B650M/3090 FE or B660M/3070 Ti profile; monitors on RTX; display temporarily removed; no T/U/Enter | [Internal headless guide](docs/HEADLESS.en.md) |
+| **Internal headless** | B650M/3090 FE or B660M/3070 Ti / 3090 Ti profile; monitors on RTX; display temporarily removed; no T/U/Enter | [Internal headless guide](docs/HEADLESS.en.md) |
 | **Headless USB** | Reported RTX 3060 / 3090 Ti configurations; profile-specific wrapper and child on a FAT32 USB stick | [Headless USB guide](docs/HEADLESS-USB.en.md) |
 | Internal AMD-display manual / Auto | Original B650M profile, motherboard/iGPU display preserved; manual variant requires U | [Existing internal guide](docs/INTERNAL-BOOT.en.md) |
 | Legacy USB manual | Original AMD/iGPU display profile; U once, then Boot Override to Windows without reset | [Legacy USB guide](docs/GUIDE.en.md) |
