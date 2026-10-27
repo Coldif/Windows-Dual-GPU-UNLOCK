@@ -19,6 +19,18 @@
   failed Get with a plausible partial value retains its failure status. No reviewed
   profile, release path or generator admission rule other than the attribute record changes.
 
+## Unreleased — recheck PROM read state after allocation
+
+- Recheck the exact PCI interface, identity, all 64 configuration DWORDs and MEM1/BME0
+  after PROM buffer allocation, before dependent reads. Preserve both IO-enabled and
+  IO-disabled reference configurations. A later buffer-free error no longer replaces
+  an earlier read/hash/configuration error.
+- Extracted the shared safety idea from PR #53 without its MSI profile, proposed
+  attribute policy or the #49 support expansion. No hardware support is added.
+- `internal-boot/boot/test-prom-boundary.ps1` uses synthetic RAM and the real SHA-256
+  implementation for all five reference profiles, manual and headless configurations.
+  Tests cover service-return drift, partial reads and combined read/cleanup failures.
+
 ## Unreleased — harden GA106 observation and integrate the fifth profile
 
 - Preserve current GA104/GA102 profiles, LOCAL gates, ownership checks and TF32 tools
