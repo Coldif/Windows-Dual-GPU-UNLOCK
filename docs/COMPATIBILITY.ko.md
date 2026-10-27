@@ -2,13 +2,14 @@
 
 [English](COMPATIBILITY.en.md) | **한국어**
 
-현재 소스에는 실기기 결과가 기록된 정확한 장비 프로필 다섯 개가 있습니다.
-내부 headless 두 구성과 headless USB 세 구성입니다. 최초 B650M은 유지관리자가
+현재 소스에는 실기기 결과가 기록된 정확한 장비 프로필 여섯 개가 있습니다.
+내부 headless 세 구성과 headless USB 세 구성입니다. 최초 B650M은 유지관리자가
 시험했고, B660M·X870·B660-PLUS의 근거는 기여자의 보고입니다
 ([PR #5](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/5),
 [PR #10](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/10),
 [PR #24](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/24),
-[PR #30](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/30)).
+[PR #30](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/30),
+[PR #77](https://github.com/impacifist/Windows-GPU-UNLOCK/pull/77)).
 빌드는 [internal-boot/unlock/machine-profile.h](../internal-boot/unlock/machine-profile.h)에서
 빌드 시점에 선택된 하나의 검토된 프로필 전용이며, 다른 GPU·플랫폼은 지원하지 않습니다.
 
@@ -19,6 +20,7 @@
 | `x870-3090ti` | Gigabyte X870 AORUS ELITE WIFI7 BIOS F13d / Ryzen 7 9800X3D / ASUS RTX 3090 Ti | USB 전용; 기여자 보고 |
 | `b660plus-3060` | ASUS PRIME B660-PLUS D4 BIOS 3010 / iGPU 없는 i5-12600KF / GA104 RTX 3060 12GB | USB 전용, 디스플레이 child 두 개, CSM 끔; 기여자 보고 |
 | `h610m-3060` | Gigabyte H610M H BIOS FC / i5-14400(iGPU 켜짐, GOP 없음) / Gigabyte GA106 RTX 3060 12GB | USB 전용, 디스플레이 child 두 개; 기여자 보고 |
+| `b660m-3090ti` | ASUS TUF GAMING B660M-E D4 BIOS 4003 / iGPU 없는 i7-12700F / Colorful RTX 3090 Ti | 내부; 기여자가 cold boot 1회 보고 |
 
 최신 태그 v0.3.1은 소스 전용 사전 릴리스이며, 현재 소스에는 그 이후의 USB 경로와
 X870 프로필 등이 포함됩니다. 실기기 보고는 각 기록의 빌드에 해당합니다. 현재 cold
@@ -159,6 +161,24 @@ non-aggregate 디스플레이 child 두 개를 사용합니다.
 FP32 9.58 → 9.34 TFLOPS입니다. 저장소의 cuBLAS n=4096과는 다른 측정 절차입니다.
 실기기 보고와 해시는 원 기여 `4b748f5`에 해당하며 이후 보강한 통합본의 실기기 시험이
 아닙니다. [근거와 한계](../evidence/h610m-3060-usb/README.md)를 참고하세요.
+
+## 프로필 6: ASUS TUF B660M-E D4 / Colorful RTX 3090 Ti(내부)
+
+`b660m-3090ti`는 PCI `10de:2203`, subsystem `7377:1301`, GA102 `0xb72000a1`,
+`0x5ff4` MiB와 [기여자의 기록](../evidence/b660m-3090ti-internal/README.md)에 있는
+정확한 PROM 해시를 고정합니다. 같은 보드·BIOS 4003의 콘솔·EDID·nvgop fingerprint를
+프로필 2와 공유하며 런타임 소유권·코드·cold 상태·정리 검사는 유지합니다.
+
+내부 ESP cold boot 한 번에서 깨끗한 트랜잭션, Windows 직접 시작과 화면 복귀를
+보고했습니다. 반복 부팅·재시작·절전·안정성·통제된 성능 비교는 미검증입니다.
+통합 빌드의 유지관리자 실기 시험이 아닌 기여자 보고입니다. USB 경로의 실기 근거가
+없으므로 이 프로필은 USB 선택 항목을 제공하지 않습니다.
+
+main 소스에서 `internal-boot/Configure.ps1`과 `research/headless/build-unlock.ps1`
+양쪽에 `-HardwareProfile b660m-3090ti`를 전달하세요. v0.3.1 태그에는 없습니다.
+Cold/full-flow와 컴파일 회귀 검사를 제공하지만 `test-all.ps1`의 전체 개인 fixture
+트랜잭션 재현은 아직 연결하지 않았습니다. 공개 근거에 정확한 FWSEC 이미지 offset·size와
+개인 입력이 없으므로 펌웨어 배치를 추정해 통과시키지 않고 해당 검증을 차단합니다.
 
 ## 기록된 구성 밖의 범위
 
