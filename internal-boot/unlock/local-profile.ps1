@@ -36,6 +36,7 @@ function Get-LocalProfile([string]$Repo) {
 # by the build scripts themselves (platform-config.h, generated.h, build/) are excluded.
 function Get-LocalRequiredFiles {
  @('internal-boot/efi_runtime.c','internal-boot/unlock/local-profile.ps1',
+   'internal-boot/unlock/gpu-family.h','internal-boot/unlock/firmware-profile.h',
    'internal-boot/unlock/build.ps1','internal-boot/boot/handoff.c',
    'research/headless/build-usb.ps1','research/headless/stage-usb.ps1',
    'research/profile/make-profile.py','research/profile/capture_graph.py','research/profile/test-profile.ps1',

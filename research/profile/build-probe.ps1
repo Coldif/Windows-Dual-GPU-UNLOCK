@@ -40,7 +40,7 @@ try {
  if($LASTEXITCODE -ne 0){throw 'Probe PE verification failed'}
  [ordered]@{Mode='generic-read-only-probe-then-windows-usb';CanUnlock=$false;CanDetach=$false;WritesFirmwareVariables=$false;HardwareTested=$false;Defines=$defines
   EfiSha256=(Get-FileHash -LiteralPath "$out/BOOTX64.EFI").Hash.ToLowerInvariant();BuiltUtc=[DateTime]::UtcNow.ToString('o')
-  Sources=@(($sources+@('diagnostic.h','media.h','probe.h')) | ForEach-Object {[ordered]@{Path=$_;Sha256=(Get-FileHash -LiteralPath $_).Hash.ToLowerInvariant()}})
+  Sources=@(($sources+@('diagnostic.h','media.h','probe.h','../unlock/machine-profile.h','../unlock/gpu-family.h','../unlock/firmware-profile.h')) | ForEach-Object {[ordered]@{Path=$_;Sha256=(Get-FileHash -LiteralPath $_).Hash.ToLowerInvariant()}})
  } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath "$out/manifest.json" -Encoding utf8
  "Built generic read-only probe $out/BOOTX64.EFI; hardware untested."
 } finally {Pop-Location}

@@ -169,6 +169,10 @@ The guide also covers comparing two reports to investigate common differences.
 
 ## Implementation and boundaries
 
+The [GPU family layer](docs/GPU-FAMILIES.en.md) shares reviewed GA102/GA104/GA106
+traits and identical firmware templates, while exact card/platform pins remain
+separate. Existing profile names and support scope are unchanged.
+
 Headless is a separate compile-time profile. Exact GPU/PROM/PCI state, firmware
 driver code, ownership, cold state, immutable selectors and cleanup checks remain.
 The child logs to files only and rejects physical GOP reappearance or changed

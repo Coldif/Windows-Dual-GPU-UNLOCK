@@ -1,5 +1,18 @@
 # Changes
 
+## Unreleased — separate GPU family traits, firmware templates and machine pins
+
+- Centralize exact GA102/GA104/GA106 chip revisions and current PCI-ID/VRAM
+  admission rules. Fixed profiles select a family; legacy LOCAL headers retain
+  captured literal values and the existing GA102 admission combinations.
+- Factor identical console/EDID/nvgop fingerprint tuples into independent fixed
+  firmware templates. LOCAL inherits none; identity-only probes gain no write traits.
+- Preserve the shared transaction/layout implementation and all exact subsystem,
+  PROM, BAR, path, topology and runtime safety checks. No new hardware support,
+  GPU register-map admission or automatic LOCAL generation is added.
+- Include the new headers in required provenance inputs and diagnostic manifests.
+  Add compile-only family/card/firmware boundary regressions and EN/KO architecture docs.
+
 ## Unreleased — RTX 3080 display-routing observations
 
 - Integrate PR #39's contributor research and bounded read-only Windows

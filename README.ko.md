@@ -161,6 +161,10 @@ python -I research/profile/check-compatibility.py "D:\RTX3090-UNLOCK" --lang ko
 
 ## 구현과 경계
 
+[GPU 계열 공통화](docs/GPU-FAMILIES.ko.md)로 GA102·GA104·GA106 특성과 동일한
+펌웨어 템플릿을 공유하고, 정확한 카드·플랫폼 고정값은 분리합니다.
+기존 프로필 이름과 지원 범위는 유지합니다.
+
 Headless는 별도 컴파일 프로필입니다. 정확한 GPU·PROM·PCI 상태·펌웨어 드라이버 코드·
 소유권·cold 상태·불변 selector와 정리 검사를 유지합니다. Child는 파일에만 기록하고
 물리 GOP 재등장이나 콘솔·입력 인터페이스 변경을 거부합니다. 일반 빌드의 AMD 화면
