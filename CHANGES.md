@@ -1,5 +1,24 @@
 # Changes
 
+## Unreleased — probe: non-01 PCI bus and PciIo attribute record
+
+- The generic probe takes its deep-read bus from `GU_PROBE_BUS` (`research/profile/build-probe.ps1
+  -TargetBus`, default 1). The default keeps the same deep-read BDF check; a non-default bus compiles
+  only into the read-only diagnostic build. Many AM4/B550 boards put the CPU x16 slot on another
+  bus (for example `0x2b`), where the probe could only inventory the card.
+- The checked probe records the PciIo attribute cache once, with `EfiPciIoAttributeOperationGet`,
+  before its final raw-state recheck (`pci-attributes status= value=`). `make-profile.py` requires
+  that record and refuses a capture whose IO/MEM/BME attribute bits differ from the PCI command
+  register: `full-release.c` `CapturePermit` would stop the release there, after the console was
+  already detached. Captures from an older probe must be taken again.
+- Benchmark selection is unchanged: the native benchmark still requires bus `01`.
+- Refuse malformed or ambiguous PciIo attribute records, including a damaged record beside a valid one.
+- Host tests: the generic probe suite also runs at bus `0x2b`; a non-default bus is refused outside
+  the diagnostic build; the attributes mock fails on any operation other than Get. Attribute
+  callbacks that change MEM/BME/configuration/BDF/interface prevent all dependent reads; a
+  failed Get with a plausible partial value retains its failure status. No reviewed
+  profile, release path or generator admission rule other than the attribute record changes.
+
 ## Unreleased — recheck PROM read state after allocation
 
 - Recheck the exact PCI interface, identity, all 64 configuration DWORDs and MEM1/BME0

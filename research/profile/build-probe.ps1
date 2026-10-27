@@ -3,7 +3,8 @@
 # (PROM.BIN) and loaded driver images (IMGnn.BIN) to the stick it booted from, then starts
 # Windows. It compiles only as a diagnostic build: no unlock code, GPU writes, driver release,
 # DMA or firmware variable writes. Builds files only.
-param([Parameter(Mandatory)][guid]$WindowsEspGuid,[string]$Clang='clang',[string]$LldLink='lld-link',[string]$Python='python')
+param([Parameter(Mandatory)][guid]$WindowsEspGuid,[string]$Clang='clang',[string]$LldLink='lld-link',[string]$Python='python',
+      [ValidateRange(1,255)][int]$TargetBus=1)
 $ErrorActionPreference='Stop'
 $repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $boot=Join-Path $repo 'internal-boot/boot'
@@ -25,6 +26,7 @@ try {
  New-Item -ItemType Directory -Path $out -Force | Out-Null
  $sources=@('handoff.c','diagnostic.c','../efi_runtime.c','probe.c','../unlock/sha256.c')
  $defines=@('-DGU_DIAGNOSTIC_ONLY','-DGU_DIAGNOSTIC_PROBE','-DGU_PROBE_GENERIC','-DGU_USB_PROBE')
+ if($TargetBus -ne 1){$defines+=('-DGU_PROBE_BUS=0x{0:x}U' -f $TargetBus)}
  $objects=@()
  foreach($source in $sources) {
   $obj="$out/"+[IO.Path]::GetFileNameWithoutExtension($source)+'.obj'

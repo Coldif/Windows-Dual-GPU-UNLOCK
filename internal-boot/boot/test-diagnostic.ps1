@@ -48,4 +48,15 @@ try {
  if($LASTEXITCODE -ne 0){throw 'Generic probe tests compile failed'}
  & ./build/diagnostic/test-probe-generic.exe
  if($LASTEXITCODE -ne 0){throw 'Generic probe tests failed'}
+# Non-default deep-read bus (e.g. AM4 boards with the CPU x16 slot on 0x2b): same suite, other bus.
+ & $Clang -std=c11 -O1 -Wall -Wextra -Werror -D_CRT_SECURE_NO_WARNINGS -DGU_DIAGNOSTIC_ONLY -DGU_DIAGNOSTIC_PROBE -DGU_PROBE_GENERIC -DGU_PROBE_BUS=0x2bU -I ../../deps/edk2/MdePkg/Include -I ../../deps/edk2/MdePkg/Include/X64 test_probe_generic.c probe.c ../unlock/sha256.c -o build/diagnostic/test-probe-generic-bus2b.exe
+ if($LASTEXITCODE -ne 0){throw 'Generic probe (bus 0x2b) tests compile failed'}
+ & ./build/diagnostic/test-probe-generic-bus2b.exe
+ if($LASTEXITCODE -ne 0){throw 'Generic probe (bus 0x2b) tests failed'}
+ # A non-default bus must never compile outside the read-only diagnostic probe.
+ $ErrorActionPreference='Continue'
+ $out=& $Clang -target x86_64-pc-windows-msvc -std=c11 -ffreestanding -fsyntax-only -DGU_DIAGNOSTIC_PROBE -DGU_PROBE_GENERIC -DGU_PROBE_BUS=0x2bU -I ../../deps/edk2/MdePkg/Include -I ../../deps/edk2/MdePkg/Include/X64 probe.c 2>&1 | Out-String
+ if($LASTEXITCODE -eq 0 -or $out -notmatch 'only for the read-only diagnostic probe'){throw 'Non-default GU_PROBE_BUS not rejected outside a diagnostic-only build'}
+ $ErrorActionPreference='Stop'
+ 'PASS non-default probe bus rejected outside diagnostic-only builds'
 } finally {Pop-Location}

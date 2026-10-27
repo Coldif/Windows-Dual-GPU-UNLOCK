@@ -26,6 +26,7 @@ reviewed profiles have proven on hardware. There is no override flag. Today that
 | AMI console text/GOP splitter and EDID drivers, `nvgop-ga1xx` | the release path in `full-release.c` |
 | `nvgop-ga1xx` `.text` hash already released cleanly on hardware | another build has never been released |
 | GPU in its power-on state at every capture | the unlock never runs from anything else |
+| PciIo attribute cache recorded and equal to the PCI command register's IO/MEM bits, no bus mastering | `CapturePermit` stops the release otherwise, after the console was detached; captures from an older probe are refused |
 | at least two complete captures from separate full shutdowns, all agreeing | load-address- or boot-dependent values are refused |
 | PROM.BIN matches the captured hash; the production parser finds FWSEC-FRTS within tested bounds | FWSEC pin and transaction tests |
 
@@ -53,7 +54,10 @@ Run the same command repeatedly; each run does the next step.
    loaded driver images, and for a single eligible RTX 3090 / 3090 Ti only,
    16 BAR0 registers and the 1 MiB PROM window. The deep read requires MEM1/BME0,
    the reviewed class/revision, `0000:01:00.0`, a 32-bit aligned 16 MiB BAR resource
-   and unchanged handle/interface/config after resource queries and allocation.
+   and unchanged handle/interface/config after resource queries and allocation. A card on
+   another bus can be captured with `build-probe.ps1 -TargetBus 0x2b` (diagnostic build only);
+   the profile generator still requires `0000:01:00.0`. The probe also records the PciIo
+   attribute cache (Get only), which the generator compares with the PCI command register.
    Unknown devices and multiple NVIDIA displays receive inventory only; they cannot
    produce an eligible local profile. It writes
    `DIAGnn.TXT`, `PROM.BIN` and `IMGnn.BIN` through the launch volume validated by the
