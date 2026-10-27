@@ -10,10 +10,10 @@
  */
 #pragma once
 
-#if (defined(GU_PROFILE_B650M_3090FE) + defined(GU_PROFILE_B660M_3070TI) + defined(GU_PROFILE_X870_3090TI) + defined(GU_PROFILE_B660PLUS_3060) + defined(GU_PROFILE_LOCAL) + defined(GU_PROFILE_H610M_3060) + defined(GU_PROFILE_PROBE_H610M_3060)) > 1
+#if (defined(GU_PROFILE_B650M_3090FE) + defined(GU_PROFILE_B660M_3070TI) + defined(GU_PROFILE_B660M_3090TI) + defined(GU_PROFILE_X870_3090TI) + defined(GU_PROFILE_B660PLUS_3060) + defined(GU_PROFILE_LOCAL) + defined(GU_PROFILE_H610M_3060) + defined(GU_PROFILE_PROBE_H610M_3060)) > 1
 #error Select exactly one machine profile
 #endif
-#if !defined(GU_PROFILE_B650M_3090FE) && !defined(GU_PROFILE_B660M_3070TI) && !defined(GU_PROFILE_X870_3090TI) && !defined(GU_PROFILE_B660PLUS_3060) && !defined(GU_PROFILE_LOCAL) && !defined(GU_PROFILE_H610M_3060) && !defined(GU_PROFILE_PROBE_H610M_3060)
+#if !defined(GU_PROFILE_B650M_3090FE) && !defined(GU_PROFILE_B660M_3070TI) && !defined(GU_PROFILE_B660M_3090TI) && !defined(GU_PROFILE_X870_3090TI) && !defined(GU_PROFILE_B660PLUS_3060) && !defined(GU_PROFILE_LOCAL) && !defined(GU_PROFILE_H610M_3060) && !defined(GU_PROFILE_PROBE_H610M_3060)
 #define GU_PROFILE_B650M_3090FE 1
 #endif
 
@@ -33,7 +33,7 @@
  * (aggregate GOP + text-out driver chain; verified on AMI boards without a
  * second display GPU). 0 = nvgop owns the console GOP on the target directly
  * (original verified B650M headless topology). */
-#if defined(GU_PROFILE_B660M_3070TI) || defined(GU_PROFILE_B660PLUS_3060)
+#if defined(GU_PROFILE_B660M_3070TI) || defined(GU_PROFILE_B660M_3090TI) || defined(GU_PROFILE_B660PLUS_3060)
 #define GU_CONSOLE_AGGREGATE 1
 #else
 #define GU_CONSOLE_AGGREGATE 0
@@ -195,6 +195,51 @@
 #define GU_NVGOP_TEXT_BYTES 0x20d33U
 #define GU_NVGOP_TEXT_SHA256 "615b37a708b1894e18d7fa60cfcdacaa4d8b598863a10b8103d231a595847b2b"
 
+#elif defined(GU_PROFILE_B660M_3090TI)
+
+/* ASUSTeK TUF GAMING B660M-E D4 BIOS 4003, i7-12700F (no iGPU),
+ * Colorful RTX 3090 Ti 24GB (GA102, 10de:2203, subsystem 1301:7377):
+ * same board, BIOS 4003 and AMI aggregate console topology as the
+ * verified B660M_3070TI entry, so every machine-side fingerprint is
+ * identical to it. GPU-side constants come from this machine read-only
+ * probe capture DIAG03.TXT / PROM.BIN / IMG44.BIN (2026-10-27): the card
+ * reports 0x5ff4 MiB usable like the X870 GA102 sibling, not the 3070
+ * Ti 0x2000. Root port and the display device path are unchanged. */
+#define GU_PROFILE_NAME "ASUS-TUF-GAMING-B660M-E-D4-4003-RTX3090TI"
+#define GU_BOARD_ID 0x220310deU
+#define GU_BOARD_SUBSYSTEM 0x13017377U
+#define GU_BAR0_BASE 0x82000000ULL
+#define GU_BAR0_END 0x82ffffffULL
+#define GU_DEVICE_MEMORY_SIZE 0x5ff4U
+#define GU_CHIP_ID 0xb72000a1U
+#define GU_PROM_SHA256 "22b77e844a215bf52d745e0b10c6698ec3d9479f8350e833247bd5d77430bf44"
+#define GU_ROOT_PORT_DEVICE 1U
+#define GU_ROOT_PORT_FUNCTION 0U
+/* 36-byte display device path: ACPI root, PciRoot(0), Pci(1,0), Pci(0,0), ADR 0x80010320. */
+#define GU_RTX_PATH_BYTES 2,1,12,0,0xd0,0x41,3,10,0,0,0,0,1,1,6,0,0,1,1,1,6,0,0,0,2,3,8,0,32,3,1,128,127,255,4,0
+/* AMI console splitter text-out driver (BIOS 4003 image fingerprint). */
+#define GU_CONSOLE_TEXT_SIZE 0x6a40U
+#define GU_CONSOLE_TEXT_STOP 0x104cU
+#define GU_CONSOLE_TEXT_VERSION 0x10U
+/* AMI GOP combo splitter C1 GOP (BIOS 4003 image fingerprint). */
+#define GU_CONSOLE_GFX_SIZE 0x3bc0U
+#define GU_CONSOLE_GFX_STOP 0xb2cU
+#define GU_CONSOLE_GFX_VERSION 0x10U
+/* AMI GOP combo aggregate driver present only in this topology. */
+#define GU_COMBO_SIZE 0x2160U
+#define GU_COMBO_STOP 0x88cU
+#define GU_COMBO_VERSION 0x11U
+/* AMI EDID/mouse runtime driver (BIOS 4003 image fingerprint). */
+#define GU_EDID_IMAGE_SIZE 0x9000U
+#define GU_EDID_STOP 0x14d4U
+#define GU_EDID_TEXT_BYTES 0x37daU
+#define GU_EDID_TEXT_SHA256 "a015d52f55fa6441414458e2b699ba2edcb53f03b001ac6367e45bcd908c418e"
+/* nvgop-ga1xx driver shipped for GA102 (binding 0x60010). */
+#define GU_NVGOP_VERSION 0x60010U
+#define GU_NVGOP_IMAGE_SIZE 0x26ae0U
+#define GU_NVGOP_STOP 0x678U
+#define GU_NVGOP_TEXT_BYTES 0x20d33U
+#define GU_NVGOP_TEXT_SHA256 "615b37a708b1894e18d7fa60cfcdacaa4d8b598863a10b8103d231a595847b2b"
 #elif defined(GU_PROFILE_B660PLUS_3060)
 
 /* ASUSTeK PRIME B660-PLUS D4 BIOS 3010 (CSM disabled), i5-12600KF (no iGPU),
