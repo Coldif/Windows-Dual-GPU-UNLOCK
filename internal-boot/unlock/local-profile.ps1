@@ -16,12 +16,19 @@ function Get-LocalProfile([string]$Repo) {
   if(!$m.Success){throw "profile-local.h has no valid $Name"}
   return $m.Groups[1].Value
  }
+ $edidRows=@([regex]::Matches($text,'(?m)^[ \t]*#[ \t]*define[ \t]+GU_NO_EDID_DRIVER\b[^\r\n]*'))
+ if($edidRows.Count -ne 1 -or $edidRows[0].Value -cnotmatch '^#define GU_NO_EDID_DRIVER [01]$' -or
+    $text -match '(?m)^[ \t]*#[ \t]*undef[ \t]+GU_NO_EDID_DRIVER\b'){
+  throw 'profile-local.h requires one exact GU_NO_EDID_DRIVER 0/1; regenerate the local profile'
+ }
+ $noEdidDriver=$edidRows[0].Value.EndsWith(' 1')
  return [ordered]@{
   Define='-DGU_PROFILE_LOCAL';Name=(Value 'GU_PROFILE_NAME' '"(LOCAL-[0-9a-f]{8}-[0-9a-f]{8}-[0-9a-f]{8})"')
   TargetPci=(Value 'GU_BOARD_ID' '0x([0-9a-f]{8})U');Subsystem=(Value 'GU_BOARD_SUBSYSTEM' '0x([0-9a-f]{8})U')
   Chip=('0x'+(Value 'GU_CHIP_ID' '0x([0-9a-f]{8})U'));Prom=(Value 'GU_PROM_SHA256' '"([0-9a-f]{64})"')
   Memory=('0x'+(Value 'GU_DEVICE_MEMORY_SIZE' '0x([0-9a-f]+)U'));HeadlessOnly=$true;UsbOnly=$true
   HeaderSha256=(Get-GuSha256 $header)
+  NoEdidDriver=$noEdidDriver
  }
 }
 
@@ -31,7 +38,7 @@ function Get-LocalRequiredFiles {
  @('internal-boot/efi_runtime.c','internal-boot/unlock/local-profile.ps1',
    'internal-boot/unlock/build.ps1','internal-boot/boot/handoff.c',
    'research/headless/build-usb.ps1','research/headless/stage-usb.ps1',
-   'research/profile/make-profile.py','research/profile/test-profile.ps1',
+   'research/profile/make-profile.py','research/profile/capture_graph.py','research/profile/test-profile.ps1',
    'research/profile/host.ps1','research/profile/proven.json')
 }
 function Get-LocalTreeInputs([string]$Repo) {
@@ -69,13 +76,17 @@ function Get-LocalInputDigest($Inputs) {
  try{return (($sha.ComputeHash($bytes) | ForEach-Object {$_.ToString('x2')}) -join '')}finally{$sha.Dispose()}
 }
 function Get-LocalTreeDigest([string]$Repo) {Get-LocalInputDigest @(Get-LocalTreeInputs $Repo)}
-function Get-LocalExpectedJobs {
- [ordered]@{'generator refusals'=0;'stock-selection'=0;'checks (real config)'=0;
+function Get-LocalExpectedJobs([bool]$NoEdidDriver=$false) {
+ $jobs=[ordered]@{'generator refusals'=0;'stock-selection'=0;'checks (real config)'=0;
  'checks other profile (must reject)'=1;'port'=0;'write-lock'=0;'master-attributes'=0;'runtime'=0;
  'profile-lock-entryLatchedSs1Full'=0;'profile-lock-entryLatchedSs1Preserve'=0;
  'r2 console replay (real graph)'=0;'r2 replay other profile (must reject)'=1;
  'cold pre-check (read-only)'=0;'full flow gates'=0;'core transaction (efi)'=0;
  'manual entry-latched'=0;'automatic internal'=0;'headless internal'=0;'headless USB (shipped child)'=0}
+ # A firmware without an EDID driver releases the GPU differently from every reviewed profile, so its
+ # evidence must also hold the driver-release replay on its own graph.
+ if($NoEdidDriver){$jobs['release replay, no EDID driver (real graph)']=0}
+ return $jobs
 }
 function Get-LocalObjectNames($Value) {
  if($null -eq $Value){return @()}
@@ -102,6 +113,9 @@ function Get-LocalProfileReport([string]$Repo,$Hardware) {
     $report.ProfileName -cne $Hardware.Name -or $report.HeaderSha256 -cne $Hardware.HeaderSha256 -or
     $report.PromSha256 -cne $Hardware.Prom -or $report.HardwareTested -isnot [bool] -or $report.HardwareTested){throw 'Generated profile report identity is invalid'}
  Assert-LocalFixtures $Repo $report.Fixtures
+ if($null -eq $report.Replay -or $report.Replay.NoEdidDriver -isnot [bool] -or $report.Replay.NoEdidDriver -ne $Hardware.NoEdidDriver){
+  throw 'Generated profile report NoEdidDriver must be boolean and match the header'
+ }
  return $report
 }
 
@@ -126,7 +140,7 @@ function Assert-LocalProfileEvidence([string]$Repo) {
   if($e.Inputs[$i].Path -cne $inputs[$i].Path -or $e.Inputs[$i].Sha256 -cne $inputs[$i].Sha256){throw 'Build input path/hash changed after tests'}
  }
  if($e.TreeSha256 -cne (Get-LocalInputDigest $inputs)){throw 'Build input digest changed after tests'}
- $jobs=Get-LocalExpectedJobs
+ $jobs=Get-LocalExpectedJobs $hw.NoEdidDriver
  Assert-LocalKeys $e.Results @($jobs.Keys) 'Host jobs'
  foreach($name in $jobs.Keys){
   $job=$e.Results.$name

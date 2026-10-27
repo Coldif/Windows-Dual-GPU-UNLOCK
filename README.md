@@ -174,8 +174,11 @@ can build and test its own local profile with the [new-machine pipeline](docs/NE
 This experimental workflow inventories NVIDIA display devices, but deep capture is
 limited to one RTX 3090 / 3090 Ti in the reviewed PCI/BAR state. A generated local
 profile does not add another verified machine profile. USB write builds require all
-19 host jobs and unchanged profile, fixtures and build inputs; hardware validation
-is still required. Staging the unlock package needs `-StageUnlock`.
+19 host jobs (20 when the firmware binds no EDID driver) and unchanged profile,
+fixtures and build inputs; hardware validation is still required. Within this envelope
+the bus is pinned per machine, and single-RTX systems may have no iGPU or separate
+EDID driver. Aggregate consoles and multiple NVIDIA GPUs are not generated.
+Staging the unlock package needs `-StageUnlock`.
 
 ## License and attribution
 

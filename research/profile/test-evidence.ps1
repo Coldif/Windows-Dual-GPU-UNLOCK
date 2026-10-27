@@ -14,6 +14,7 @@ Put 'research/profile/local/fixtures/PROM.BIN' 'synthetic PROM, not GPU data'
 $prom=Get-GuSha256 (Join-Path $sandbox 'research/profile/local/fixtures/PROM.BIN')
 $header=@"
 #define GU_LOCAL_PROFILE_GENERATOR 1
+#define GU_NO_EDID_DRIVER 0
 #define GU_PROFILE_NAME "LOCAL-220410de-145410de-12345678"
 #define GU_BOARD_ID 0x220410deU
 #define GU_BOARD_SUBSYSTEM 0x145410deU
@@ -28,7 +29,7 @@ foreach($path in @('probe/REPORT.TXT','cold/REPORT.TXT','console/DIAG.TXT')) {
  $fixtures[$path]=Get-GuSha256 (Join-Path $sandbox ('research/profile/local/fixtures/'+$path))
 }
 $hw=Get-LocalProfile $sandbox
-$report=[ordered]@{Format=1;ProfileName=$hw.Name;HeaderSha256=$hw.HeaderSha256;PromSha256=$prom;HardwareTested=$false;Fixtures=$fixtures}
+$report=[ordered]@{Format=1;ProfileName=$hw.Name;HeaderSha256=$hw.HeaderSha256;PromSha256=$prom;HardwareTested=$false;Fixtures=$fixtures;Replay=[ordered]@{NoEdidDriver=$false}}
 Put 'research/profile/local/profile.json' ($report|ConvertTo-Json -Depth 8)
 $jobs=[ordered]@{}
 $expected=Get-LocalExpectedJobs
@@ -66,6 +67,59 @@ Check 'missing manifest row' {param($e) $e.Inputs=@($e.Inputs|Select-Object -Ski
 Check 'manifest hash' {param($e) $e.Inputs[0].Sha256='0'*64}
 Check 'manifest path' {param($e) $e.Inputs[0].Path='other.c'}
 Check 'digest' {param($e) $e.TreeSha256='0'*64}
+# A firmware without an EDID driver releases the GPU unlike every reviewed profile, so its evidence
+# must also hold the driver-release replay on its own graph, and that replay must have passed.
+$noEdidHeader=$header.Replace('#define GU_NO_EDID_DRIVER 0','#define GU_NO_EDID_DRIVER 1')
+Put 'internal-boot/unlock/profile-local.h' $noEdidHeader
+$noEdidHw=Get-LocalProfile $sandbox
+$reportNoEdid=[ordered]@{Format=1;ProfileName=$hw.Name;HeaderSha256=$noEdidHw.HeaderSha256;PromSha256=$prom;HardwareTested=$false;Fixtures=$fixtures;Replay=[ordered]@{NoEdidDriver=$true}}
+Put 'research/profile/local/profile.json' ($reportNoEdid|ConvertTo-Json -Depth 8)
+$jobsNoEdid=[ordered]@{};$expectedNoEdid=Get-LocalExpectedJobs $true
+foreach($name in $expectedNoEdid.Keys){$jobsNoEdid[$name]=[ordered]@{Exit=[int]$expectedNoEdid[$name];Expected=[int]$expectedNoEdid[$name]}}
+$normalBaseline=$baseline
+$baseline=[ordered]@{Format=2;AllPassed=$true;HardwareAccess=$false;ProfileName=$hw.Name;
+ HeaderSha256=$noEdidHw.HeaderSha256;PromSha256=$prom;ProfileReportSha256=(Get-GuSha256 (Join-Path $sandbox 'research/profile/local/profile.json'));
+ Fixtures=$fixtures;Inputs=$inputs;TreeSha256=(Get-LocalInputDigest $inputs);Results=$jobsNoEdid}|ConvertTo-Json -Depth 10
+Check 'no-EDID-driver evidence with the release replay' {} $true
+Check 'no-EDID-driver evidence without the release replay' {param($e) $e.Results.PSObject.Properties.Remove('release replay, no EDID driver (real graph)')}
+Check 'no-EDID-driver release replay failed' {param($e) $e.Results.'release replay, no EDID driver (real graph)'.Exit=1}
+Check 'no-EDID-driver release replay expectation weakened' {param($e) $e.Results.'release replay, no EDID driver (real graph)'.Expected=1;$e.Results.'release replay, no EDID driver (real graph)'.Exit=1}
+foreach($value in @($false,$null,'true','false',1)) {
+ $reportNoEdid.Replay.NoEdidDriver=$value
+ Put 'research/profile/local/profile.json' ($reportNoEdid|ConvertTo-Json -Depth 8)
+ Check ('header1/report NoEdidDriver mismatch '+[string]$value) {
+  param($e)
+  $e.ProfileReportSha256=Get-GuSha256 (Join-Path $sandbox 'research/profile/local/profile.json')
+  if(-not [bool]$value){$e.Results.PSObject.Properties.Remove('release replay, no EDID driver (real graph)')}
+ }
+}
+$reportNoEdid.Replay.NoEdidDriver=$true
+$baseline=$normalBaseline
+Put 'internal-boot/unlock/profile-local.h' $header
+Put 'research/profile/local/profile.json' ($report|ConvertTo-Json -Depth 8)
+foreach($value in @($true,$null,'false',0)) {
+ $report.Replay.NoEdidDriver=$value
+ Put 'research/profile/local/profile.json' ($report|ConvertTo-Json -Depth 8)
+ Check ('header0/report NoEdidDriver mismatch '+[string]$value) {
+  param($e)
+  $e.ProfileReportSha256=Get-GuSha256 (Join-Path $sandbox 'research/profile/local/profile.json')
+  if([bool]$value){$e.Results|Add-Member NoteProperty 'release replay, no EDID driver (real graph)' @{Exit=0;Expected=0}}
+ }
+}
+$report.Replay.NoEdidDriver=$false
+Put 'research/profile/local/profile.json' ($report|ConvertTo-Json -Depth 8)
+foreach($invalid in @(
+ $header.Replace('#define GU_NO_EDID_DRIVER 0',''),
+ $header.Replace('#define GU_NO_EDID_DRIVER 0','#define GU_NO_EDID_DRIVER 2'),
+ ($header+"`n#define GU_NO_EDID_DRIVER 1"),
+ ($header+"`n#undef GU_NO_EDID_DRIVER"),
+ $header.Replace('#define GU_NO_EDID_DRIVER 0','#define GU_NO_EDID_DRIVER (0)'))) {
+ Put 'internal-boot/unlock/profile-local.h' $invalid
+ $accepted=$true;try{$null=Get-LocalProfile $sandbox}catch{$accepted=$false}
+ if($accepted){throw 'Ambiguous/malformed local no-EDID define accepted'};$checks++
+}
+Put 'internal-boot/unlock/profile-local.h' $header
+Check 'release replay job on a profile that has an EDID driver' {param($e) $e.Results|Add-Member NoteProperty 'release replay, no EDID driver (real graph)' @{Exit=0;Expected=0}}
 Put 'research/profile/local/test-results.json' $baseline
 $package=[ordered]@{HardwareProfile=$hw.Name;LocalProfileHeaderSha256=$hw.HeaderSha256;
  LocalProfileTreeSha256=(Get-LocalInputDigest $inputs);

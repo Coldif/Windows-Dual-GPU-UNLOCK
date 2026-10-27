@@ -39,12 +39,12 @@ static void Basic(UINT32 C[64]) {
 
 static int Valid(const UINT32 C[64]) {
   GU_CAPS Caps;
-  return GuCheckConfig(C, 0, 1, 0, 0, &Caps);
+  return GuCheckConfig(C, 0, GU_TARGET_BUS, 0, 0, &Caps);
 }
 
 static void Reject(const UINT32 C[64], const char *Name) {
   GU_CAPS Caps = {0xffff, 0xffff, 0xffff, 0xffff, 0xff};
-  Check(!GuCheckConfig(C, 0, 1, 0, 0, &Caps), Name);
+  Check(!GuCheckConfig(C, 0, GU_TARGET_BUS, 0, 0, &Caps), Name);
   Check(Caps.pm == 0 && Caps.pcie == 0 && Caps.msi == 0 && Caps.msix == 0 &&
         Caps.pcie_version == 0, "rejection clears capability output");
 }
@@ -80,7 +80,7 @@ static void TestCapture(const UINT32 Captured[64]) {
   GU_CAPS Caps;
   memcpy(C, Captured, sizeof(C));
   memcpy(Before, C, sizeof(C));
-   Check(GuCheckConfig(C, 0, 1, 0, 0, &Caps), "captured RTX3090 RUN00 config accepted");
+   Check(GuCheckConfig(C, 0, GU_TARGET_BUS, 0, 0, &Caps), "captured RTX3090 RUN00 config accepted");
   Check(Caps.pm == 0x60 && Caps.msi == 0x68 && Caps.pcie == 0x78 &&
         Caps.msix == 0 && Caps.pcie_version == 2,
         "capture returns linked caps only; c8 is unlinked");
@@ -89,7 +89,7 @@ static void TestCapture(const UINT32 Captured[64]) {
   memcpy(C,Before,sizeof(C));C[0]=0x164e1002;C[11]=0x88771043;
   Reject(C,"AMD display cannot be target");memcpy(C,Before,sizeof(C));
   Byte(C, 0xb5, 0xc8);
-  Check(GuCheckConfig(C, 0, 1, 0, 0, &Caps) && Caps.msix == 0xc8,
+  Check(GuCheckConfig(C, 0, GU_TARGET_BUS, 0, 0, &Caps) && Caps.msix == 0xc8,
         "synthetically linked captured MSI-X is disabled and accepted");
   Word(C, 0xca, 0x8005);
   Reject(C, "linked enabled MSI-X rejected");
@@ -125,12 +125,12 @@ static void TestIdentity(void) {
     Reject(C, Mutations[I].Name);
   }
   Basic(C);
-  Check(!GuCheckConfig(C, 1, 1, 0, 0, &Caps), "wrong segment rejected");
-  Check(!GuCheckConfig(C, 0, 2, 0, 0, &Caps), "wrong bus rejected");
-  Check(!GuCheckConfig(C, 0, 1, 1, 0, &Caps), "wrong device location rejected");
-  Check(!GuCheckConfig(C, 0, 1, 0, 1, &Caps), "wrong function location rejected");
-  Check(!GuCheckConfig(NULL, 0, 1, 0, 0, &Caps), "null config rejected");
-  Check(!GuCheckConfig(C, 0, 1, 0, 0, NULL), "null output rejected");
+  Check(!GuCheckConfig(C, 1, GU_TARGET_BUS, 0, 0, &Caps), "wrong segment rejected");
+  Check(!GuCheckConfig(C, 0, GU_TARGET_BUS + 1, 0, 0, &Caps), "wrong bus rejected");
+  Check(!GuCheckConfig(C, 0, GU_TARGET_BUS, 1, 0, &Caps), "wrong device location rejected");
+  Check(!GuCheckConfig(C, 0, GU_TARGET_BUS, 0, 1, &Caps), "wrong function location rejected");
+  Check(!GuCheckConfig(NULL, 0, GU_TARGET_BUS, 0, 0, &Caps), "null config rejected");
+  Check(!GuCheckConfig(C, 0, GU_TARGET_BUS, 0, 0, NULL), "null output rejected");
 }
 
 static void TestPowerAndPcie(void) {
@@ -197,13 +197,13 @@ static void TestCapabilities(void) {
   for (I = 0; I < sizeof(MsiControl) / sizeof(MsiControl[0]); ++I) {
     Basic(C); Byte(C, 0x49, 0x90);
     C[0x90 / 4] = (MsiControl[I] << 16) | 5;
-    Check(GuCheckConfig(C, 0, 1, 0, 0, &Caps) && Caps.msi == 0x90,
+    Check(GuCheckConfig(C, 0, GU_TARGET_BUS, 0, 0, &Caps) && Caps.msi == 0x90,
           "disabled 32/64-bit MSI with/without masks accepted");
     Word(C, 0x92, MsiControl[I] | 1);
     Reject(C, "enabled MSI rejected for each layout");
   }
   Basic(C); Byte(C, 0x49, 0x90); C[0x90 / 4] = 0x40000011;
-  Check(GuCheckConfig(C, 0, 1, 0, 0, &Caps) && Caps.msix == 0x90,
+  Check(GuCheckConfig(C, 0, GU_TARGET_BUS, 0, 0, &Caps) && Caps.msix == 0x90,
         "disabled and function-masked MSI-X accepted");
   Basic(C); Byte(C, 0x49, 0x90); C[0x90 / 4] = 0x00040009;
   Check(Valid(C), "bounded vendor capability accepted");

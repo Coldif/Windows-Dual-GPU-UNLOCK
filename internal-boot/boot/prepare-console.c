@@ -220,7 +220,7 @@ static EFI_STATUS Displays(EFI_SYSTEM_TABLE *t,PLAN *p,BOOLEAN first) {
 #endif
     } else if(DisplayRoute(path,RtxPath) && !rtx) {
       rtx=handles[i];UINT32 cfg[16];EFI_HANDLE h=NULL;EFI_PCI_IO_PROTOCOL *io=NULL;
-      s=PciFor(bs,path,1,GU_BOARD_ID,GU_BOARD_SUBSYSTEM,&h,&io,cfg);
+      s=PciFor(bs,path,GU_TARGET_BUS,GU_BOARD_ID,GU_BOARD_SUBSYSTEM,&h,&io,cfg);
       if(s!=EFI_SUCCESS)break;
       if(first){p->RtxPci=h;p->RtxIo=io;for(UINTN j=0;j<16;j++)p->RtxConfig[j]=cfg[j];for(UINTN j=0;j<36;j++)p->RtxDisplayPath[j]=((UINT8 *)path)[j];}
       else if(p->RtxPci!=h || p->RtxIo!=io || !Bytes(cfg,p->RtxConfig,sizeof(cfg)) || !PathMatches(path,p->RtxDisplayPath))s=EFI_NOT_READY;
@@ -339,7 +339,7 @@ static EFI_STATUS Consumers(EFI_SYSTEM_TABLE *t,PLAN *p,const GRAPH *g) {
     if(child==p->RtxPci || child==p->Console || child==p->Input || child==p->Error || child==p->Agg)return EFI_ACCESS_DENIED;
     EFI_STATUS s=Interface(t->BootServices,child,&PathGuid,(VOID **)&path);
     if(s!=EFI_SUCCESS || !DisplayRoute(path,RtxPath))return EFI_UNSUPPORTED;
-    s=PciFor(t->BootServices,path,1,GU_BOARD_ID,GU_BOARD_SUBSYSTEM,&pci,&io,config);
+    s=PciFor(t->BootServices,path,GU_TARGET_BUS,GU_BOARD_ID,GU_BOARD_SUBSYSTEM,&pci,&io,config);
     if(s!=EFI_SUCCESS || pci!=p->RtxPci || io!=p->RtxIo || !Bytes(config,p->RtxConfig,sizeof(config)))return EFI_NOT_READY;
     for(UINTN prior=0;prior<c;prior++)if(Bytes(p->ChildPaths[prior],path,36))return EFI_UNSUPPORTED;
     for(UINTN j=0;j<36;j++)p->ChildPaths[c][j]=((UINT8 *)path)[j];

@@ -26,6 +26,11 @@
       "version": "60010",
       "text_sha256": "615b37a708b1894e18d7fa60cfcdacaa4d8b598863a10b8103d231a595847b2b",
       "evidence": "evidence/x870-3090ti-usb"
+    },
+    {
+      "version": "60009",
+      "text_sha256": "d045cee2113e461c7c678ec21542b1d0f18356765c0fc6a0bf2dcf824088e011",
+      "evidence": "evidence/b550m-3090-usb"
     }
   ],
   "min_captures": 2
