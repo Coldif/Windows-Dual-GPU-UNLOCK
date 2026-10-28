@@ -44,6 +44,7 @@ enum {PCI=1,PRIMARY,SIBLING,AGG,CONSOLE,INPUT,NV,EDID,COMBO,GFX,TEXT_DRIVER,
 #define STDERR_HANDLE CONSOLE
 #endif
 #define H(n) ((EFI_HANDLE)(UINTN)(n))
+#define TEST_CONTROLLER_BYTES (GU_RTX_DISPLAY_BYTES-12U)
 static GRAPH Live;
 static EFI_BOOT_SERVICES Boot;
 static EFI_SYSTEM_TABLE Table;
@@ -57,7 +58,10 @@ static EFI_SIMPLE_TEXT_OUTPUT_MODE TextMode;
 static EFI_SIMPLE_TEXT_INPUT_PROTOCOL Input;
 static EFI_DRIVER_BINDING_PROTOCOL Bindings[5];
 static EFI_LOADED_IMAGE_PROTOCOL Images[5];
-static UINT8 DriverPaths[5][32],DisplayPaths[2][36],ControllerPath[28];
+static UINT8 DriverPaths[5][32],DisplayPaths[2][GU_RTX_DISPLAY_BYTES],ControllerPath[TEST_CONTROLLER_BYTES+4];
+static UINT8 FaultDisplayPath[GU_RTX_DISPLAY_BYTES+6];
+static UINTN FaultControllerBytes;
+static BOOLEAN ParentDrift,PathFault;
 static UINT8 NvMemory[GU_NVGOP_IMAGE_SIZE],EdidMemory[GU_EDID_IMAGE_SIZE],
   ComboMemory[GU_COMBO_SIZE],GfxMemory[GU_CONSOLE_GFX_SIZE],OutMemory[GU_CONSOLE_TEXT_SIZE],PromMemory[1048576];
 static UINT32 Config[64];
@@ -68,6 +72,18 @@ static BOOLEAN ScenarioReached;
 static const char *FirstError;
 static EFI_GUID PrivateGuid={0x11223344,0,0,{0}};
 static EFI_STATUS EFIAPI Handle(EFI_HANDLE h,EFI_GUID *guid,VOID **out);
+static void ChangePathLength(BOOLEAN longer) {
+  const UINT8 *source=DisplayPaths[TEST_CHILDREN==2?1:0];
+  if(longer) {
+    UINTN at=TEST_CONTROLLER_BYTES-6;
+    memcpy(FaultDisplayPath,source,at);memcpy(FaultDisplayPath+at,(UINT8[]){1,1,6,0,0,4},6);
+    memcpy(FaultDisplayPath+at+6,source+at,GU_RTX_DISPLAY_BYTES-at);FaultControllerBytes=TEST_CONTROLLER_BYTES+6;
+  } else {
+    memcpy(FaultDisplayPath,source,12);memcpy(FaultDisplayPath+12,source+18,GU_RTX_DISPLAY_BYTES-18);
+    FaultControllerBytes=TEST_CONTROLLER_BYTES-6;
+  }
+  PathFault=TRUE;
+}
 static UINTN DriverHandle(UINTN i) {const UINTN handles[]={NV,EDID,COMBO,GFX,TEXT_DRIVER};return handles[i];}
 static UINTN ImageHandle(UINTN i) {const UINTN handles[]={NV,EDID,COMBO_IMAGE,GFX_IMAGE,OUT_IMAGE};return handles[i];}
 static void Check(BOOLEAN good,const char *why) {
@@ -148,6 +164,7 @@ static EFI_STATUS EFIAPI Handle(EFI_HANDLE h,EFI_GUID *guid,VOID **out) {
   if(GuGuidEqual(guid,&PathGuid) && (!GpuGone || Mode==7)) {
     if(h==H(PRIMARY))*out=DisplayPaths[0];
     if(TEST_CHILDREN==2 && h==H(SIBLING))*out=DisplayPaths[1];
+    if(PathFault && h==H(TEST_CHILDREN==2?SIBLING:PRIMARY))*out=FaultDisplayPath;
   }
   if(GuGuidEqual(guid,&PathGuid) && h==H(PCI))*out=ControllerPath;
   if(GuGuidEqual(guid,&PathGuid) && GpuGone && Mode==10 && h==H(AGG))*out=DisplayPaths[0];
@@ -176,8 +193,10 @@ static EFI_STATUS EFIAPI Handle(EFI_HANDLE h,EFI_GUID *guid,VOID **out) {
 }
 static EFI_STATUS EFIAPI FindPci(EFI_GUID *guid,EFI_DEVICE_PATH_PROTOCOL **path,EFI_HANDLE *handle) {
   Check(GuGuidEqual(guid,&PciGuid),"PCI-only lookup");
-  BOOLEAN known=(VOID *)*path==DisplayPaths[0] || (TEST_CHILDREN==2 && (VOID *)*path==DisplayPaths[1]);
-  if(!known)return EFI_UNSUPPORTED;*handle=H(PCI);*path=(VOID *)((UINT8 *)*path+24);return EFI_SUCCESS;
+  BOOLEAN fault=(VOID *)*path==FaultDisplayPath;
+  BOOLEAN known=(VOID *)*path==DisplayPaths[0] || (TEST_CHILDREN==2 && (VOID *)*path==DisplayPaths[1]) || fault;
+  if(!known)return EFI_UNSUPPORTED;*handle=H(PCI);
+  *path=(VOID *)((UINT8 *)*path+(fault?FaultControllerBytes:TEST_CONTROLLER_BYTES)-(ParentDrift?6:0));return EFI_SUCCESS;
 }
 static EFI_STATUS EFIAPI Location(EFI_PCI_IO_PROTOCOL *io,UINTN *seg,UINTN *bus,UINTN *dev,UINTN *fun) {
   Check(io==&Io,"exact PCI interface");
@@ -277,6 +296,7 @@ static EFI_STATUS Log(VOID *context,const char *event,EFI_STATUS status) {
 static void Setup(void) {
   memset(&Boot,0,sizeof(Boot));memset(&Table,0,sizeof(Table));memset(&Io,0,sizeof(Io));Live.Count=0;
   Calls=EdidCalls=NvCalls=Enables=Claims=Closes=0;GpuGone=ScenarioReached=FALSE;
+  ParentDrift=PathFault=FALSE;memset(FaultDisplayPath,0,sizeof(FaultDisplayPath));
   FirstError=NULL;memset(NvMemory,0,sizeof(NvMemory));memset(EdidMemory,0,sizeof(EdidMemory));
   Boot.AllocatePool=Allocate;Boot.FreePool=Free;Boot.RaiseTPL=Raise;Boot.RestoreTPL=Restore;
   Boot.LocateHandleBuffer=Locate;Boot.ProtocolsPerHandle=Protocols;Boot.OpenProtocolInformation=Opens;
@@ -292,19 +312,22 @@ static void Setup(void) {
   PhysicalMode=(EFI_GRAPHICS_OUTPUT_PROTOCOL_MODE){0};PhysicalMode.MaxMode=1;PhysicalMode.Info=&Info;PhysicalMode.SizeOfInfo=sizeof(Info);
   PhysicalMode.FrameBufferBase=0xfcc0000000ULL;PhysicalMode.FrameBufferSize=1920*1080*4;Physical.Mode=&PhysicalMode;
   AggregateMode=(EFI_GRAPHICS_OUTPUT_PROTOCOL_MODE){0};Aggregate.Mode=&AggregateMode;
-  memcpy(DisplayPaths[0],RtxPath,36);memcpy(DisplayPaths[1],RtxPath,36);DisplayPaths[1][28]^=0x30;
-  memcpy(ControllerPath,RtxPath,24);memcpy(ControllerPath+24,(UINT8[]){127,255,4,0},4);
+  memcpy(DisplayPaths[0],RtxPath,sizeof(RtxPath));memcpy(DisplayPaths[1],RtxPath,sizeof(RtxPath));DisplayPaths[1][TEST_CONTROLLER_BYTES+4]^=0x30;
+  memcpy(ControllerPath,RtxPath,TEST_CONTROLLER_BYTES);memcpy(ControllerPath+TEST_CONTROLLER_BYTES,(UINT8[]){127,255,4,0},4);
   memset(Config,0,sizeof(Config));Config[0]=GU_BOARD_ID;Config[1]=0x00100003;Config[2]=0x030000a1;
   Config[4]=GU_BAR0_BASE;Config[11]=GU_BOARD_SUBSYSTEM;Config[13]=0x40;
   Config[16]=0x00034801;Config[18]=0x00020010;Config[19]=1U<<28;Attributes=0x300;
 #ifdef GU_AGGREGATE_CAPTURE_FIXTURE
   const UINT8 captured_path[]={FX_PRIMARY_PATH_BYTES};
   Check(sizeof(captured_path)==sizeof(RtxPath) && !memcmp(captured_path,RtxPath,sizeof(RtxPath)),"captured primary path matches profile");
-  memcpy(DisplayPaths[0],captured_path,36);
+  Check(FX_DISPLAY_PATH_BYTES==sizeof(RtxPath) && FX_CONTROLLER_BYTES==TEST_CONTROLLER_BYTES,"captured path lengths match profile and parent consumption");
+  memcpy(DisplayPaths[0],captured_path,sizeof(DisplayPaths[0]));
 #if TEST_CHILDREN==2
-  const UINT8 sibling_path[]={FX_EDID_CHILD_PATH_BYTES};memcpy(DisplayPaths[1],sibling_path,36);
+  const UINT8 sibling_path[]={FX_EDID_CHILD_PATH_BYTES};
+  Check(sizeof(sibling_path)==sizeof(DisplayPaths[1]),"captured sibling length matches profile");
+  memcpy(DisplayPaths[1],sibling_path,sizeof(DisplayPaths[1]));
 #endif
-  memcpy(ControllerPath,captured_path,24);memcpy(Config,FixtureFullRtxConfig,sizeof(Config));
+  memcpy(ControllerPath,captured_path,TEST_CONTROLLER_BYTES);memcpy(Config,FixtureFullRtxConfig,sizeof(Config));
   Check(!memcmp(Config,FixtureRtxConfig,sizeof(FixtureRtxConfig)),"complete config matches graph PCI snapshot");
   Check(FixtureAmdConfig[0]!=Config[0],"unrelated adapter is not the target");
   Attributes=FX_PCI_ATTRIBUTES;
@@ -357,7 +380,7 @@ int main(int argc,char **argv) {
 #else
   Check(argc==1 || argc==4,"optional EDID, NVIDIA and PROM images");
 #endif
-  for(Mode=0;Mode<19;Mode++) {
+  for(Mode=0;Mode<23;Mode++) {
     Setup();
     if(argc==4) {
       LoadExact(argv[1],EdidMemory,sizeof(EdidMemory));LoadExact(argv[2],NvMemory,sizeof(NvMemory));
@@ -369,8 +392,11 @@ int main(int argc,char **argv) {
       ScenarioReached=TRUE;
       if(Mode==15)NvMemory[0x280]^=1;
       if(Mode==16)EdidMemory[0x1000]^=1;
-      if(Mode==17)DisplayPaths[0][28]^=1;
+      if(Mode==17)DisplayPaths[0][TEST_CONTROLLER_BYTES+4]^=1;
       if(Mode==18)Bindings[2].Stop=(EFI_DRIVER_BINDING_STOP)(ComboMemory+GU_COMBO_STOP+1);
+      if(Mode==19)ParentDrift=TRUE;
+      if(Mode==20 || Mode==21)ChangePathLength(Mode==21);
+      if(Mode==22)DisplayPaths[0][16]^=1;
     }
     status=GuReleaseGop(&Table,H(APP),Log,NULL);
     if(!Mode || Mode==6) {
@@ -396,6 +422,6 @@ int main(int argc,char **argv) {
          !strcmp(FirstError,Mode==15?"nvidia-code-profile":"ami-runtime-code-profile"),"corrupt code rejected at exact fingerprint gate");
     }
   }
-  printf("PASS aggregate full prepare/release: %u checks, %u display children, 19 scenarios; RAM-only\n",Checks,TEST_CHILDREN);
+  printf("PASS aggregate full prepare/release: %u checks, %u display children, 23 scenarios; RAM-only\n",Checks,TEST_CHILDREN);
   return 0;
 }

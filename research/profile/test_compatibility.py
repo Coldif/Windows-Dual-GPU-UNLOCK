@@ -122,6 +122,21 @@ class CompatibilityTests(unittest.TestCase):
                     self.assertIs(report['Replay']['Aggregate'], False)
                     self.assertEqual(report['Replay']['ChildCount'], children)
 
+    def test_complete_root_and_bridge_ancestry_must_agree_across_cold_boots(self):
+        changes=(('02010c00d041030a00000000','02010c00d041030a01000000'),
+                 ('02010c00d041030a00000000','02010c00d041080a00000000'),
+                 ('010106000103','010106000003'))
+        for old,new in changes:
+            with self.subTest(new=new):
+                text=self.populate(no_edid=False)
+                changed=text.replace('path-node raw='+old,'path-node raw='+new)
+                self.assertNotEqual(changed,text)
+                (self.folder/'DIAG00.TXT').write_text(changed,encoding='ascii')
+                self.assert_reason('invalid_data','captures_disagree')
+                with self.assertRaisesRegex(checker.mp.Refused,'disagree'), \
+                     patch.object(checker.mp,'locate_fwsec',side_effect=AssertionError('ancestry drift must stop before PROM parsing')):
+                    checker.mp.generate(self.folder,Path('not-invoked'),self.envelope)
+
     def test_missing_assets_are_not_candidate(self):
         self.populate()
         (self.folder / 'IMG00.BIN').unlink()

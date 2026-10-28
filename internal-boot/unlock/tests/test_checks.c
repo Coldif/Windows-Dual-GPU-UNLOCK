@@ -415,6 +415,34 @@ static void TestPaths(void) {
   (void)LegacyTestPaths; /* Preserved historical vectors, not this board's contract. */
 }
 
+#ifdef GU_PROFILE_LOCAL
+static int ExactAmd(const UINT8 *p,UINTN bytes) {
+  static const UINT8 Amd[]={2,1,12,0,0xd0,0x41,3,0x0a,0,0,0,0,
+    1,1,6,0,1,8,1,1,6,0,0,0,2,3,8,0,0,3,1,0x80,0x7f,0xff,4,0};
+  return bytes>=sizeof(Amd) && !memcmp(p,Amd,sizeof(Amd));
+}
+static void TestLocalPaths(void) {
+  static const UINT8 Target[]={GU_RTX_PATH_BYTES};
+  static const UINT8 Amd[]={2,1,12,0,0xd0,0x41,3,0x0a,0,0,0,0,
+    1,1,6,0,1,8,1,1,6,0,0,0,2,3,8,0,0,3,1,0x80,0x7f,0xff,4,0};
+  UINT8 changed[sizeof(Target)+16];
+  int expected=ExactAmd(Target,sizeof(Target))?1:2;
+  Check(Path(Amd,sizeof(Amd))==1,"LOCAL preserves exact historical AMD classification");
+  Check(Path(Target,sizeof(Target))==expected,"LOCAL classifies its complete captured PCI ancestry");
+  Check(!GuDisplayPath(NULL,256),"LOCAL null path rejected");
+  for(UINTN i=0;i<sizeof(Target);i++) {
+    Check(!Path(Target,i),"every truncated LOCAL target rejected");
+    memcpy(changed,Target,sizeof(Target));changed[i]^=0x40;
+    int want=(i>=sizeof(Target)-8 && i<sizeof(Target)-4)?2:0;
+    if(ExactAmd(changed,sizeof(Target)))want=1;
+    Check(Path(changed,sizeof(Target))==want,"LOCAL pins ancestry and shape while discovering output ADR");
+  }
+  memset(changed,0xa5,sizeof(changed));memcpy(changed,Target,sizeof(Target));
+  Check(Path(changed,sizeof(changed))==expected,"LOCAL bound may extend after end-entire");
+  (void)TestPaths; /* Fixed-profile vectors remain unchanged in their own builds. */
+}
+#endif
+
 int main(int Argc, char **Argv) {
   UINT32 Captured[64],Legacy[64];
   if (Argc != 2 || !LoadCapture(Argv[1], Captured)) return 2;
@@ -423,7 +451,11 @@ int main(int Argc, char **Argv) {
   TestIdentity();
   TestPowerAndPcie();
   TestCapabilities();
+#ifdef GU_PROFILE_LOCAL
+  TestLocalPaths();
+#else
   TestPaths();
+#endif
   if (Failures != 0) {
     fprintf(stderr, "%u/%u checks failed\n", Failures, Checks);
     return 1;

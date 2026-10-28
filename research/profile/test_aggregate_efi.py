@@ -1,4 +1,4 @@
-"""Freestanding compile/link/PE regression for synthetic LOCAL aggregate headers.
+"""Freestanding compile/link/PE regression for synthetic generated LOCAL headers.
 
 Build artifacts stay in a new ignored directory, never execute, and are not an
 authorized package. This deliberately does not write or bypass LOCAL evidence.
@@ -31,7 +31,7 @@ def main():
         parser.error('Expected synthetic host replay inputs')
     cases=sorted({row['case'] for row in inputs['cases'] if row['stage']=='release'})
     if not cases:parser.error('No completed LOCAL release cases')
-    if any(not re.fullmatch(r'id[0-9a-f]{8}-children[12]',name) for name in cases):
+    if any(not re.fullmatch(r'(id[0-9a-f]{8}|hops(1|2|3|8|16)-root[38])-children[12]',name) for name in cases):
         parser.error('Unexpected synthetic case path')
     out.mkdir(parents=True)
     (out/'NOT-A-PACKAGE.txt').write_text('Synthetic compile regression only. No LOCAL evidence or package authorization. Do not stage or execute.\n')
@@ -69,8 +69,8 @@ def main():
         report=json.loads((profiles/name/'profile.json').read_text())
         if hashlib.sha256(header.read_bytes()).hexdigest()!=report['HeaderSha256']:
             raise RuntimeError('Generated header changed: '+name)
-        if report['Replay']['Aggregate'] is not True or report['HardwareTested'] is not False:
-            raise RuntimeError('Expected an untested aggregate LOCAL header')
+        if type(report['Replay']['Aggregate']) is not bool or report['HardwareTested'] is not False:
+            raise RuntimeError('Expected an untested generated LOCAL header')
         contract=case/'child-contract.h'
         contract.write_text('#error Synthetic child contract is not bound yet\n')
         overlay=case/'overlay.json'

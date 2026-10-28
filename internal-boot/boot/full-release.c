@@ -28,7 +28,7 @@ typedef struct {
   BOOLEAN Captured,Released,Owned,Restored;
 #ifdef GU_HEADLESS_RESEARCH
   EFI_HANDLE Children[GU_HEADLESS_MAX_DISPLAY_CHILDREN];
-  UINT8 ChildPaths[GU_HEADLESS_MAX_DISPLAY_CHILDREN][36];
+  UINT8 ChildPaths[GU_HEADLESS_MAX_DISPLAY_CHILDREN][GU_RTX_DISPLAY_BYTES];
   UINTN ChildCount;
   UINTN EdidDetached;
 #endif
@@ -247,11 +247,11 @@ static EFI_STATUS FullConsumers(const GRAPH *g) {
   for(UINTN c=0;c<Full.ChildCount;c++) {
     EFI_HANDLE child=Full.Children[c];EFI_DEVICE_PATH_PROTOCOL *path=NULL;VOID *foundEdid=NULL,*other=NULL;
     EFI_STATUS s=Interface(bs,child,&PathGuid,(VOID **)&path);
-    if(s!=EFI_SUCCESS || !DisplayRoute(path,RtxPath) || !Bytes(path,PreparedPlan.ChildPaths[c],36))return EFI_UNSUPPORTED;
+    if(s!=EFI_SUCCESS || !DisplayRoute(path,RtxPath,sizeof(RtxPath)) || !Bytes(path,PreparedPlan.ChildPaths[c],sizeof(PreparedPlan.ChildPaths[c])))return EFI_UNSUPPORTED;
     UINT32 cfg[16];EFI_HANDLE pci=NULL;EFI_PCI_IO_PROTOCOL *io=NULL;
     s=PciFor(bs,path,GU_TARGET_BUS,GU_BOARD_ID,GU_BOARD_SUBSYSTEM,&pci,&io,cfg);
     if(s!=EFI_SUCCESS || pci!=PreparedPlan.RtxPci || io!=PreparedPlan.RtxIo || !Bytes(cfg,PreparedPlan.RtxConfig,sizeof(cfg)))return EFI_NOT_READY;
-    for(UINTN j=0;j<36;j++)Full.ChildPaths[c][j]=((UINT8 *)path)[j];
+    for(UINTN j=0;j<sizeof(Full.ChildPaths[c]);j++)Full.ChildPaths[c][j]=((UINT8 *)path)[j];
     if(Interface(bs,child,&EdidGuid,&foundEdid)!=EFI_SUCCESS || !foundEdid)return EFI_UNSUPPORTED;
     if(c) {
       s=Interface(bs,child,&GopGuid,&other);
@@ -284,11 +284,11 @@ static EFI_STATUS FullConsumers(const GRAPH *g) {
   {
     EFI_DEVICE_PATH_PROTOCOL *path=NULL;VOID *edid=NULL;
     EFI_STATUS s=Interface(bs,Full.Children[0],&PathGuid,(VOID **)&path);
-    if(s!=EFI_SUCCESS || !DisplayRoute(path,RtxPath))return EFI_UNSUPPORTED;
+    if(s!=EFI_SUCCESS || !DisplayRoute(path,RtxPath,sizeof(RtxPath)))return EFI_UNSUPPORTED;
     UINT32 cfg[16];EFI_HANDLE pci=NULL;EFI_PCI_IO_PROTOCOL *io=NULL;
     s=PciFor(bs,path,GU_TARGET_BUS,GU_BOARD_ID,GU_BOARD_SUBSYSTEM,&pci,&io,cfg);
     if(s!=EFI_SUCCESS || pci!=PreparedPlan.RtxPci || io!=PreparedPlan.RtxIo || !Bytes(cfg,PreparedPlan.RtxConfig,sizeof(cfg)))return EFI_NOT_READY;
-    for(UINTN j=0;j<36;j++)Full.ChildPaths[0][j]=((UINT8 *)path)[j];
+    for(UINTN j=0;j<sizeof(Full.ChildPaths[0]);j++)Full.ChildPaths[0][j]=((UINT8 *)path)[j];
     if(Interface(bs,Full.Children[0],&EdidGuid,&edid)!=EFI_SUCCESS)return EFI_UNSUPPORTED;
   }
   for(UINTN i=0;i<g->Count;i++) {
@@ -331,12 +331,12 @@ static EFI_STATUS FullConsumers(const GRAPH *g) {
     if(Full.Children[c]==PreparedPlan.Console || Full.Children[c]==PreparedPlan.Input || Full.Children[c]==PreparedPlan.Error || Full.Children[c]==PreparedPlan.RtxPci)return EFI_ACCESS_DENIED;
     EFI_DEVICE_PATH_PROTOCOL *path=NULL;VOID *edid=NULL,*other=NULL;
     EFI_STATUS s=Interface(bs,Full.Children[c],&PathGuid,(VOID **)&path);
-    if(s!=EFI_SUCCESS || !DisplayRoute(path,RtxPath))return EFI_UNSUPPORTED;
+    if(s!=EFI_SUCCESS || !DisplayRoute(path,RtxPath,sizeof(RtxPath)))return EFI_UNSUPPORTED;
     UINT32 cfg[16];EFI_HANDLE pci=NULL;EFI_PCI_IO_PROTOCOL *io=NULL;
     s=PciFor(bs,path,GU_TARGET_BUS,GU_BOARD_ID,GU_BOARD_SUBSYSTEM,&pci,&io,cfg);
     if(s!=EFI_SUCCESS || pci!=PreparedPlan.RtxPci || io!=PreparedPlan.RtxIo || !Bytes(cfg,PreparedPlan.RtxConfig,sizeof(cfg)))return EFI_NOT_READY;
-    for(UINTN j=0;j<36;j++)Full.ChildPaths[c][j]=((UINT8 *)path)[j];
-    for(UINTN prior=0;prior<c;prior++)if(Bytes(Full.ChildPaths[prior],path,36))return EFI_UNSUPPORTED;
+    for(UINTN j=0;j<sizeof(Full.ChildPaths[c]);j++)Full.ChildPaths[c][j]=((UINT8 *)path)[j];
+    for(UINTN prior=0;prior<c;prior++)if(Bytes(Full.ChildPaths[prior],path,sizeof(Full.ChildPaths[prior])))return EFI_UNSUPPORTED;
     if(Interface(bs,Full.Children[c],&EdidGuid,&edid)!=EFI_SUCCESS)return EFI_UNSUPPORTED;
     if(c) {
       s=Interface(bs,Full.Children[c],&GopGuid,&other);
@@ -514,7 +514,7 @@ static EFI_STATUS AmdOnly(VOID) {
     EFI_STATUS ps=Interface(bs,handles[i],&PathGuid,(VOID **)&path);
     EFI_GRAPHICS_OUTPUT_PROTOCOL_MODE *m=gop->Mode;
     if((ps==EFI_UNSUPPORTED || ps==EFI_NOT_FOUND) && !path && handles[i]==p->Console && !m->FrameBufferBase && !m->FrameBufferSize)continue;
-    if(ps!=EFI_SUCCESS || handles[i]!=p->Amd || !PathMatches(path,p->AmdDisplayPath) || ++amd!=1 || !m->Info || m->SizeOfInfo<sizeof(*m->Info) ||
+    if(ps!=EFI_SUCCESS || handles[i]!=p->Amd || !PathMatches(path,p->AmdDisplayPath,sizeof(p->AmdDisplayPath)) || ++amd!=1 || !m->Info || m->SizeOfInfo<sizeof(*m->Info) ||
        !m->FrameBufferBase || !m->FrameBufferSize || m->Mode>=m->MaxMode || m->Info->PixelFormat>PixelBlueGreenRedReserved8BitPerColor ||
        !m->Info->HorizontalResolution || !m->Info->VerticalResolution || m->Info->PixelsPerScanLine<m->Info->HorizontalResolution ||
        (UINT64)m->Info->PixelsPerScanLine*m->Info->VerticalResolution>m->FrameBufferSize/4){s=EFI_UNSUPPORTED;break;}
@@ -642,7 +642,7 @@ EFI_STATUS GuReleaseGop(EFI_SYSTEM_TABLE *t,EFI_HANDLE image,GU_PREPARE_LOG log,
     for(UINTN c=0;s==EFI_SUCCESS && c<Full.ChildCount;c++) {
       EFI_DEVICE_PATH_PROTOCOL *path=NULL;
       s=Interface(bs,Full.Children[c],&PathGuid,(VOID **)&path);
-      if(s==EFI_SUCCESS && !PathMatches(path,Full.ChildPaths[c]))s=EFI_NOT_READY;
+      if(s==EFI_SUCCESS && !PathMatches(path,Full.ChildPaths[c],sizeof(Full.ChildPaths[c])))s=EFI_NOT_READY;
     }
     if(s==EFI_SUCCESS)s=Alive(t,&PreparedPlan);
 #endif

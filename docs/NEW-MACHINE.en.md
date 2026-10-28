@@ -20,7 +20,8 @@ reviewed profiles have proven on hardware. There is no override flag. Today that
 |---|---|
 | RTX 3090 / 3090 Ti `220410de` / `220310de`, or RTX 3060 12GB `248710de` / `250410de` | exact reviewed PCI-ID/chip/VRAM combinations are required |
 | GA102 `b72000a1` with `6000` / `5ff4` MiB; GA104 `b74000a1` with `248710de` + `3000` MiB; GA106 `b76000a1` with `250410de` + `3000` MiB | these are coupled tuples, not independent choices; class/revision remains `030000a1` |
-| exactly one NVIDIA display controller, at segment 0, device 0, function 0 on a nonzero PCI bus (reviewed profiles: bus `01`), behind one root port | `GuCheckConfig` / `GuDisplayPath`; the bus is the per-machine constant `GU_TARGET_BUS` |
+| exactly one NVIDIA display controller, at segment 0, device 0, function 0 on a nonzero PCI bus (reviewed profiles: bus `01`) | PCI identity and the captured bus remain independently verified |
+| ACPI PNP0A03 or PNP0A08 root, a captured root UID, 1–16 legal PCI path nodes ending at `Pci(0,0)`, one ADR and an end node | LOCAL pins the complete ancestry; display paths are bounded to 120 bytes and the PCI parent must consume exactly the controller prefix |
 | at most one integrated (non-NVIDIA) display controller; the RTX owns the only physical GOP | a recognized pathless, zero-framebuffer AMI aggregate GOP is allowed; a second physical GOP is refused |
 | non-aggregate `ConOut` is exactly the RTX GOP, or the complete reviewed AMI aggregate ownership graph is present | aggregate profiles require distinct NVIDIA/Combo/EDID/Gfx/Out roles and one or two unique NVIDIA display children |
 | AMI console text/GOP splitter drivers and `nvgop-ga1xx`; the AMI EDID driver is optional | the release path in `full-release.c` (see below) |
@@ -77,8 +78,12 @@ Captured PCI path nodes must contain legal device/function numbers. LOCAL consol
 selection uses the captured NVIDIA ancestry and independently checks its PCI identity;
 a root-port number that matches a historical AMD route does not identify an AMD GPU.
 The bounded C/Python path decoder is checked on identical synthetic inputs as part of
-the generator regressions. Longer bridge chains remain outside the current LOCAL
-admission shape until the runtime buffers and PCI-parent checks are integrated.
+the generator regressions. LOCAL generation accepts this bounded bridge-chain shape
+for aggregate, non-aggregate and no-EDID consoles. Root HID/UID, every PCI hop and all
+display child paths must agree across captures. The runtime checks the complete
+ancestry and exact PCI-parent consumption again before release. This extends the
+experimental discovery route; it does not add a hardware success report or widen the
+GPU/driver-code proof envelope.
 
 Maintainers can run capture-free regression checks with
 `python -I research/profile/test_local_topology.py` and

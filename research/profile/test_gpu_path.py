@@ -1,6 +1,9 @@
 """Exact capture paths and pinned ancestry; synthetic inputs only."""
 import importlib.util
 from pathlib import Path
+import subprocess
+import sys
+import tempfile
 import unittest
 
 HERE=Path(__file__).resolve().parent
@@ -56,11 +59,35 @@ class GpuPathTests(unittest.TestCase):
             with self.assertRaisesRegex(data.mp.Refused,'bounded ACPI/PCI/ADR'):
                 data.analyze(text)
 
-    def test_longer_route_stays_closed_until_backend_length_integration(self):
-        text=data.synthetic_capture().replace('path-node raw=010106000103',
-            'path-node raw=010106000103\npath-node raw=010106000004')
-        with self.assertRaisesRegex(data.mp.Refused,'other topologies are unreviewed'):
-            data.analyze(text)
+    def test_generator_pins_the_complete_longer_route(self):
+        for aggregate,no_edid in ((True,False),(False,False),(False,True)):
+            text=data.synthetic_capture(aggregate=aggregate,no_edid=no_edid).replace('path-node raw=010106000103',
+                'path-node raw=010106000103\npath-node raw=010106000004')
+            result=data.analyze(text)
+            self.assertEqual(result['aggregate'],aggregate)
+            primary=bytes.fromhex(result['child_paths'][0])
+            self.assertEqual(len(primary),42)
+            self.assertEqual(len(contract.decode_gpu_display_path(primary)['pci_nodes']),3)
+            self.assertEqual(dict(result['defines'])['GU_ROOT_PORT_DEVICE'],'3U')
+
+    def test_short_pci_parent_is_rejected_by_generator_and_all_fixture_topologies(self):
+        for aggregate,no_edid in ((True,False),(False,False),(False,True)):
+            text=data.synthetic_capture(aggregate=aggregate,no_edid=no_edid)
+            start=text.index('handle id=0x1\n');end=text.index('handle id=0x2\n',start)
+            block=text[start:end]
+            short=block.replace('path-node raw=010106000000\n','',1)
+            self.assertNotEqual(short,block)
+            text=text[:start]+short+text[end:]
+            with self.assertRaisesRegex(data.mp.Refused,'complete GPU ancestry'):
+                data.analyze(text)
+            with tempfile.TemporaryDirectory() as folder:
+                source=Path(folder)/'DIAG00.TXT';target=Path(folder)/'fixture.h';source.write_text(text)
+                flags=(['--aggregate'] if aggregate else [])+(['--no-edid-driver'] if no_edid else [])
+                done=subprocess.run([sys.executable,'-I',str(HERE.parents[1]/'internal-boot/boot/make-console-fixture.py'),str(source),
+                    '--single-rtx','--no-igpu','--no-edid-child',*flags,'--output='+str(target)],capture_output=True,text=True)
+                self.assertEqual(done.returncode,1)
+                self.assertIn('does not belong to the PCI controller',done.stderr)
+                self.assertFalse(target.exists())
 
 
 if __name__=='__main__':unittest.main()

@@ -23,7 +23,7 @@ static UINT32 InitialFullConfig[64],MockConfig[64];
 static UINT64 MockAttributes;
 static int FullScenario,EnableCalls,ClaimCalls,CloseCalls,Phase,ColdCalls;
 #ifdef GU_HEADLESS_RESEARCH
-static UINT8 SecondChildPath[36];
+static UINT8 SecondChildPath[GU_RTX_DISPLAY_BYTES];
 static BOOLEAN PhaseForHeadlessTest(VOID) {return Phase>=4;}
 #endif
 static const UINT32 MockCold[]={GU_CHIP_ID,0x8b8f,0x3ff,0x10,0,0xffffff8f,0x03000062,6,GU_DEVICE_MEMORY_SIZE};
@@ -211,8 +211,8 @@ static EFI_STATUS FullLog(VOID *ctx,const char *event,EFI_STATUS status) {
   }
   if(!strcmp(event,"detach-nvidia-gop-intent")) {
     if(FullScenario==25) {
-      if(FX_EdidChild)SecondChildPath[28]^=1;
-      else TestRtxPath[28]^=1;
+      if(FX_EdidChild)SecondChildPath[sizeof(SecondChildPath)-8]^=1;
+      else TestRtxPath[sizeof(TestRtxPath)-8]^=1;
     }
     if(FullScenario==26)NvMemory[0x280]^=1;
   }
@@ -235,10 +235,11 @@ static EFI_STATUS RunFull(int scenario) {
   FullScenario=scenario;EnableCalls=ClaimCalls=CloseCalls=0;Phase=2;ColdCalls=0;
 #ifdef GU_HEADLESS_RESEARCH
 #ifdef FX_EDID_CHILD_PATH_BYTES
-  const UINT8 recordedChildPath[36]={FX_EDID_CHILD_PATH_BYTES};
+  const UINT8 recordedChildPath[]={FX_EDID_CHILD_PATH_BYTES};
+  Check(sizeof(recordedChildPath)==sizeof(SecondChildPath),"recorded child path has compiled target length");
   memcpy(SecondChildPath,recordedChildPath,sizeof(recordedChildPath));
 #else
-  memcpy(SecondChildPath,TestRtxPath,36);SecondChildPath[28]^=0x50;
+  memcpy(SecondChildPath,TestRtxPath,sizeof(SecondChildPath));SecondChildPath[sizeof(SecondChildPath)-8]^=0x50;
 #endif
 #endif
   memcpy(MockConfig,InitialFullConfig,sizeof(MockConfig));

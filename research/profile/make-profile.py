@@ -237,13 +237,16 @@ def aggregate_roles(text, blocks, pci, primary, bindings):
     if not 1 <= len(children) <= 2 or len(set(children)) != len(children) or primary not in children:
         fail('aggregate console requires one or two unique NVIDIA display children')
     primary_path = path_of(blocks[primary]['raw'])
+    primary_layout = gpu_display_path(primary_path)
+    controller_bytes = primary_layout['controller_bytes']
     paths = []
     for child in children:
         if child not in blocks or child in (pci, agg, console, error, input_handle):
             fail('aggregate display child is missing or aliases a console handle')
         child_path = path_of(blocks[child]['raw'])
-        if primary_path is None or child_path is None or len(child_path) != 36 or \
-                child_path[:24] != primary_path[:24] or child_path[24:28] != bytes.fromhex('02030800'):
+        child_layout = gpu_display_path(child_path)
+        if child_layout['controller_bytes'] != controller_bytes or \
+                child_path[:controller_bytes] != primary_path[:controller_bytes]:
             fail('aggregate display child has a different or incomplete PCI route')
         paths.append(child_path)
         if child != primary and (GOP in blocks[child]['protocols'] or TEXT_OUT in blocks[child]['protocols'] or
@@ -505,16 +508,14 @@ def analyze(diag, image_dir, envelope):
         fail(f'expected one RTX GOP child, found {len(gops)}')
     rtx = gops[0]
     rtx_path = path_of(blocks[rtx]['raw'])
-    # Validate bounded, legal PCI nodes before applying the current backend's
-    # narrower admission shape. Longer routes stay refused until all consumers
-    # carry their exact lengths and controller offsets.
-    gpu_display_path(rtx_path)
-    # ACPI PNP0A03 UID 0 / Pci(root port) / Pci(0,0) / ACPI ADR / End: 36 bytes.
-    if len(rtx_path) != 36 or rtx_path[0:12] != bytes.fromhex('02010c00d041030a00000000') or \
-            rtx_path[12:16] != b'\x01\x01\x06\x00' or rtx_path[18:24] != bytes.fromhex('010106000000') or \
-            rtx_path[24:28] != b'\x02\x03\x08\x00' or rtx_path[32:36] != b'\x7f\xff\x04\x00':
-        fail('RTX GOP path is not PciRoot(0)/root port/Pci(0,0)/ADR; other topologies are unreviewed')
-    root_function, root_device = rtx_path[16], rtx_path[17]
+    # The complete captured ancestry is pinned, not a motherboard/root-port
+    # name. The runtime independently validates PCI identity and parent offset.
+    path_layout = gpu_display_path(rtx_path)
+    if pci_path != rtx_path[:path_layout['controller_bytes']]:
+        fail('RTX PCI controller path is not the complete GPU ancestry')
+    # Keep legacy first-hop macros for consumers that still name them. LOCAL
+    # route matching uses the full byte array, including root HID/UID and hops.
+    root_device, root_function = path_layout['pci_nodes'][0]
     fb = re.search(r'^gop framebuffer=0x([0-9a-f]+) ', blocks[rtx]['raw'], re.M)
     if not fb:
         fail('RTX GOP has no framebuffer record')
@@ -551,9 +552,13 @@ def analyze(diag, image_dir, envelope):
     if no_edid_driver and any(EDID_DISCOVERED not in blocks[c]['protocols'] for c in children):
         fail('without an EDID driver every RTX display child must carry the EdidDiscovered interface')
     child_paths = [path_of(blocks[c]['raw']) for c in children]
-    if any(path is None or len(path) != 36 or path[:24] != pci_path or
-           path[24:28] != b'\x02\x03\x08\x00' or path[32:] != b'\x7f\xff\x04\x00'
-           for path in child_paths) or len(set(child_paths)) != len(child_paths):
+    try:
+        child_layouts = [gpu_display_path(path) for path in child_paths]
+    except Refused:
+        fail('console display children require unique complete paths under the target PCI controller')
+    if any(layout['controller_bytes'] != path_layout['controller_bytes'] or
+           path[:layout['controller_bytes']] != pci_path for path, layout in zip(child_paths, child_layouts)) or \
+            len(set(child_paths)) != len(child_paths):
         fail('console display children require unique complete paths under the target PCI controller')
     # Firmware handle numbers and enumeration order can change between cold boots.
     # Compare physical child paths instead, keeping the primary GOP first.

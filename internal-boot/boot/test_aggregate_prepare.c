@@ -29,11 +29,14 @@ static void Damage(unsigned fault) {
     case 7:Live.Edges[0].Count++;break;
     case 8:Table.StandardErrorHandle=H(PCI);break;
     case 9:Edge(PRIMARY,OBSERVER,PRIMARY,&GopGuid,EFI_OPEN_PROTOCOL_BY_DRIVER);break;
+    case 15:ParentDrift=TRUE;break;
+    case 16:ChangePathLength(FALSE);break;
+    case 17:ChangePathLength(TRUE);break;
   }
 }
 int main(void) {
   Mode=0;
-  for(PrepareFault=0;PrepareFault<=14;PrepareFault++) {
+  for(PrepareFault=0;PrepareFault<=17;PrepareFault++) {
     Setup();Damage(PrepareFault);
     UINTN original_count=Live.Count;
     EFI_STATUS status=GuPrepareConsole(&Table,PrepareLog,NULL);
@@ -51,6 +54,6 @@ int main(void) {
     Check(GuVerifyPreparedConsole(&Table)!=EFI_SUCCESS,"late graph, driver, route, framebuffer and input drift rejected");
     Check(!Calls && !Enables && !Claims && !Closes,"late refusal has no hardware mutation");
   }
-  printf("PASS aggregate prepare: %u checks, %u children, 24 scenarios; RAM-only, no detach\n",Checks,TEST_CHILDREN);
+  printf("PASS aggregate prepare: %u checks, %u children, 27 scenarios; RAM-only, no detach\n",Checks,TEST_CHILDREN);
   return 0;
 }

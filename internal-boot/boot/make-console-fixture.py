@@ -80,12 +80,12 @@ if single:
         roles['EdidChild'] = child_records[0][2]
     else:
         roles['EdidChild'] = 0  # No physical second child; tests must not invent one.
+spec = importlib.util.spec_from_file_location('console_fixture_profile', Path(__file__).resolve().parents[2] / 'research/profile/make-profile.py')
+profile = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(profile)
 if aggregate:
-    # Use the same strict graph-role inspection as admission. This produces test
-    # data only; make-profile.py still refuses aggregate write-profile generation.
-    spec = importlib.util.spec_from_file_location('aggregate_fixture_profile', Path(__file__).resolve().parents[2] / 'research/profile/make-profile.py')
-    profile = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(profile)
+    # Use the same strict graph-role inspection as admission. Fixture generation
+    # is data preparation, never write eligibility or hardware evidence.
     original = {index: int(handle, 16) for handle, index in indices.items()}
     observed_bindings = profile.parse_bindings(text.splitlines())
     topology = profile.aggregate_roles(text, parsed, original[roles['RtxPci']], original[roles['Rtx']], observed_bindings)
@@ -118,14 +118,22 @@ for role, value in zip(['Console', 'Error', 'Input'], console.groups()):
 lines = [f'/* Local diagnostic sha256 {hashlib.sha256(raw).hexdigest()} */', f'#define FX_HANDLES {len(blocks)}',
          f'#define FX_NO_EDID_DRIVER {1 if no_edid_driver else 0}',
          f'#define FX_EXTRA_DISPLAY_CHILD {1 if roles.get("EdidChild") else 0}']
+primary_key=next(handle for handle,index in indices.items() if index==roles['Rtx'])
+primary_block=blocks[primary_key]
+primary_path=profile.path_of(primary_block)
+if profile.PATH not in parsed[int(primary_key,16)]['protocols']:
+    raise ValueError('Replay requires the complete primary display path')
+primary_layout=profile.gpu_display_path(primary_path)
+controller_bytes=primary_layout['controller_bytes']
+pci_block=blocks[next(handle for handle,index in indices.items() if index==roles['RtxPci'])]
+parent_path=profile.path_of(pci_block)
+if parent_path is None or len(parent_path)!=controller_bytes+4 or parent_path[-4:]!=bytes.fromhex('7fff0400') or parent_path[:-4]!=primary_path[:controller_bytes]:
+    raise ValueError('Replay primary path does not belong to the PCI controller')
+lines.append(f'#define FX_DISPLAY_PATH_BYTES {primary_layout["path_bytes"]}')
+lines.append(f'#define FX_CONTROLLER_BYTES {controller_bytes}')
+lines.append('#define FX_PRIMARY_PATH_BYTES '+','.join(str(byte) for byte in primary_path))
 if aggregate:
     lines.append('#define FX_CONSOLE_AGGREGATE 1')
-    primary_block=blocks[next(handle for handle,index in indices.items() if index==roles['Rtx'])]
-    primary_path=profile.path_of(primary_block)
-    primary_original=original[roles['Rtx']]
-    if profile.PATH not in parsed[primary_original]['protocols'] or primary_path is None or len(primary_path)!=36:
-        raise ValueError('Aggregate replay requires the complete primary display path')
-    lines.append('#define FX_PRIMARY_PATH_BYTES '+','.join(str(byte) for byte in primary_path))
     patterns=[(r'^gop framebuffer=0x([0-9a-f]+) bytes=0x([0-9a-f]+) mode=0x([0-9a-f]+) max-mode=0x([0-9a-f]+)$',
                ('FRAMEBUFFER','FRAMEBUFFER_BYTES','MODE','MAX_MODE'),(64,64,32,32)),
               (r'^gop width=0x([0-9a-f]+) height=0x([0-9a-f]+) stride=0x([0-9a-f]+)$',
@@ -171,10 +179,6 @@ if aggregate:
     if len(words)!=64 or any(not re.fullmatch(r'[0-9a-f]{1,8}',word) for word in words):
         raise ValueError('Aggregate replay requires one full PCI snapshot')
     words=[int(word,16) for word in words]
-    pci_block=blocks[next(handle for handle,index in indices.items() if index==roles['RtxPci'])]
-    parent_path=profile.path_of(pci_block)
-    if parent_path is None or len(parent_path)!=28 or parent_path[:-4]!=primary_path[:24]:
-        raise ValueError('Aggregate primary path does not belong to the PCI controller')
     if words[:16]!=profile.pci_config(pci_block):
         raise ValueError('Aggregate graph and full PCI snapshots disagree')
     locations=re.findall(r'^pci location-status=0x([0-9a-f]{1,16}) segment=0x([0-9a-f]{1,16}) bus=0x([0-9a-f]{1,16}) device=0x([0-9a-f]{1,16}) function=0x([0-9a-f]{1,16})$',pci_block,re.M)
@@ -202,8 +206,9 @@ if roles.get('EdidChild'):
     child_block = blocks[next(h for h, index in indices.items() if index == roles['EdidChild'])]
     path_rows = re.findall(r'^path-node raw=([0-9a-f]+)$', child_block, re.M)
     child_path = b''.join(bytes.fromhex(row) for row in path_rows)
-    if len(child_path) != 36:
-        raise ValueError('Additional display child requires its recorded 36-byte path')
+    child_layout=profile.gpu_display_path(child_path)
+    if child_layout['controller_bytes']!=controller_bytes or child_path[:controller_bytes]!=primary_path[:controller_bytes]:
+        raise ValueError('Additional display child has a different PCI route')
     lines.append('#define FX_EDID_CHILD_PATH_BYTES ' + ','.join(str(byte) for byte in child_path))
 for role, value in roles.items():
     lines.append(f'#define FX_{role} ((EFI_HANDLE){value})')
