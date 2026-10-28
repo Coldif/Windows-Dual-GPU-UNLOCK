@@ -60,6 +60,12 @@ Maintainers can run capture-free regression checks with
 `research/profile/test-local-release.ps1`. These use synthetic data only and do not
 replace the actual machine's required capture/asset replay or hardware evidence.
 
+`research/profile/test-pci-layout.ps1` checks the production PCI save/reset/restore
+path against RAM-only services, including late PCIe v1/v2 capability layouts and
+failure containment. `test-capture-model.ps1` checks that captured capabilities and
+IO/MEM attributes reach the transaction model. Neither runs on a GPU or replaces
+the full firmware-asset replay required for a local profile.
+
 ## Check existing captures first
 
 The [offline compatibility checker](CHECK-COMPATIBILITY.en.md) reports missing data

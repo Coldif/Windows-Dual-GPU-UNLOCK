@@ -1,5 +1,17 @@
 # Changes
 
+## Unreleased — preserve valid late PCIe capability layouts
+
+- Match PCI configuration save bounds to the existing parser: aligned PCIe v1
+  capabilities may start as late as `0xec`, while v2 may start as late as `0xc4`.
+  Reject invalid offsets and unknown versions before device access.
+- Exercise production save, FLR and restore with RAM-only PCI services across
+  six layouts, IO/MEM command states and failure scenarios. Keep reset wait,
+  one-reset-only, status-write restrictions and containment checks.
+- Include layout regressions in the host test runner and extend captured-config
+  model tests to both layout boundaries. These are synthetic host tests, not
+  full firmware transactions or new hardware compatibility evidence.
+
 ## Unreleased — discover the diagnostic target bus and replay captured PCI layouts
 
 - Automatically discover the single NVIDIA diagnostic target's nonzero PCI bus.
