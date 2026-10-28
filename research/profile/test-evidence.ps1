@@ -50,6 +50,9 @@ function Check([string]$Label,[scriptblock]$Mutate,[bool]$Accept=$false) {
  $script:checks++
 }
 Check 'complete synthetic evidence' {} $true
+Check 'EDID-driver evidence without the release replay' {param($e) $e.Results.PSObject.Properties.Remove('release replay, EDID driver (real graph)')}
+Check 'EDID-driver release replay failed' {param($e) $e.Results.'release replay, EDID driver (real graph)'.Exit=1}
+Check 'EDID-driver release replay expectation weakened' {param($e) $e.Results.'release replay, EDID driver (real graph)'.Expected=1;$e.Results.'release replay, EDID driver (real graph)'.Exit=1}
 # Test the actual JSON number tokens, not just pre-serialization .NET types.
 foreach($json in @('0','1','2','-1','2147483648','9223372036854775807')) {
  $value=ConvertFrom-Json ('{"value":'+$json+'}')

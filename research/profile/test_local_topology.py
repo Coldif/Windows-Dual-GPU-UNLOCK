@@ -18,20 +18,23 @@ END = bytes.fromhex('7fff0400')
 PCI_PATH = bytes.fromhex('02010c00d041030a00000000010106000103010106000000')
 RTX_PATH = PCI_PATH + bytes.fromhex('0203080070030180') + END
 ENVELOPE = {'probe_device_ids': ['220410de'], 'class_revision': '030000a1',
-            'chips': [{'chip': 'b72000a1', 'family': 'GA102', 'memory': ['6000', '5ff4']}]}
+            'chips': [{'chip': 'b72000a1', 'family': 'GA102', 'memory': ['6000', '5ff4'],
+                       'pci_memory': {'220410de': ['6000', '5ff4']},
+                       'nvgop': [{'version': '60009', 'text_sha256': 'd045cee2113e461c7c678ec21542b1d0f18356765c0fc6a0bf2dcf824088e011'}]}]}
 
 
-def configuration(command=3):
+def configuration(command=3, board=0x220410de):
     cfg = [0] * 64
-    for at, value in {0: 0x220410de, 1: 0x00100000 | command, 2: 0x030000a1,
+    for at, value in {0: board, 1: 0x00100000 | command, 2: 0x030000a1,
                       4: 0xf5000000, 11: 0x38811462, 13: 0x40,
                       16: 0x00014801, 18: 0x00020010, 19: 1 << 28}.items():
         cfg[at] = value
     return cfg
 
 
-def synthetic_capture(*, bus=0x2b, igpu=False, no_edid=True, children=2, command=3, memory=0x6000, child_adr=0x20):
-    cfg = configuration(command)
+def synthetic_capture(*, bus=0x2b, igpu=False, no_edid=True, children=2, command=3, memory=0x6000, child_adr=0x20,
+                      board=0x220410de, chip=0xb72000a1):
+    cfg = configuration(command, board)
     handles = {i: {} for i in (1, 2, 3, 4, 5, 6, 8, 10, 11)}
     if children == 2:
         handles[7] = {}
@@ -80,11 +83,12 @@ def synthetic_capture(*, bus=0x2b, igpu=False, no_edid=True, children=2, command
              'probe targets=0001 cfg-incomplete=0000', 'cfg dwords=' + ' '.join(f'{v:08x}' for v in cfg),
              f'pci-attributes status=0x0000000000000000 value=0x{0x200 | (0x100 if command & 1 else 0):016x}',
              'prom sha256=' + PROM_HASH]
-    cold = [0xb72000a1, 0xffffff8f, 0x8b8f, 0x3ff, 0x10, 0, 0x03000062, 6, memory]
+    cold = [chip, 0xffffff8f, 0x8b8f, 0x3ff, 0x10, 0, 0x03000062, 6, memory]
     lines += [f'mmio off=0x{at:08x} status=0x0000000000000000 value=0x{value:08x}' for at, value in zip(mp.COLD, cold)]
+    nv_size,nv_stop,nv_version=(0x26ae0,0x678,0x60010) if board in (0x248710de,0x250410de) else (0x2be40,0x698,0x60009)
     bindings = [(4, 10, 0x400000, 0x60c0, 0x1290, 0x10, 3, mp.OUT_FILE),
                 (5, 11, 0x500000, 0x39e0, 0xa3c, 0x10, 3, mp.GFX_FILE),
-                (3, 3, 0x100000, 0x2be40, 0x698, 0x60009, 3, None)]
+                (3, 3, 0x100000, nv_size, nv_stop, nv_version, 3, None)]
     if not no_edid:
         bindings.append((9, 9, 0x600000, 0x9000, 0x157c, 1, 5, mp.MOUSE_FILE))
     for agent, image, base, size, stop, version, code_type, guid in bindings:
@@ -104,11 +108,11 @@ def synthetic_capture(*, bus=0x2b, igpu=False, no_edid=True, children=2, command
     return '\n'.join(lines) + '\n'
 
 
-def analyze(text):
+def analyze(text, envelope=ENVELOPE):
     with tempfile.TemporaryDirectory() as folder:
         path = Path(folder) / 'DIAG00.TXT'
         path.write_text(text, encoding='ascii')
-        return mp.analyze(path, None, ENVELOPE)
+        return mp.analyze(path, None, envelope)
 
 
 def add_open(text, handle, protocol, row):

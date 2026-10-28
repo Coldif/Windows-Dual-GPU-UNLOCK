@@ -355,6 +355,11 @@ def analyze(diag, image_dir, envelope):
         fail(f'chip {chip:#010x} has no hardware-proven profile')
     if memory not in [int(m, 16) for m in proven[0]['memory']]:
         fail(f'{proven[0]["family"]} with {memory:#x} MiB is not hardware-proven')
+    # PCI identity, exact chip revision and memory must be one reviewed tuple,
+    # never an independent cross product of the envelope's device/family lists.
+    allowed_memory = proven[0].get('pci_memory', {}).get(f'{board:08x}', [])
+    if f'{memory:x}' not in allowed_memory:
+        fail('PCI identity/chip/memory combination is not hardware-proven')
     # full-release.c ColdRead: power-on state; the unlock never runs from anything else.
     if (g1, g2, g3, wpr2, plm) != (0x8b8f, 0x3ff, 0x10, 0, 0xffffff8f) or ss1 > 15 or \
             ss0 in (0xffffffff, 0x88888888) or ss0 & 0xffff0000 == 0xbadf0000:
@@ -495,7 +500,9 @@ def analyze(diag, image_dir, envelope):
     if image_dir is not None:
         edid_code = code_hash(image_dir, edid, EDID_TEXT_RVA) if edid else None
         nv_code = code_hash(image_dir, nv, NVGOP_TEXT_RVA)
-        known = [g for g in envelope['nvgop'] if int(g['version'], 16) == nv['version'] and g['text_sha256'] == nv_code['sha256']]
+        global_codes = {(g['version'], g['text_sha256']) for g in envelope['nvgop']}
+        known = [g for g in proven[0].get('nvgop', []) if (g['version'], g['text_sha256']) in global_codes and
+                 int(g['version'], 16) == nv['version'] and g['text_sha256'] == nv_code['sha256']]
         if len(known) != 1:
             fail(f'nvgop {nv["version"]:#x} with .text {nv_code["sha256"][:16]}... has not released cleanly on proven hardware')
         result['code'] = {'edid': edid_code, 'nvgop': nv_code}

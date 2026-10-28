@@ -14,7 +14,7 @@ static EFI_DRIVER_BINDING_PROTOCOL NvBinding;
 static EFI_LOADED_IMAGE_PROTOCOL NvImage;
 static UINT8 NvPath[32];
 #else
-static UINT8 MouseMemory[0x9000],NvMemory[0x2b6e0],PromMemory[1048576];
+static UINT8 MouseMemory[GU_EDID_IMAGE_SIZE],NvMemory[GU_NVGOP_IMAGE_SIZE],PromMemory[1048576];
 static EFI_DRIVER_BINDING_PROTOCOL MouseBinding,NvBinding;
 static EFI_LOADED_IMAGE_PROTOCOL MouseImage,NvImage;
 static UINT8 MousePath[24],NvPath[32];
@@ -28,6 +28,7 @@ static BOOLEAN PhaseForHeadlessTest(VOID) {return Phase>=4;}
 #endif
 static const UINT32 MockCold[]={GU_CHIP_ID,0x8b8f,0x3ff,0x10,0,0xffffff8f,0x03000062,6,GU_DEVICE_MEMORY_SIZE};
 
+#ifndef GU_PROFILE_LOCAL
 static VOID LoadMapped(const char *path,UINT8 *memory,UINTN size) {
   FILE *f=fopen(path,"rb");Check(f!=NULL,"driver fixture exists");
   fseek(f,0,SEEK_END);long n=ftell(f);rewind(f);UINT8 *data=malloc(n);
@@ -41,6 +42,24 @@ static VOID LoadMapped(const char *path,UINT8 *memory,UINTN size) {
   }
   free(data);
 }
+#endif
+#if !GU_NO_EDID_DRIVER
+/* Probe captures are loaded-image dumps; legacy fixtures may be PE files. */
+static VOID LoadDriverFixture(const char *path,UINT8 *memory,UINTN size) {
+  FILE *file=fopen(path,"rb");Check(file!=NULL,"captured driver fixture exists");
+  Check(!fseek(file,0,SEEK_END),"driver fixture seek");long length=ftell(file);rewind(file);
+  if(length>=0 && (UINTN)length==size) {
+    Check(fread(memory,1,size,file)==size && fgetc(file)==EOF,"read exact captured loaded driver image");fclose(file);
+  } else {
+    fclose(file);
+#ifdef GU_PROFILE_LOCAL
+    Check(FALSE,"captured loaded driver image size mismatch");
+#else
+    LoadMapped(path,memory,size);
+#endif
+  }
+}
+#endif
 static EFI_STATUS ExtraHandle(EFI_HANDLE h,EFI_GUID *g,VOID **out) {
 #ifdef GU_HEADLESS_RESEARCH
   if(h==FX_EdidChild && GuGuidEqual(g,&PathGuid) && Phase<4){*out=SecondChildPath;return EFI_SUCCESS;}
@@ -135,13 +154,14 @@ static EFI_STATUS ExtraDisconnect(EFI_HANDLE h,EFI_HANDLE agent,EFI_HANDLE child
     if(FullScenario==14)Live.Edges[0].Count++;
   }
 #else
-  if(Calls==3 || Calls==4) {
+  if(agent==FX_EdidAgent) {
+    Check(Calls==3 || (Full.ChildCount==2 && Calls==4),"EDID stops follow console detach in child order");
     Check(h==(Calls==3?FX_Rtx:FX_EdidChild) && agent==FX_EdidAgent,"only each reviewed EDID child stopped");
-    if(FullScenario==1 || (FullScenario==2 && Calls==4))return EFI_DEVICE_ERROR;
+    if(FullScenario==1 || (FullScenario==2 && (UINTN)Calls==2+Full.ChildCount))return EFI_DEVICE_ERROR;
     if(FullScenario==29)return EFI_WARN_UNKNOWN_GLYPH;
     Drop(h,agent,&EdidGuid);Phase=3;
   }else {
-    Check(Calls==5 && h==FX_RtxPci && agent==FX_NvAgent,"NV stop only after two reviewed EDID stops");
+    Check((UINTN)Calls==3+Full.ChildCount && h==FX_RtxPci && agent==FX_NvAgent,"NV stop only after all reviewed EDID stops");
     if(FullScenario==3)return EFI_DEVICE_ERROR;
     if(FullScenario==30){for(UINTN i=0;i<Live.Count;i++)if(Live.Edges[i].Handle==h && GuGuidEqual(&Live.Edges[i].Protocol,&PathGuid)){Live.Edges[i]=Live.Edges[--Live.Count];break;}return EFI_DEVICE_ERROR;}
     Drop(h,agent,&PciGuid);Drop(h,agent,&PathGuid);Phase=4;
@@ -186,7 +206,7 @@ static EFI_STATUS FullLog(VOID *ctx,const char *event,EFI_STATUS status) {
       Live.Edges[Live.Count++]=(EDGE){child,FX_OutAgent,child,EdidGuid,EFI_OPEN_PROTOCOL_BY_DRIVER,1};
     }
 #else
-    if(FullScenario==28)Drop(FX_EdidChild,FX_EdidAgent,&EdidGuid);
+    if(FullScenario==28)Drop(FX_EdidChild?FX_EdidChild:FX_Rtx,FX_EdidAgent,&EdidGuid);
 #endif
   }
   if(!strcmp(event,"detach-nvidia-gop-intent")) {
@@ -230,8 +250,8 @@ static EFI_STATUS RunFull(int scenario) {
   NvImage.ImageBase=NvMemory;NvImage.ImageSize=sizeof(NvMemory);NvImage.ImageCodeType=EfiBootServicesCode;NvImage.DeviceHandle=FX_RtxPci;
 #else
   MouseBinding=(EFI_DRIVER_BINDING_PROTOCOL){0};NvBinding=MouseBinding;
-  MouseBinding.Version=1;MouseBinding.DriverBindingHandle=MouseBinding.ImageHandle=FX_EdidAgent;MouseBinding.Stop=(EFI_DRIVER_BINDING_STOP)(MouseMemory+0x157c);
-  NvBinding.Version=0x60008;NvBinding.DriverBindingHandle=NvBinding.ImageHandle=FX_NvAgent;NvBinding.Stop=(EFI_DRIVER_BINDING_STOP)(NvMemory+0x698);
+  MouseBinding.Version=1;MouseBinding.DriverBindingHandle=MouseBinding.ImageHandle=FX_EdidAgent;MouseBinding.Stop=(EFI_DRIVER_BINDING_STOP)(MouseMemory+GU_EDID_STOP);
+  NvBinding.Version=GU_NVGOP_VERSION;NvBinding.DriverBindingHandle=NvBinding.ImageHandle=FX_NvAgent;NvBinding.Stop=(EFI_DRIVER_BINDING_STOP)(NvMemory+GU_NVGOP_STOP);
   MouseImage=(EFI_LOADED_IMAGE_PROTOCOL){0};NvImage=MouseImage;
   MouseImage.ImageBase=MouseMemory;MouseImage.ImageSize=sizeof(MouseMemory);MouseImage.ImageCodeType=EfiRuntimeServicesCode;
   NvImage.ImageBase=NvMemory;NvImage.ImageSize=sizeof(NvMemory);NvImage.ImageCodeType=EfiBootServicesCode;NvImage.DeviceHandle=FX_RtxPci;
@@ -271,7 +291,7 @@ int LegacyFullMain(int argc,char **argv) {
 int main(int argc,char **argv) {
 #endif
   Check(argc==5,"need two driver PE files, PROM and 256-byte config fixture");
-  LoadMapped(argv[1],MouseMemory,sizeof(MouseMemory));LoadMapped(argv[2],NvMemory,sizeof(NvMemory));
+  LoadDriverFixture(argv[1],MouseMemory,sizeof(MouseMemory));LoadDriverFixture(argv[2],NvMemory,sizeof(NvMemory));
   FILE *f=fopen(argv[3],"rb");Check(f && fread(PromMemory,1,sizeof(PromMemory),f)==sizeof(PromMemory),"read pinned PROM fixture");fclose(f);
   f=fopen(argv[4],"rb");Check(f && fread(InitialFullConfig,1,sizeof(InitialFullConfig),f)==sizeof(InitialFullConfig),"read full config fixture");fclose(f);
   Check(GuHashMatches(PromMemory,sizeof(PromMemory),"8ea297373e9e5d3600ff41ad9fae88f2d14c98c017d100669f7333981da673b4"),"PROM source pin");

@@ -18,8 +18,8 @@ reviewed profiles have proven on hardware. There is no override flag. Today that
 
 | Requirement | Why |
 |---|---|
-| RTX 3090 / 3090 Ti PCI identity `220410de` / `220310de` | only these identities have the reviewed GA102 deep-capture envelope |
-| GA102 (`chip=0xb72000a1`, class/revision `030000a1`) with `0x6000` or `0x5ff4` MiB | the only chip/memory layouts that completed the transaction on hardware |
+| RTX 3090 / 3090 Ti `220410de` / `220310de`, or RTX 3060 12GB `248710de` / `250410de` | exact reviewed PCI-ID/chip/VRAM combinations are required |
+| GA102 `b72000a1` with `6000` / `5ff4` MiB; GA104 `b74000a1` with `248710de` + `3000` MiB; GA106 `b76000a1` with `250410de` + `3000` MiB | these are coupled tuples, not independent choices; class/revision remains `030000a1` |
 | exactly one NVIDIA display controller, at segment 0, device 0, function 0 on a nonzero PCI bus (reviewed profiles: bus `01`), behind one root port | `GuCheckConfig` / `GuDisplayPath`; the bus is the per-machine constant `GU_TARGET_BUS` |
 | at most one integrated (non-NVIDIA) display controller; with none, the RTX owns the only GOP in the whole graph | the single-RTX console path never uses a second adapter and refuses any AMD GOP |
 | `ConOut` is exactly the RTX GOP (non-aggregate console) | aggregate splitter consoles are not generated |
@@ -30,8 +30,13 @@ reviewed profiles have proven on hardware. There is no override flag. Today that
 | at least two complete captures from separate full shutdowns, all agreeing | load-address- or boot-dependent values are refused |
 | PROM.BIN matches the captured hash; the production parser finds FWSEC-FRTS within tested bounds | FWSEC pin and transaction tests |
 
-A RTX 3090 or 3090 Ti on an AMI BIOS board, with or without an iGPU, is the likely fit. Anything
-else is refused with the reason. Widening the envelope needs a reviewed change that cites new
+A matching card on an AMI BIOS board, with or without an iGPU, is a candidate. Anything
+else is refused with the reason. The RTX 3060 tuples require nvgop `60010` with the exact
+reviewed `.text` hash in `proven.json`. The GA104 evidence is an aggregate B660-PLUS
+machine: this generator still refuses that aggregate topology, so its non-aggregate
+LOCAL route is a new combination, not another physical success report. The GA106
+evidence is one non-aggregate H610M success. Other boards and current builds still
+need their own host replay and physical validation. Widening the envelope needs a reviewed change that cites new
 hardware evidence, normally a new reviewed profile (PORTABILITY stage 4).
 
 **Bus, iGPU and EDID.** The generator accepts a card on another PCI bus, a machine without an
@@ -43,7 +48,8 @@ skips the EDID stage and only stops the NVIDIA GOP driver after the console deta
 child of the RTX must still carry the `EdidDiscovered` interface, and any live driver holding a
 display child, or an EDID driver appearing later, stops the release before the NVIDIA stop. Such a
 profile must also pass a replay of the whole driver release on its own graph, driver image, PROM
-and PCI config (a 20th job). Only the non-aggregate headless build supports the flag; other builds
+and PCI config. Every LOCAL profile now requires a full driver-release replay, whether
+the EDID driver exists or not. Only the non-aggregate headless build supports the flag; other builds
 refuse it at compile time. The generic probe automatically selects the bus of the single
 eligible NVIDIA display controller; you do not need a motherboard-specific bus option.
 It still requires segment 0, device 0, function 0 and a nonzero bus.
@@ -90,7 +96,7 @@ Run the same command repeatedly; each run does the next step.
    `EFI\BOOT\BOOTX64.EFI`, keeping any previous loader in `RTX3090-UNLOCK\backup\` and earlier
    capture files in `RTX3090-UNLOCK\old-*\`. Shut down fully, choose the stick in the firmware
    boot menu, and let it start Windows. Do this twice. The probe only reads: PCI config,
-   loaded driver images, and for a single eligible RTX 3090 / 3090 Ti only,
+   loaded driver images, and for a single eligible RTX 3090 / 3090 Ti or RTX 3060 12GB identity,
    16 BAR0 registers and the 1 MiB PROM window. The deep read requires MEM1/BME0,
    the reviewed class/revision, the selected segment-0/device-0/function-0 bus, a 32-bit aligned 16 MiB BAR resource
    and unchanged handle/interface/config after resource queries and allocation. The bus is
@@ -129,9 +135,9 @@ Run the same command repeatedly; each run does the next step.
 A write build of `-HardwareProfile local` (`internal-boot/unlock/build.ps1`, `build-usb.ps1`,
 and `stage-usb.ps1` again before copying) is refused unless `test-results.json`:
 
-- uses evidence format 2 with boolean pass/no-hardware flags and the exact 19
-  host results (including exit 1 for the two required rejection jobs; 20 for a firmware
-  without an EDID driver, which adds the driver-release replay),
+- uses evidence format 2 with boolean pass/no-hardware flags and the exact 20
+  host results (including exit 1 for the two required rejection jobs and the full
+  driver-release replay selected by the profile's EDID state),
 - was made against exactly the current `profile-local.h` bytes and PROM hash,
 - matches exactly the four fixtures and the generated profile report byte for byte, and
 - matches an ordered path/hash manifest and digest of the sources, tests, generator,

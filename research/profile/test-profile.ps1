@@ -91,9 +91,7 @@ try {
  $w=@('-std=c11','-O1','-Wall','-Wextra','-Werror','-D_CRT_SECURE_NO_WARNINGS','-I','build/cold/include','-I','../../deps/edk2/MdePkg/Include','-I','../../deps/edk2/MdePkg/Include/X64')
  Run-Job 'cold pre-check (read-only)' ($w+$profile+@('-DGU_HEADLESS_RESEARCH','-DGU_SINGLE_RTX_CONSOLE','-DGU_FULL_UNLOCK','-DGU_AUTOMATIC_BOOT','test_cold_precheck.c','console-flow.c','../unlock/checks.c','../unlock/sha256.c','-o','build/cold/test-cold-local.exe')) @('./build/cold/test-cold-local.exe')
  Run-Job 'full flow gates' ($w+@('test_full_flow.c','full-flow.c','-o','build/cold/test-full-flow.exe')) @('./build/cold/test-full-flow.exe')
- if($hw.NoEdidDriver) {
-  # No reviewed profile releases the GPU without an EDID stage, so replay the whole driver release
-  # on this machine's own graph, driver image, PROM and PCI config, and require it in the evidence.
+  # Every generated profile replays the complete driver release with its own captures.
   $words=[regex]::Matches([IO.File]::ReadAllText($probe),'value=0x([0-9a-f]{8})') | ForEach-Object {[Convert]::ToUInt32($_.Groups[1].Value,16)}
   if(@($words).Count -ne 64){throw 'The probe fixture does not hold 64 config dwords'}
   $configImage=New-Object byte[] 256
@@ -102,8 +100,15 @@ try {
   $configPath=Join-Path $boot 'build/release/config.bin';[IO.File]::WriteAllBytes($configPath,$configImage)
   $driverImage=Join-Path $local ('capture/'+$report.Code.nvgop.dump)
   if(!(Test-Path -LiteralPath $driverImage -PathType Leaf)){throw 'The captured nvgop image is missing from research/profile/local/capture'}
-  Run-Job 'release replay, no EDID driver (real graph)' ($w+$profile+@('-DGU_HEADLESS_RESEARCH','-DGU_SINGLE_RTX_CONSOLE','-DGU_FULL_UNLOCK','-DGU_AUTOMATIC_BOOT','test_headless_full.c','console-flow.c','../unlock/checks.c','../unlock/sha256.c','-o','build/release/test-release-local.exe')) @('./build/release/test-release-local.exe',$driverImage,$prom,$configPath)
- }
+  $releaseName='release replay, no EDID driver (real graph)'
+  $releaseArgs=@('./build/release/test-release-local.exe',$driverImage,$prom,$configPath)
+  if(!$hw.NoEdidDriver) {
+   $edidImage=Join-Path $local ('capture/'+$report.Code.edid.dump)
+   if(!(Test-Path -LiteralPath $edidImage -PathType Leaf)){throw 'The captured EDID image is missing from research/profile/local/capture'}
+   $releaseName='release replay, EDID driver (real graph)'
+   $releaseArgs=@('./build/release/test-release-local.exe',$edidImage,$driverImage,$prom,$configPath)
+  }
+  Run-Job $releaseName ($w+$profile+@('-DGU_HEADLESS_RESEARCH','-DGU_SINGLE_RTX_CONSOLE','-DGU_FULL_UNLOCK','-DGU_AUTOMATIC_BOOT','test_headless_full.c','console-flow.c','../unlock/checks.c','../unlock/sha256.c','-o','build/release/test-release-local.exe')) $releaseArgs
 } finally {Pop-Location}
 
 # Transaction stage: production app + vendor unlock core against this card's real PROM and

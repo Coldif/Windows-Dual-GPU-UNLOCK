@@ -42,10 +42,12 @@ fixed profiles share the same nvgop `0x60010` tuple.
 LOCAL profiles always keep their captured driver hashes, including nvgop
 `0x60009`; they inherit no fixed template. Existing generated headers retain their
 literal chip/memory values. Family metadata is derived from the exact captured
-chip without changing the [local generator's admission](NEW-MACHINE.en.md).
-That route still admits only its existing GA102 envelope, including its two
-reviewed PCI IDs and both admitted memory sizes. This refactor does not make
-GA104/GA106 eligible for automatic local-profile generation.
+chip. The [local generator](NEW-MACHINE.en.md) also admits the exact 12 GiB
+GA104 `248710de` and GA106 `250410de` tuples. These require the reviewed nvgop
+`60010` code; the existing GA102 combinations remain available. LOCAL still
+requires a non-aggregate topology and all 20 host jobs, including complete
+driver-release replay. Generated profiles are experimental candidates, not
+new physical compatibility reports.
 
 The identity-only H610M probe still has no chip, VRAM or PROM pins and cannot
 compile into a write/release image. External overrides of the selected family

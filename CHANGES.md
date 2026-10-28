@@ -1,5 +1,19 @@
 # Changes
 
+## Unreleased — connect reviewed RTX 3060 families to local capture and replay
+
+- Add bounded generic read-only capture for the exact `248710de` and `250410de`
+  RTX 3060 12GB identities. Preserve target pinning, BAR and MEM/BME restrictions.
+- Couple each admitted PCI identity to its exact chip revision, VRAM and reviewed
+  nvgop version/code hash. Preserve existing GA102 combinations; new 3060 tuples
+  require the recorded `60010` code.
+- Require full driver-release replay for every generated profile, including
+  EDID-present firmware. Older EDID-present evidence must be regenerated.
+  Generalize the host model's image sizes, stops, version and display-child count.
+- Extend synthetic admission and release matrices across GA102/GA104/GA106.
+  Aggregate LOCAL generation remains unsupported. These changes add experimental
+  per-machine candidates, not another hardware success or a universal support claim.
+
 ## Unreleased — preserve valid late PCIe capability layouts
 
 - Match PCI configuration save bounds to the existing parser: aligned PCIe v1

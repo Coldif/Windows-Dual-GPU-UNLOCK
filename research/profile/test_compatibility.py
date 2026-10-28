@@ -53,6 +53,7 @@ class CompatibilityTests(unittest.TestCase):
         self.envelope = copy.deepcopy(topology.ENVELOPE)
         self.envelope.update(min_captures=2, nvgop=[{
             'version': '60009', 'text_sha256': hashlib.sha256(bytes(0x500)).hexdigest()}])
+        self.envelope['chips'][0]['nvgop'] = copy.deepcopy(self.envelope['nvgop'])
 
     def populate(self, *, no_edid=True, count=2, **options):
         text = topology.synthetic_capture(no_edid=no_edid, **options)

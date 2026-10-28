@@ -227,8 +227,12 @@ int main(void) {
     Check(!S.RegReads && !S.PromReads,"bad inventory permits no deep reads");
     Check(!Logged("capture-complete=1"),"bad inventory cannot claim a complete capture");
   }
-  GenericSetup(G_OK);TestId=0x220310de;
-  Check(GuCaptureGraphOnVolume(&Table,&LogFile,&RootFile)==EFI_SUCCESS,"second reviewed GA102 identity succeeds");
+  const UINT32 reviewedIds[]={0x220310deU,0x248710deU,0x250410deU};
+  for(UINTN i=0;i<sizeof(reviewedIds)/sizeof(reviewedIds[0]);i++) {
+    GenericSetup(G_OK);TestId=reviewedIds[i];
+    Check(GuCaptureGraphOnVolume(&Table,&LogFile,&RootFile)==EFI_SUCCESS,"reviewed GA10x capture identity succeeds");
+    Check(S.RegReads==16 && S.PromReads==PROM_DWORDS,"each reviewed identity retains bounded deep reads");
+  }
 #ifdef GU_PROBE_AUTO_BUS
   const UINTN buses[]={1,0x2b,255};
   for(UINTN i=0;i<sizeof(buses)/sizeof(buses[0]);i++) {

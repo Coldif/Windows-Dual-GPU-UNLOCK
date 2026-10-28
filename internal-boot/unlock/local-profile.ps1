@@ -107,9 +107,9 @@ function Get-LocalExpectedJobs([bool]$NoEdidDriver=$false) {
  'r2 console replay (real graph)'=0;'r2 replay other profile (must reject)'=1;
  'cold pre-check (read-only)'=0;'full flow gates'=0;'core transaction (efi)'=0;
  'manual entry-latched'=0;'automatic internal'=0;'headless internal'=0;'headless USB (shipped child)'=0}
- # A firmware without an EDID driver releases the GPU differently from every reviewed profile, so its
- # evidence must also hold the driver-release replay on its own graph.
+ # Every generated profile must replay the complete release on its own graph/images.
  if($NoEdidDriver){$jobs['release replay, no EDID driver (real graph)']=0}
+ else {$jobs['release replay, EDID driver (real graph)']=0}
  return $jobs
 }
 function Get-LocalObjectNames($Value) {

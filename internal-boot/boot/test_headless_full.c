@@ -12,15 +12,20 @@ static VOID PostUnlockStatusTest(VOID) {
 }
 #if GU_NO_EDID_DRIVER
 /* Firmware that binds no EDID driver: the release is the console detach plus one NVIDIA GOP stop.
- * The driver image is accepted either as a PE file or as a loaded-image dump of exactly the
- * profile's image size (what the probe saves as IMGnn.BIN). */
+ * LOCAL requires a loaded-image dump of exactly the profile's image size
+ * (what the probe saves as IMGnn.BIN). Fixed profiles also accept legacy PE fixtures. */
 static VOID LoadNv(const char *path) {
   FILE *f=fopen(path,"rb");Check(f!=NULL,"nvgop image fixture exists");
   fseek(f,0,SEEK_END);long n=ftell(f);rewind(f);
   if((UINTN)n==sizeof(NvMemory)) {
-    Check(fread(NvMemory,1,sizeof(NvMemory),f)==sizeof(NvMemory),"read nvgop loaded-image dump");fclose(f);
+    Check(fread(NvMemory,1,sizeof(NvMemory),f)==sizeof(NvMemory) && fgetc(f)==EOF,"read exact nvgop loaded-image dump");fclose(f);
   } else {
-    fclose(f);LoadMapped(path,NvMemory,sizeof(NvMemory));
+    fclose(f);
+#ifdef GU_PROFILE_LOCAL
+    Check(FALSE,"captured loaded driver image size mismatch");
+#else
+    LoadMapped(path,NvMemory,sizeof(NvMemory));
+#endif
   }
 }
 int main(int argc,char **argv) {
@@ -63,14 +68,15 @@ int main(int argc,char **argv) {
 #else
 int main(int argc,char **argv) {
   Check(argc==5,"two PE code fixtures, PROM and full PCI fixture required");
-  LoadMapped(argv[1],MouseMemory,sizeof(MouseMemory));LoadMapped(argv[2],NvMemory,sizeof(NvMemory));
+  LoadDriverFixture(argv[1],MouseMemory,sizeof(MouseMemory));LoadDriverFixture(argv[2],NvMemory,sizeof(NvMemory));
   FILE *f=fopen(argv[3],"rb");Check(f && fread(PromMemory,1,sizeof(PromMemory),f)==sizeof(PromMemory),"read pinned PROM");fclose(f);
   f=fopen(argv[4],"rb");Check(f && fread(InitialFullConfig,1,sizeof(InitialFullConfig),f)==sizeof(InitialFullConfig),"read exact full config");fclose(f);
   DecodeTests();
   Check(Run(31)!=EFI_SUCCESS && !Calls,"missing Reset rejected before any device detach");
-  Check(RunFull(0)==EFI_SUCCESS && Calls==5 && Full.EdidDetached==2 && EnableCalls==1 && ClaimCalls==1 && CloseCalls==1,"two EDID + NV stop and bounded IO/MEM-only restore");
+  Check(RunFull(0)==EFI_SUCCESS && (UINTN)Calls==3+Full.ChildCount && Full.EdidDetached==Full.ChildCount && EnableCalls==1 && ClaimCalls==1 && CloseCalls==1,"all EDID + NV stop and bounded IO/MEM-only restore");
+  UINTN children=Full.ChildCount;
   Check(GuVerifyReleased(LastTable,TRUE)==EFI_SUCCESS,"zero physical GOP and protected graph verified");
-  Check(Live.Count+8==sizeof(FixtureEdges)/sizeof(FixtureEdges[0]),"three console edges, two EDID edges, three NV edges removed only");
+  Check(Live.Count+4+2*children==sizeof(FixtureEdges)/sizeof(FixtureEdges[0]),"only console, EDID and exact NV ownership edges removed");
   for(int scenario=1;scenario<=20;scenario++) {
     Check(RunFull(scenario)!=EFI_SUCCESS,"partial failure/code/config/cold/graph/owner/log fault stops");
     if(scenario==8 || scenario==9 || scenario==10 || scenario==11 || scenario==12 || scenario==13)Check(EnableCalls==1,"failure after effect remains failure");
@@ -79,8 +85,8 @@ int main(int argc,char **argv) {
   }
   for(int scenario=23;scenario<=30;scenario++) {
     Check(RunFull(scenario)!=EFI_SUCCESS && !EnableCalls && !ClaimCalls,"extra child/consumer/path/code/missing EDID/warning/partial NV stop blocks decode and unlock");
-    if(scenario==25 || scenario==26)Check(Calls==4,"late second child/code mutation blocks recursive NV stop");
-    if(scenario==30)Check(Calls==5 && !Full.Released,"NV partial child cleanup error cannot be promoted to release success");
+    if(scenario==25 || scenario==26)Check((UINTN)Calls==2+children,"late child/code mutation blocks recursive NV stop");
+    if(scenario==30)Check((UINTN)Calls==3+children && !Full.Released,"NV partial child cleanup error cannot be promoted to release success");
   }
   Check(RunFull(32)!=EFI_SUCCESS && Calls==3 && !EnableCalls && !ClaimCalls,"last cold-read GOP info mutation blocks next detach");
   Check(RunFull(0)==EFI_SUCCESS,"new release session");

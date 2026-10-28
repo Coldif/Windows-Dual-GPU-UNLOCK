@@ -157,12 +157,14 @@ static VOID DumpProm(CAPTURE *c,EFI_FILE_PROTOCOL *root,UINT8 *page) {
 
 #ifdef GU_CHECKED_PROBE
 /* Inventory never implies permission to read another GPU's register map.
- * Generic reads accept reviewed GA102 identities; named probes pin their own
+ * Generic reads accept the reviewed GA102 and 12 GiB GA104/GA106 identities;
+ * named probes pin their own
  * PCI/subsystem and require the same 16 MiB, MEM1/BME0 resource envelope.
  * All allocation/protocol calls finish before the final identity/config recheck. */
 static BOOLEAN ProbeEnvelope(CAPTURE *c,EFI_PCI_IO_PROTOCOL *io,const UINT32 *cfg) {
 #ifdef GU_PROBE_GENERIC
-  BOOLEAN identity=cfg[0]==0x220410deU || cfg[0]==0x220310deU;
+  BOOLEAN identity=cfg[0]==0x220410deU || cfg[0]==0x220310deU ||
+    cfg[0]==0x248710deU || cfg[0]==0x250410deU;
 #else
   BOOLEAN identity=cfg[0]==GU_BOARD_ID && cfg[11]==GU_BOARD_SUBSYSTEM;
 #ifdef GU_BAR0_BASE

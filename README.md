@@ -192,9 +192,9 @@ support. New systems require [compatibility reporting](docs/CONTRIBUTING.en.md) 
 [portability validation](docs/PORTABILITY.en.md). A machine inside the hardware-proven envelope
 can build and test its own local profile with the [new-machine pipeline](docs/NEW-MACHINE.en.md).
 This experimental workflow inventories NVIDIA display devices, but deep capture is
-limited to one RTX 3090 / 3090 Ti in the reviewed PCI/BAR state. A generated local
+limited to one reviewed RTX 3090 / 3090 Ti or RTX 3060 12GB identity in the reviewed PCI/BAR state. A generated local
 profile does not add another verified machine profile. USB write builds require all
-19 host jobs (20 when the firmware binds no EDID driver) and unchanged profile,
+20 host jobs, including the complete driver-release replay with or without an EDID driver, and unchanged profile,
 fixtures and build inputs; hardware validation is still required. Within this envelope
 the generic probe discovers the bus automatically and the generated profile pins it per
 machine. An optional `-TargetBus` constrains discovery and resumed captures. Single-RTX systems may have no iGPU or separate
