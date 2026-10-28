@@ -45,6 +45,9 @@ REPO = Path(__file__).resolve().parents[2]
 _graph_spec = importlib.util.spec_from_file_location('profile_capture_graph', Path(__file__).with_name('capture_graph.py'))
 _graph = importlib.util.module_from_spec(_graph_spec)
 _graph_spec.loader.exec_module(_graph)
+_path_spec = importlib.util.spec_from_file_location('profile_gpu_path', Path(__file__).with_name('gpu_path.py'))
+_path = importlib.util.module_from_spec(_path_spec)
+_path_spec.loader.exec_module(_path)
 TEXT_OUT = '387477c2-69c7-11d2-8e39-00a0c969723b'
 TEXT_IN = '387477c1-69c7-11d2-8e39-00a0c969723b'
 GOP = '9042a9de-23dc-4a38-96fb-7aded080516a'
@@ -171,6 +174,13 @@ def binding_for(bindings, agent):
     if 'base' not in b or 'size' not in b or not b['base'] <= b['stop'] < b['base'] + b['size']:
         fail(f'binding {agent:#x} stop is outside its image')
     return b
+
+
+def gpu_display_path(path):
+    try:
+        return _path.decode_gpu_display_path(path)
+    except ValueError as error:
+        fail(str(error))
 
 
 def aggregate_roles(text, blocks, pci, primary, bindings):
@@ -495,6 +505,10 @@ def analyze(diag, image_dir, envelope):
         fail(f'expected one RTX GOP child, found {len(gops)}')
     rtx = gops[0]
     rtx_path = path_of(blocks[rtx]['raw'])
+    # Validate bounded, legal PCI nodes before applying the current backend's
+    # narrower admission shape. Longer routes stay refused until all consumers
+    # carry their exact lengths and controller offsets.
+    gpu_display_path(rtx_path)
     # ACPI PNP0A03 UID 0 / Pci(root port) / Pci(0,0) / ACPI ADR / End: 36 bytes.
     if len(rtx_path) != 36 or rtx_path[0:12] != bytes.fromhex('02010c00d041030a00000000') or \
             rtx_path[12:16] != b'\x01\x01\x06\x00' or rtx_path[18:24] != bytes.fromhex('010106000000') or \

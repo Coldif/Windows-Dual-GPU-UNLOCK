@@ -43,10 +43,12 @@ function Run-Job([string]$name,[string[]]$compile,[string[]]$run,[int]$expect=0)
  if($code -ne $expect){throw "Unexpected result: $name"}
 }
 
-foreach($test in @('test_probe_records.py','test_local_topology.py')) {
+foreach($test in @('test_probe_records.py','test_local_topology.py','test_gpu_path.py')) {
  & $Python -I (Join-Path $PSScriptRoot $test)
  if($LASTEXITCODE -ne 0){throw "Capture-free generator regression failed: $test"}
 }
+& $Python -I (Join-Path $PSScriptRoot 'test_gpu_path_contract.py') --clang $Clang --output (Join-Path $PSScriptRoot ('build/path-contract-'+[Guid]::NewGuid().ToString('N')))
+if($LASTEXITCODE -ne 0){throw 'Native/Python GPU path contract comparison failed'}
 & $Python -I (Join-Path $PSScriptRoot 'test_make_profile.py') (Join-Path $local 'capture') (Build-GuFwsecLocate $repo $Clang)
 if($LASTEXITCODE -ne 0){throw 'Generator refusal tests failed'};$results['generator refusals']=[ordered]@{Exit=0;Expected=0}
 

@@ -77,6 +77,9 @@ function Get-LocalProfile([string]$Repo) {
 function Get-LocalRequiredFiles {
  @('internal-boot/efi_runtime.c','internal-boot/unlock/local-profile.ps1',
    'internal-boot/unlock/gpu-family.h','internal-boot/unlock/firmware-profile.h',
+   'internal-boot/unlock/gpu-path.h','research/profile/gpu_path.py',
+   'internal-boot/unlock/tests/test_gpu_paths.c','internal-boot/unlock/tests/test_gpu_path_vectors.c',
+   'research/profile/test_gpu_path.py','research/profile/test_gpu_path_contract.py',
    'internal-boot/unlock/build.ps1','internal-boot/boot/handoff.c',
    'research/headless/build-usb.ps1','research/headless/stage-usb.ps1',
    'research/profile/make-profile.py','research/profile/capture_graph.py','research/profile/test-profile.ps1',

@@ -6,6 +6,7 @@
  */
 #include "prepare-console.h"
 #include "../unlock/machine-profile.h"
+#include "../unlock/gpu-path.h"
 #include "media.h"
 #include <Protocol/GraphicsOutput.h>
 #include <Protocol/PciIo.h>
@@ -131,8 +132,13 @@ static BOOLEAN PathMatches(const EFI_DEVICE_PATH_PROTOCOL *p,const UINT8 *expect
  * it this boot, then pin the entire path for every later check. */
 static BOOLEAN DisplayRoute(const EFI_DEVICE_PATH_PROTOCOL *p,const UINT8 *platform) {
   UINTN bytes=0;
+#ifdef GU_PROFILE_LOCAL
+  return GuInspectPath(p,NULL,&bytes,NULL,NULL) && bytes==36 &&
+    GuSameGpuDisplayRoute(p,bytes,platform,36);
+#else
   return GuInspectPath(p,NULL,&bytes,NULL,NULL) && bytes==36 &&
     Bytes(p,platform,28) && Bytes((const UINT8 *)p+32,platform+32,4);
+#endif
 }
 static EFI_STATUS PciFor(EFI_BOOT_SERVICES *bs,EFI_DEVICE_PATH_PROTOCOL *path,UINTN bus,UINT32 id,UINT32 subsystem,EFI_HANDLE *handle,EFI_PCI_IO_PROTOCOL **io,UINT32 *config) {
   EFI_DEVICE_PATH_PROTOCOL *rest=path;*handle=NULL;
@@ -208,7 +214,13 @@ static EFI_STATUS Displays(EFI_SYSTEM_TABLE *t,PLAN *p,BOOLEAN first) {
     if(!m->Info || m->SizeOfInfo<sizeof(*m->Info) || !m->FrameBufferBase || !m->FrameBufferSize || m->Mode>=m->MaxMode ||
        m->Info->PixelFormat>PixelBlueGreenRedReserved8BitPerColor || !m->Info->HorizontalResolution || !m->Info->VerticalResolution ||
        m->Info->PixelsPerScanLine<m->Info->HorizontalResolution || (UINT64)m->Info->PixelsPerScanLine*m->Info->VerticalResolution>m->FrameBufferSize/4){s=EFI_UNSUPPORTED;break;}
-    if(DisplayRoute(path,AmdPath) && !amd) {
+    if(DisplayRoute(path,AmdPath) && !amd
+#ifdef GU_PROFILE_LOCAL
+       /* A captured NVIDIA route can share this historical AMD ancestry.
+        * Prefer the pinned LOCAL route; PciFor still verifies its PCI identity. */
+       && !DisplayRoute(path,RtxPath)
+#endif
+       ) {
 #ifdef GU_SINGLE_RTX_CONSOLE
       s=EFI_UNSUPPORTED;break; /* Sole physical GOP must be this RTX. */
 #else

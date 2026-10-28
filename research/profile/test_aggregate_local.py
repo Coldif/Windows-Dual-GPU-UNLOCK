@@ -64,6 +64,10 @@ def main():
                                     children=children,bus=0x2b if children==2 else 1,command=2 if children==2 else 3)
         if board==0x220410de and children==2:
             text=text.replace('38811462','145410de')  # Exercise the alternate foreign-profile selector.
+        if board==0x250410de and children==2:
+            # A real target route may coincide with the old AMD ancestry constant.
+            # PCI identity, not that historical root-port number, selects the GPU.
+            text=text.replace('path-node raw=010106000103','path-node raw=010106000108')
         # Bind the actual code_hash parser to the complete loaded PE images.
         for agent,index in ((3,0),(9,1)):
             pattern=rf'(^binding handle=0x{agent:x} .*?)(?=^binding handle=|^handles status=)'

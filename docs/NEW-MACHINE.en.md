@@ -73,6 +73,13 @@ an EDID driver. Capture with the current probe if older records lack pixel forma
 GOP info size or the raw BAR0 resource descriptor. Synthetic host integration covers
 generation and prepare/release but is not physical validation or a vendor transaction test.
 
+Captured PCI path nodes must contain legal device/function numbers. LOCAL console
+selection uses the captured NVIDIA ancestry and independently checks its PCI identity;
+a root-port number that matches a historical AMD route does not identify an AMD GPU.
+The bounded C/Python path decoder is checked on identical synthetic inputs as part of
+the generator regressions. Longer bridge chains remain outside the current LOCAL
+admission shape until the runtime buffers and PCI-parent checks are integrated.
+
 Maintainers can run capture-free regression checks with
 `python -I research/profile/test_local_topology.py` and
 `research/profile/test-local-release.ps1`. These use synthetic data only and do not
