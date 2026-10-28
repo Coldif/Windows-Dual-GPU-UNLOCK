@@ -50,6 +50,31 @@ function Check([string]$Label,[scriptblock]$Mutate,[bool]$Accept=$false) {
  $script:checks++
 }
 Check 'complete synthetic evidence' {} $true
+# Test the actual JSON number tokens, not just pre-serialization .NET types.
+foreach($json in @('0','1','2','-1','2147483648','9223372036854775807')) {
+ $value=ConvertFrom-Json ('{"value":'+$json+'}')
+ foreach($want in @(0,1,2)) {
+  $accepted=Test-GuExactInteger $value.value $want
+  if($accepted -ne ($json -ceq [string]$want)){throw "JSON integer comparison failed: $json expected $want"};$checks++
+ }
+}
+foreach($json in @('null','true','false','"0"','"1"','"2"','0.0','1.0','2e0','[]','{}')) {
+ $value=ConvertFrom-Json ('{"value":'+$json+'}')
+ foreach($want in @(0,1,2)) {
+  if(Test-GuExactInteger $value.value $want){throw "Coerced JSON token accepted: $json expected $want"};$checks++
+ }
+}
+Check 'string evidence format' {param($e) $e.Format='2'}
+Check 'boolean evidence format' {param($e) $e.Format=$true}
+Check 'oversized evidence format' {param($e) $e.Format=[long]2147483648}
+Check 'boolean exit' {param($e) $e.Results.runtime.Exit=$false}
+Check 'null expected' {param($e) $e.Results.runtime.Expected=$null}
+foreach($json in @('"1"','1.0','true','null','2147483648')) {
+ $validReport=$report|ConvertTo-Json -Depth 8
+ Put 'research/profile/local/profile.json' ([regex]::Replace($validReport,'"Format":\s*1\b',('"Format": '+$json)))
+ Check ('invalid report Format token '+$json) {param($e) $e.ProfileReportSha256=Get-GuSha256 (Join-Path $sandbox 'research/profile/local/profile.json')}
+}
+Put 'research/profile/local/profile.json' ($report|ConvertTo-Json -Depth 8)
 Check 'old format' {param($e) $e.Format=1}
 Check 'string pass flag' {param($e) $e.AllPassed='true'}
 Check 'hardware flag' {param($e) $e.HardwareAccess=$true}
@@ -138,6 +163,12 @@ Put 'research/profile/local/test-results.json' $baseline
 $manifest=[ordered]@{Format=2;Mode='single-rtx-headless-unlock-then-windows-usb';CanUnlock=$true;RequiresHumanKey=$false;HardwareTested=$false;EfiSha256=('0'*64);ChildSha256=('1'*64)}
 foreach($key in $package.Keys){$manifest[$key]=$package[$key]}
 Assert-GuUsbManifest $sandbox $manifest;$checks++
+foreach($json in @('"2"','2.0','2e0','true','null','2147483648')) {
+ $text=$manifest|ConvertTo-Json -Depth 8
+ $badManifest=([regex]::Replace($text,'"Format":\s*2\b',('"Format": '+$json)))|ConvertFrom-Json
+ $accepted=$true;try{Assert-GuUsbManifest $sandbox $badManifest}catch{$accepted=$false}
+ if($accepted){throw "Invalid USB Format token accepted: $json"};$checks++
+}
 foreach($value in @($null,'','unknown','LOCAL-bad','local-220410de-145410de-12345678')) {
  $manifest.HardwareProfile=$value
  $accepted=$true;try{Assert-GuUsbManifest $sandbox $manifest}catch{$accepted=$false}

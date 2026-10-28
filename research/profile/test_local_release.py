@@ -78,15 +78,9 @@ def main():
         print(name + ': ' + summary, flush=True)
         if children == 1 and command == 2 and memory == 0x6000:
             probe = case / 'probe-report.txt'
-            # test_checks also tests a specific linked-capability layout. Supply that
-            # layout synthetically, retaining this local profile's identity and bus.
-            checks_config = config.copy()
-            checks_config[13] = 0x60
-            checks_config[16:] = [0] * 48
-            for at,value in {0x60:0x00036801,0x68:0x00807805,0x78:0x0012b410,
-                             0x7c:1<<28,0xb4:0x00140009,0xc8:0x00050011}.items():
-                checks_config[at//4] = value
-            probe.write_text(''.join(f'config_offset=0x{i*4:x}\nvalue=0x{value:08x}\n' for i,value in enumerate(checks_config)))
+            # Exercise the actual alternate 40/48 layout; test_checks retains its
+            # historical 60/68/78 assertions in a separate synthetic fixture.
+            probe.write_text(''.join(f'config_offset=0x{i*4:x}\nvalue=0x{value:08x}\n' for i,value in enumerate(config)))
             for job, inputs, arguments in (
                 ('checks', [str(ROOT / 'internal-boot/unlock/tests/test_checks.c'), str(ROOT / 'internal-boot/unlock/checks.c')], [str(probe)]),
                 ('port', [str(ROOT / 'internal-boot/unlock/tests/test_port.c'), str(ROOT / 'internal-boot/unlock/port.c')], [])):

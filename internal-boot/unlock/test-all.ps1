@@ -71,7 +71,7 @@ try {
    }
    foreach($profile in $profiles) {
     $profileDefs=$defs+@('-DGU_EXPERIMENTAL_3090',(ProfileDefine $profile))
-    if($haveAssets){$jobs+=@{Name="core24GB-$profile";Sources=@('tests/test_efi_transaction.c')+$core;Defines=$profileDefs;Args=@($Prom,$Assets,$ColdCapture)}}
+    if($haveAssets){$jobs+=@{Name="core24GB-$profile";Sources=@('tests/test_efi_transaction.c','checks.c')+$core;Defines=$profileDefs;Args=@($Prom,$Assets,$ColdCapture)}}
     $appTest=if($profile -like 'entryLatchedSs1*'){'tests/test_entry_latched.c'}else{'tests/test_3090_experimental.c'}
     $jobs+=@{Name="experimental-$profile";Sources=@($appTest,'app_io.c','ownership.c','format.c','sha256.c','checks.c')+$core;Defines=$profileDefs;Args=$experimentalArgs}
    }

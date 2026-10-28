@@ -75,12 +75,13 @@ static int LoadCapture(const char *Path, UINT32 C[64]) {
   return Count == 64;
 }
 
-static void TestCapture(const UINT32 Captured[64]) {
+/* Historical RUN00 linked-capability regression, independent of input machine. */
+static void TestLegacyCapture(const UINT32 Captured[64]) {
   UINT32 C[64], Before[64];
   GU_CAPS Caps;
   memcpy(C, Captured, sizeof(C));
   memcpy(Before, C, sizeof(C));
-   Check(GuCheckConfig(C, 0, GU_TARGET_BUS, 0, 0, &Caps), "captured RTX3090 RUN00 config accepted");
+  Check(GuCheckConfig(C, 0, GU_TARGET_BUS, 0, 0, &Caps), "legacy RUN00 capability layout accepted");
   Check(Caps.pm == 0x60 && Caps.msi == 0x68 && Caps.pcie == 0x78 &&
         Caps.msix == 0 && Caps.pcie_version == 2,
         "capture returns linked caps only; c8 is unlinked");
@@ -93,6 +94,49 @@ static void TestCapture(const UINT32 Captured[64]) {
         "synthetically linked captured MSI-X is disabled and accepted");
   Word(C, 0xca, 0x8005);
   Reject(C, "linked enabled MSI-X rejected");
+}
+
+static unsigned ConfigByte(const UINT32 C[64], unsigned Offset) {
+  return (C[Offset / 4] >> ((Offset & 3U) * 8U)) & 0xffU;
+}
+
+static int Linked(const UINT32 C[64], unsigned Offset, unsigned Id) {
+  unsigned At=ConfigByte(C,0x34);
+  for(unsigned Step=0;At && Step<48;Step++) {
+    if(At<0x40 || At>0xfc || (At&3))return 0;
+    if(At==Offset)return ConfigByte(C,At)==Id;
+    At=ConfigByte(C,At+1);
+  }
+  return 0;
+}
+
+static void TestCapture(const UINT32 Captured[64]) {
+  UINT32 C[64],Before[64];GU_CAPS Caps;
+  memcpy(C,Captured,sizeof(C));memcpy(Before,C,sizeof(C));
+  int Accepted=GuCheckConfig(C,0,GU_TARGET_BUS,0,0,&Caps);
+  Check(Accepted,"captured config satisfies this exact profile");
+  Check(memcmp(C,Before,sizeof(C))==0,"actual capture validation preserves all config bytes");
+  if(!Accepted)return;
+  Check(Caps.pm && Linked(C,Caps.pm,1),"returned PM capability is linked in this capture");
+  Check(Caps.pcie && Linked(C,Caps.pcie,0x10),"returned PCIe capability is linked in this capture");
+  Check(Caps.pcie_version==(ConfigByte(C,Caps.pcie+2)&15),"returned PCIe version comes from the linked capability");
+  Check(!Caps.msi || Linked(C,Caps.msi,5),"optional MSI is linked if present");
+  Check(!Caps.msix || Linked(C,Caps.msix,0x11),"optional MSI-X is linked if present");
+  C[0]^=1;Reject(C,"different captured PCI identity rejected");
+  memcpy(C,Before,sizeof(C));C[11]^=1;Reject(C,"different captured subsystem rejected");
+  memcpy(C,Before,sizeof(C));C[1]&=~2U;Reject(C,"captured MEM-off state rejected");
+  memcpy(C,Before,sizeof(C));C[1]|=4U;Reject(C,"captured BME-on state rejected");
+  Check(!GuCheckConfig(Before,1,GU_TARGET_BUS,0,0,&Caps),"captured config on another segment rejected");
+  Check(!GuCheckConfig(Before,0,GU_TARGET_BUS+1U,0,0,&Caps),"captured config on another bus rejected");
+  Check(!GuCheckConfig(Before,0,GU_TARGET_BUS,1,0,&Caps),"captured config on another device rejected");
+  Check(!GuCheckConfig(Before,0,GU_TARGET_BUS,0,1,&Caps),"captured config on another function rejected");
+}
+
+static void LegacyCapture(UINT32 C[64]) {
+  Basic(C);memset(C+16,0,48*sizeof(*C));C[0x34/4]=0x60;
+  C[0x60/4]=0x00036801;C[0x68/4]=0x00807805;
+  C[0x78/4]=0x0012b410;C[0x7c/4]=1U<<28;
+  C[0xb4/4]=0x00140009;C[0xc8/4]=0x00050011;
 }
 
 static void TestIdentity(void) {
@@ -121,7 +165,11 @@ static void TestIdentity(void) {
   Check(Valid(C), "single-function normal header accepted");
   for (I = 0; I < sizeof(Mutations) / sizeof(Mutations[0]); ++I) {
     Basic(C);
-    Byte(C, Mutations[I].Offset, Mutations[I].Value);
+    /* A LOCAL subsystem byte may already equal an old fixture's negative value. */
+    unsigned Value=Mutations[I].Value;
+    if(Mutations[I].Offset==0 || Mutations[I].Offset==2 || Mutations[I].Offset==0x2c || Mutations[I].Offset==0x2e)
+      Value=ConfigByte(C,Mutations[I].Offset)^1U;
+    Byte(C, Mutations[I].Offset, Value);
     Reject(C, Mutations[I].Name);
   }
   Basic(C);
@@ -368,9 +416,10 @@ static void TestPaths(void) {
 }
 
 int main(int Argc, char **Argv) {
-  UINT32 Captured[64];
+  UINT32 Captured[64],Legacy[64];
   if (Argc != 2 || !LoadCapture(Argv[1], Captured)) return 2;
   TestCapture(Captured);
+  LegacyCapture(Legacy);TestLegacyCapture(Legacy);
   TestIdentity();
   TestPowerAndPcie();
   TestCapabilities();
@@ -379,6 +428,6 @@ int main(int Argc, char **Argv) {
     fprintf(stderr, "%u/%u checks failed\n", Failures, Checks);
     return 1;
   }
-  printf("PASS %u preflight checks (real RTX3090 RUN00 fixture plus malformed inputs)\n", Checks);
+  printf("PASS %u preflight checks (actual config, legacy capability layout and malformed inputs)\n", Checks);
   return 0;
 }

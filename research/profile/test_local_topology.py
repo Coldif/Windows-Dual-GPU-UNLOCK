@@ -126,7 +126,7 @@ def add_open(text, handle, protocol, row):
 
 class LocalTopologyTests(unittest.TestCase):
     def test_valid_local_matrix(self):
-        for bus in (1, 0x2b):
+        for bus in (1, 0x2b, 255):
             for igpu in (False, True):
                 for no_edid in (False, True):
                     for children in (1, 2):

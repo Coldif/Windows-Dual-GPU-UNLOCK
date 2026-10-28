@@ -196,7 +196,8 @@ limited to one RTX 3090 / 3090 Ti in the reviewed PCI/BAR state. A generated loc
 profile does not add another verified machine profile. USB write builds require all
 19 host jobs (20 when the firmware binds no EDID driver) and unchanged profile,
 fixtures and build inputs; hardware validation is still required. Within this envelope
-the bus is pinned per machine, and single-RTX systems may have no iGPU or separate
+the generic probe discovers the bus automatically and the generated profile pins it per
+machine. An optional `-TargetBus` constrains discovery and resumed captures. Single-RTX systems may have no iGPU or separate
 EDID driver. Aggregate consoles and multiple NVIDIA GPUs are not generated.
 Staging the unlock package needs `-StageUnlock`.
 

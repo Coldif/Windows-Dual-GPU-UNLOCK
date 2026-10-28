@@ -10,7 +10,8 @@
 # here touches the GPU; only booting the staged unlock does, and that is never automatic.
 param([Parameter(Mandatory)][ValidatePattern('^[D-Zd-z]$')][string]$Drive,[Parameter(Mandatory)][guid]$WindowsEspGuid,
  [Parameter(Mandatory)][string]$Assets,[switch]$StageUnlock,
- [string]$Clang='clang',[string]$LldLink='lld-link',[string]$Python='python',[string]$VcVars)
+ [string]$Clang='clang',[string]$LldLink='lld-link',[string]$Python='python',[string]$VcVars,
+ [ValidateRange(1,255)][int]$TargetBus)
 $ErrorActionPreference='Stop'
 $repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 . (Join-Path $repo 'internal-boot/unlock/local-profile.ps1')
@@ -23,7 +24,9 @@ function Captures {@(Get-ChildItem -LiteralPath $dir -Filter 'DIAG??.TXT' -File 
  $t=[IO.File]::ReadAllText($_.FullName);$t.Contains('probe-pci-handles=') -and $t.Contains("capture-complete=1`r`n")})}
 
 if(!(Test-Path -LiteralPath $dir) -or (Captures).Count -lt $need) {
- & (Join-Path $PSScriptRoot 'build-probe.ps1') -WindowsEspGuid $WindowsEspGuid -Clang $Clang -LldLink $LldLink -Python $Python
+ $probeOptions=@{}
+ if($PSBoundParameters.ContainsKey('TargetBus')){$probeOptions.TargetBus=$TargetBus}
+ & (Join-Path $PSScriptRoot 'build-probe.ps1') -WindowsEspGuid $WindowsEspGuid -Clang $Clang -LldLink $LldLink -Python $Python @probeOptions
  if(!$?){throw 'Probe build failed'}
  $m=Get-Content -LiteralPath (Join-Path $repo 'internal-boot/boot/build/probe-generic/manifest.json') -Raw | ConvertFrom-Json
  $bootFile=Join-Path $usb 'EFI\BOOT\BOOTX64.EFI'
@@ -46,7 +49,11 @@ if(!(Test-Path -LiteralPath $dir) -or (Captures).Count -lt $need) {
  exit 0
 }
 
-"Using $((Captures).Count) probe captures from $dir."
+$selectedCaptures=@(Captures)
+if($PSBoundParameters.ContainsKey('TargetBus')) {
+ Assert-GuProbeTargetBus @($selectedCaptures | ForEach-Object {$_.FullName}) $TargetBus
+}
+"Using $($selectedCaptures.Count) probe captures from $dir."
 $capture=Join-Path $repo 'research/profile/local/capture'
 if(Test-Path -LiteralPath $capture) {
  # Preserve original captures when resuming; never recursively delete hardware evidence.

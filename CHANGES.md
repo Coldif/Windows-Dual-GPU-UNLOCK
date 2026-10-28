@@ -1,5 +1,20 @@
 # Changes
 
+## Unreleased — discover the diagnostic target bus and replay captured PCI layouts
+
+- Automatically discover the single NVIDIA diagnostic target's nonzero PCI bus.
+  Pin its handle, interface, identity and BDF across callbacks and final revalidation;
+  target loss or drift invalidates the capture. Keep existing GPU/BAR/read restrictions.
+- Preserve optional explicit `-TargetBus` constraints through probe builds and resumed
+  new-machine captures; reject a different or ambiguous target before archive/copy/build.
+- Validate real captured PCI capability offsets and IO/MEM state in host tests.
+  Retain historical capability-layout and malformed-input regressions separately.
+  Add synthetic capture-model, bus-boundary and mocked build/resume regressions.
+- Accept exact JSON Int32/Int64 schema and exit-code values on Windows PowerShell
+  and PowerShell 7, while continuing to reject strings, floats, booleans and nulls.
+- This improves discovery and host portability; it adds no hardware validation or
+  new GPU admission. No transaction implementation, real EFI execution or GPU test is included.
+
 ## Unreleased — separate GPU family traits, firmware templates and machine pins
 
 - Centralize exact GA102/GA104/GA106 chip revisions and current PCI-ID/VRAM

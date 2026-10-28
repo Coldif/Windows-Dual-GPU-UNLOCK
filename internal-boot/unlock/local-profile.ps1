@@ -6,6 +6,29 @@
 
 function Get-GuSha256([string]$Path){(Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()}
 
+# ConvertFrom-Json emits Int32 in Windows PowerShell and Int64 in PowerShell 7.
+# Check the original type before comparing: no string/float/bool coercion at a gate.
+function Test-GuExactInteger($Value,[int]$Expected) {
+ return ($Value -is [int] -or $Value -is [long]) -and $Value -eq $Expected
+}
+
+# A resumed workflow must honor the same explicit bus constraint as its probe.
+# Check before any local capture archive, profile generation or package/staging.
+function Assert-GuProbeTargetBus([string[]]$Paths,[ValidateRange(1,255)][int]$TargetBus) {
+ foreach($path in $Paths) {
+  $item=Get-Item -LiteralPath $path
+  if($item.PSIsContainer -or $item.Length -gt 8MB){throw 'Probe capture exceeds the diagnostic file limit'}
+  $text=[IO.File]::ReadAllText($item.FullName)
+  $rows=[regex]::Matches($text,'(?m)^probe-target[^\r\n]*\r?$')
+  $target=if($rows.Count -eq 1){[regex]::Match($rows[0].Value.TrimEnd("`r"),'^probe-target seg=0x([0-9a-f]{1,4}) bus=0x([0-9a-f]{1,4}) dev=0x([0-9a-f]{1,4}) fun=0x([0-9a-f]{1,4})$')}else{$null}
+  if(!$target -or !$target.Success -or
+     [Convert]::ToUInt32($target.Groups[1].Value,16) -ne 0 -or
+     [Convert]::ToUInt32($target.Groups[2].Value,16) -ne $TargetBus -or
+     [Convert]::ToUInt32($target.Groups[3].Value,16) -ne 0 -or
+     [Convert]::ToUInt32($target.Groups[4].Value,16) -ne 0){throw 'Captured probe target does not match explicit -TargetBus; no profile or package was generated'}
+ }
+}
+
 function Get-LocalProfile([string]$Repo) {
  $header=Join-Path $Repo 'internal-boot/unlock/profile-local.h'
  if(!(Test-Path -LiteralPath $header)){throw 'No local profile: run research/profile/make-profile.py on this machine''s probe captures first'}
@@ -110,7 +133,7 @@ function Assert-LocalFixtures([string]$Repo,$Fixtures) {
 }
 function Get-LocalProfileReport([string]$Repo,$Hardware) {
  $report=Get-Content -LiteralPath (Join-Path $Repo 'research/profile/local/profile.json') -Raw | ConvertFrom-Json
- if($report.Format -isnot [int] -or $report.Format -ne 1 -or
+ if(!(Test-GuExactInteger $report.Format 1) -or
     $report.ProfileName -cne $Hardware.Name -or $report.HeaderSha256 -cne $Hardware.HeaderSha256 -or
     $report.PromSha256 -cne $Hardware.Prom -or $report.HardwareTested -isnot [bool] -or $report.HardwareTested){throw 'Generated profile report identity is invalid'}
  Assert-LocalFixtures $Repo $report.Fixtures
@@ -126,7 +149,7 @@ function Assert-LocalProfileEvidence([string]$Repo) {
  $path=Join-Path $local 'test-results.json'
  if(!(Test-Path -LiteralPath $path)){throw "Local profile $($hw.Name) has no passing host-test evidence; run research/profile/test-profile.ps1"}
  $e=Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
- if($e.Format -isnot [int] -or $e.Format -ne 2 -or $e.AllPassed -isnot [bool] -or !$e.AllPassed -or
+ if(!(Test-GuExactInteger $e.Format 2) -or $e.AllPassed -isnot [bool] -or !$e.AllPassed -or
     $e.HardwareAccess -isnot [bool] -or $e.HardwareAccess -or $e.ProfileName -cne $hw.Name){throw 'Local profile evidence format/type mismatch; rerun host tests'}
  if($e.HeaderSha256 -ne $hw.HeaderSha256){throw 'profile-local.h changed after its host tests passed; rerun research/profile/test-profile.ps1'}
  if($e.PromSha256 -ne $hw.Prom){throw 'Local test evidence is for another PROM'}
@@ -145,7 +168,7 @@ function Assert-LocalProfileEvidence([string]$Repo) {
  Assert-LocalKeys $e.Results @($jobs.Keys) 'Host jobs'
  foreach($name in $jobs.Keys){
   $job=$e.Results.$name
-  if($job.Exit -isnot [int] -or $job.Expected -isnot [int] -or $job.Exit -ne $jobs[$name] -or $job.Expected -ne $jobs[$name]){throw "Missing or invalid host result: $name"}
+  if(!(Test-GuExactInteger $job.Exit $jobs[$name]) -or !(Test-GuExactInteger $job.Expected $jobs[$name])){throw "Missing or invalid host result: $name"}
  }
  return $e
 }
@@ -158,7 +181,7 @@ function Assert-LocalProfilePackage([string]$Repo,$Manifest) {
 }
 
 function Assert-GuUsbManifest([string]$Repo,$Manifest) {
- if($Manifest.Format -isnot [int] -or $Manifest.Format -ne 2 -or
+ if(!(Test-GuExactInteger $Manifest.Format 2) -or
     $Manifest.Mode -cne 'single-rtx-headless-unlock-then-windows-usb' -or
     $Manifest.CanUnlock -isnot [bool] -or !$Manifest.CanUnlock -or
     $Manifest.RequiresHumanKey -isnot [bool] -or $Manifest.RequiresHumanKey -or

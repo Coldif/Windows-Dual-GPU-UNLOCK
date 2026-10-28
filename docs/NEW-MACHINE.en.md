@@ -44,7 +44,9 @@ child of the RTX must still carry the `EdidDiscovered` interface, and any live d
 display child, or an EDID driver appearing later, stops the release before the NVIDIA stop. Such a
 profile must also pass a replay of the whole driver release on its own graph, driver image, PROM
 and PCI config (a 20th job). Only the non-aggregate headless build supports the flag; other builds
-refuse it at compile time. The probe needs `build-probe.ps1 -TargetBus` for a card off bus `01`.
+refuse it at compile time. The generic probe automatically selects the bus of the single
+eligible NVIDIA display controller; you do not need a motherboard-specific bus option.
+It still requires segment 0, device 0, function 0 and a nonzero bus.
 
 Admission and replay share a strict parser: incomplete/ambiguous handle, protocol,
 open and PCI snapshots cannot establish absence of an adapter or EDID owner. The
@@ -85,9 +87,12 @@ Run the same command repeatedly; each run does the next step.
    loaded driver images, and for a single eligible RTX 3090 / 3090 Ti only,
    16 BAR0 registers and the 1 MiB PROM window. The deep read requires MEM1/BME0,
    the reviewed class/revision, the selected segment-0/device-0/function-0 bus, a 32-bit aligned 16 MiB BAR resource
-   and unchanged handle/interface/config after resource queries and allocation. A card on
-   another bus can be captured with `build-probe.ps1 -TargetBus 0x2b` (diagnostic build only);
-   the generator then records that bus as `GU_TARGET_BUS`. The probe also records the PciIo
+   and unchanged handle/interface/config after resource queries and allocation. The bus is
+   discovered automatically and the generator records it as `GU_TARGET_BUS`. An optional
+   `-TargetBus 0x2b` on `new-machine.ps1` or `build-probe.ps1` constrains discovery to that
+   exact bus, without fallback. On resume, `new-machine.ps1` rejects existing captures
+   with a different or ambiguous target before copying them or generating a package.
+   The probe also records the PciIo
    attribute cache (Get only), which the generator compares with the PCI command register.
    Unknown devices and multiple NVIDIA displays receive inventory only; they cannot
    produce an eligible local profile. It writes
