@@ -188,6 +188,7 @@ int main(void) {
   Check(!Logged("capture-complete=1"),"unknown deep-read identity cannot claim complete capture");
 #endif
   Check(GenericRun(G_OK,TRUE)==EFI_SUCCESS,"reviewed generic envelope succeeds");
+  Check(Logged("pci-bar0-resource raw=8a2b00000000"),"validated BAR descriptor bytes are recorded before the final target recheck");
   Check(S.RegReads==16 && S.PromReads==PROM_DWORDS,"reviewed generic capture reads bounded windows");
 #if defined(GU_PROBE_GENERIC) || defined(GU_PROBE_DUMP_PROM)
   Check(RootOpens==2 && Dumps==2,"PROM and image use validated launch root");

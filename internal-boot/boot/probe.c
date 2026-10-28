@@ -187,6 +187,13 @@ static BOOLEAN ProbeEnvelope(CAPTURE *c,EFI_PCI_IO_PROTOCOL *io,const UINT32 *cf
       UINT8 sum=0;for(UINTN j=0;j<sizeof(*d)+2;j++)sum=(UINT8)(sum+((const UINT8 *)d)[j]);
       if(end[1] && sum)good=FALSE;
     }
+    if(good) {
+      UINT8 observed[sizeof(*d)+2];
+      for(UINTN j=0;j<sizeof(observed);j++)observed[j]=((const UINT8 *)d)[j];
+      Text(c,"pci-bar0-resource raw=");
+      for(UINTN j=0;j<sizeof(observed);j++)Hex(c,observed[j],2);
+      End(c);
+    }
   }
   if(raw && c->Table->BootServices->FreePool(raw)!=EFI_SUCCESS)good=FALSE;
   return good;

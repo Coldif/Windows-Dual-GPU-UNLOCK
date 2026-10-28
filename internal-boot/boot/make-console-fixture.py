@@ -12,6 +12,9 @@ from pathlib import Path
 
 source = Path(sys.argv[1])
 single = '--single-rtx' in sys.argv[2:]
+aggregate = '--aggregate' in sys.argv[2:]
+if aggregate and not single:
+    raise ValueError('--aggregate requires --single-rtx')
 def option(name, default):
     """--name=value override; defaults are the original B650M/3090 FE capture."""
     for arg in sys.argv[2:]:
@@ -51,6 +54,8 @@ if no_igpu:
                 raise ValueError('--no-igpu disagrees with the display inventory')
 # This firmware binds no EDID/mouse driver to the RTX display handles (GU_NO_EDID_DRIVER).
 no_edid_driver = '--no-edid-driver' in sys.argv[2:]
+if aggregate and no_edid_driver:
+    raise ValueError('Aggregate replay requires an EDID driver')
 if no_edid_driver and not single:
     raise ValueError('--no-edid-driver is only for the single-RTX console replay')
 EDID_DISCOVERED = '1c0c34f6-d380-41fa-a049-8ad06c1a66aa'
@@ -75,12 +80,25 @@ if single:
         roles['EdidChild'] = child_records[0][2]
     else:
         roles['EdidChild'] = 0  # No physical second child; tests must not invent one.
+if aggregate:
+    # Use the same strict graph-role inspection as admission. This produces test
+    # data only; make-profile.py still refuses aggregate write-profile generation.
+    spec = importlib.util.spec_from_file_location('aggregate_fixture_profile', Path(__file__).resolve().parents[2] / 'research/profile/make-profile.py')
+    profile = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(profile)
+    original = {index: int(handle, 16) for handle, index in indices.items()}
+    observed_bindings = profile.parse_bindings(text.splitlines())
+    topology = profile.aggregate_roles(text, parsed, original[roles['RtxPci']], original[roles['Rtx']], observed_bindings)
+    if topology is None:
+        raise ValueError('Expected an aggregate ownership graph')
+    roles['Agg'] = indices[hex(topology['aggregate'])]
+console_owner = roles['Agg'] if aggregate else roles['Rtx']
 for role, protocol, controller in [
-    ('OutAgent', '387477c2-69c7-11d2-8e39-00a0c969723b', roles['Rtx']),
-    ('GfxAgent', '9042a9de-23dc-4a38-96fb-7aded080516a', roles['Rtx']),
+    ('OutAgent', '387477c2-69c7-11d2-8e39-00a0c969723b', console_owner),
+    ('GfxAgent', '9042a9de-23dc-4a38-96fb-7aded080516a', console_owner),
     ('NvAgent', '4cf5b200-68b8-4ca5-9eec-b23e3f50029a', roles['RtxPci']),
     ('EdidAgent', EDID_DISCOVERED, roles['Rtx']),
-]:
+] + ([('ComboAgent', '9042a9de-23dc-4a38-96fb-7aded080516a', roles['Rtx'])] if aggregate else []):
     if no_edid_driver and role == 'EdidAgent':
         continue
     records = [e for e in edges if e[0] == controller and str(e[3]) == protocol and e[4] == 16]
@@ -88,6 +106,11 @@ for role, protocol, controller in [
         raise ValueError('Expected a unique consumer')
     roles[role] = records[0][1]
     block = blocks[next(h for h, i in indices.items() if i == roles[role])]
+    if aggregate:
+        observed = re.findall(r'^driver image=0x([0-9a-f]+) binding=0x([0-9a-f]+)$', block, re.M)
+        binding = profile.binding_for(observed_bindings, original[roles[role]])
+        if len(observed) != 1 or tuple(int(value, 16) for value in observed[0]) != (binding['image'], binding['handle']):
+            raise ValueError('Aggregate graph and binding image records disagree')
     roles[role.removesuffix('Agent') + 'Image'] = indices[hex(int(re.search(r'driver image=(0x[0-9a-f]+)', block)[1], 16))]
 console = re.search(r'console out=(0x[0-9a-f]+) error=(0x[0-9a-f]+) input=(0x[0-9a-f]+)', text)
 for role, value in zip(['Console', 'Error', 'Input'], console.groups()):
@@ -95,6 +118,86 @@ for role, value in zip(['Console', 'Error', 'Input'], console.groups()):
 lines = [f'/* Local diagnostic sha256 {hashlib.sha256(raw).hexdigest()} */', f'#define FX_HANDLES {len(blocks)}',
          f'#define FX_NO_EDID_DRIVER {1 if no_edid_driver else 0}',
          f'#define FX_EXTRA_DISPLAY_CHILD {1 if roles.get("EdidChild") else 0}']
+if aggregate:
+    lines.append('#define FX_CONSOLE_AGGREGATE 1')
+    primary_block=blocks[next(handle for handle,index in indices.items() if index==roles['Rtx'])]
+    primary_path=profile.path_of(primary_block)
+    primary_original=original[roles['Rtx']]
+    if profile.PATH not in parsed[primary_original]['protocols'] or primary_path is None or len(primary_path)!=36:
+        raise ValueError('Aggregate replay requires the complete primary display path')
+    lines.append('#define FX_PRIMARY_PATH_BYTES '+','.join(str(byte) for byte in primary_path))
+    patterns=[(r'^gop framebuffer=0x([0-9a-f]+) bytes=0x([0-9a-f]+) mode=0x([0-9a-f]+) max-mode=0x([0-9a-f]+)$',
+               ('FRAMEBUFFER','FRAMEBUFFER_BYTES','MODE','MAX_MODE'),(64,64,32,32)),
+              (r'^gop width=0x([0-9a-f]+) height=0x([0-9a-f]+) stride=0x([0-9a-f]+)$',
+               ('WIDTH','HEIGHT','STRIDE'),(32,32,32)),
+              (r'^gop pixel-format=0x([0-9a-f]+) info-bytes=0x([0-9a-f]+)$',
+               ('PIXEL_FORMAT','INFO_BYTES'),(32,64))]
+    for pattern,names,widths in patterns:
+        observed=re.findall(pattern,primary_block,re.M)
+        if len(observed)!=1:
+            raise ValueError('Aggregate replay requires complete unambiguous GOP mode data; recapture with the current probe')
+        for name,value,width in zip(names,observed[0],widths):
+            number=int(value,16)
+            if number>=(1<<width):raise ValueError('Aggregate GOP field is outside its integer range')
+            lines.append(f'#define FX_RTX_{name} 0x{number:x}ULL')
+    for role in ('Out','Gfx','Nv','Edid','Combo'):
+        if '18a031ab-b443-4d1a-a5c0-0c09261e9f71' not in parsed[original[roles[role+'Agent']]]['protocols']:
+            raise ValueError('Aggregate driver binding interface is missing')
+        binding=profile.binding_for(observed_bindings,original[roles[role+'Agent']])
+        if not 0<binding['size']<=profile.IMAGE_MAX or not 0<=binding['version']<=0xffffffff:
+            raise ValueError('Aggregate driver metadata is outside replay limits')
+        for name,value in (('IMAGE_SIZE',binding['size']),('STOP',binding['stop']-binding['base']),
+                           ('VERSION',binding['version']),('CODE_TYPE',binding['code-type'])):
+            lines.append(f'#define FX_{role.upper()}_{name} 0x{value:x}U')
+        image_block=parsed[binding['image']]
+        if '5b1b31a1-9562-11d2-8e3f-00a0c969723b' not in image_block['protocols']:
+            raise ValueError('Aggregate driver image interface is missing')
+        image_rows=re.findall(r'^image parent=0x([0-9a-f]{1,16}) device=0x([0-9a-f]{1,16}) base=0x([0-9a-f]{1,16}) size=0x([0-9a-f]{1,16}) code-type=0x([0-9a-f]{1,16})$',image_block['raw'],re.M)
+        if len(image_rows)!=1:
+            raise ValueError('Aggregate replay requires one loaded image observation')
+        parent,device,base,size,code_type=(int(value,16) for value in image_rows[0])
+        if (base,size,code_type)!=(binding['base'],binding['size'],binding['code-type']):
+            raise ValueError('Aggregate image and binding metadata disagree')
+        image_nodes=re.findall(r'^image-file-path-node raw=([0-9a-f]+)$',image_block['raw'],re.M)
+        if image_nodes!=[node.hex() for node in binding['nodes']]:
+            raise ValueError('Aggregate image file paths disagree')
+        if device and hex(device) not in indices:
+            raise ValueError('Aggregate image device handle is unresolved')
+        if role=='Nv' and device!=original[roles['RtxPci']]:
+            raise ValueError('Aggregate NVIDIA image belongs to another device')
+        lines.append(f'#define FX_{role.upper()}_DEVICE_HANDLE ((EFI_HANDLE){indices[hex(device)] if device else 0})')
+    rows=re.findall(r'^cfg dwords=([0-9a-f ]+)$',text,re.M)
+    words=rows[0].split() if len(rows)==1 else []
+    if len(words)!=64 or any(not re.fullmatch(r'[0-9a-f]{1,8}',word) for word in words):
+        raise ValueError('Aggregate replay requires one full PCI snapshot')
+    words=[int(word,16) for word in words]
+    pci_block=blocks[next(handle for handle,index in indices.items() if index==roles['RtxPci'])]
+    parent_path=profile.path_of(pci_block)
+    if parent_path is None or len(parent_path)!=28 or parent_path[:-4]!=primary_path[:24]:
+        raise ValueError('Aggregate primary path does not belong to the PCI controller')
+    if words[:16]!=profile.pci_config(pci_block):
+        raise ValueError('Aggregate graph and full PCI snapshots disagree')
+    locations=re.findall(r'^pci location-status=0x([0-9a-f]{1,16}) segment=0x([0-9a-f]{1,16}) bus=0x([0-9a-f]{1,16}) device=0x([0-9a-f]{1,16}) function=0x([0-9a-f]{1,16})$',pci_block,re.M)
+    if len(locations)!=1 or int(locations[0][0],16):raise ValueError('Aggregate replay requires a successful PCI location observation')
+    for name,value in zip(('SEGMENT','BUS','DEVICE','FUNCTION'),locations[0][1:]):
+        lines.append(f'#define FX_PCI_{name} 0x{int(value,16):x}ULL')
+    targets=re.findall(r'^probe-target seg=0x([0-9a-f]{1,16}) bus=0x([0-9a-f]{1,16}) dev=0x([0-9a-f]{1,16}) fun=0x([0-9a-f]{1,16})$',text,re.M)
+    if len(targets)!=1 or tuple(int(value,16) for value in targets[0])!=tuple(int(value,16) for value in locations[0][1:]):
+        raise ValueError('Aggregate graph and probe locations disagree')
+    attributes=re.findall(r'^pci-attributes status=0x([0-9a-f]{1,16}) value=0x([0-9a-f]{1,16})$',text,re.M)
+    if len(attributes)!=1 or int(attributes[0][0],16):raise ValueError('Aggregate replay requires a successful PCI attribute observation')
+    lines.append(f'#define FX_PCI_ATTRIBUTES 0x{int(attributes[0][1],16):x}ULL')
+    resources=re.findall(r'^pci-bar0-resource raw=([0-9a-f]+)$',text,re.M)
+    if len(resources)!=1 or len(resources[0])!=96:
+        raise ValueError('Aggregate replay requires one full BAR resource observation; recapture with the current probe')
+    resource=bytes.fromhex(resources[0])
+    lines.append('static const UINT8 FixtureBar0Resource[]={'+','.join(f'0x{byte:x}' for byte in resource)+'};')
+    lines.append('static const UINT32 FixtureFullRtxConfig[64]={'+','.join(f'0x{word:x}U' for word in words)+'};')
+    cold,_=profile.probe_mmio(text)
+    if any(offset not in cold for offset in profile.COLD):
+        raise ValueError('Aggregate replay requires all cold register observations')
+    lines.append('static const UINT32 FixtureCold[9]={'+','.join(f'0x{cold[offset]:x}U' for offset in profile.COLD)+'};')
+    lines.append('static const UINT32 FixtureColdOffsets[9]={'+','.join(f'0x{offset:x}U' for offset in profile.COLD)+'};')
 if roles.get('EdidChild'):
     child_block = blocks[next(h for h, index in indices.items() if index == roles['EdidChild'])]
     path_rows = re.findall(r'^path-node raw=([0-9a-f]+)$', child_block, re.M)
@@ -110,6 +213,16 @@ for h, a, c, g, attrs, count in edges:
     guid = f'{{0x{g.time_low:x},0x{g.time_mid:x},0x{g.time_hi_version:x},{{' + ','.join(f'0x{x:x}' for x in data[8:]) + '}}'
     lines.append(f'{{(EFI_HANDLE){h},(EFI_HANDLE){a},(EFI_HANDLE){c},{guid},{attrs},{count}}},')
 lines.append('};')
+if aggregate:
+    # Installed protocols remain present even when a consumer closes its open.
+    # Keep their inventory separate from the active ownership edge snapshot.
+    lines.append('static const struct {EFI_HANDLE Handle;EFI_GUID Guid;} FixtureInstalledProtocols[]={')
+    for handle, block in parsed.items():
+        for protocol in sorted(block['protocols']):
+            g = uuid.UUID(protocol)
+            guid = f'{{0x{g.time_low:x},0x{g.time_mid:x},0x{g.time_hi_version:x},{{' + ','.join(f'0x{x:x}' for x in g.bytes[8:]) + '}}'
+            lines.append(f'{{(EFI_HANDLE){indices[hex(handle)]},{guid}}},')
+    lines.append('};')
 for role in ['Rtx', 'Amd']:
     if role == 'Amd' and no_igpu:
         lines.append('static const UINT32 FixtureAmdConfig[16]={0};')

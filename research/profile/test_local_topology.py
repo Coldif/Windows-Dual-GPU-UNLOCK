@@ -4,6 +4,7 @@ import importlib.util
 from pathlib import Path
 import re
 import subprocess
+import struct
 import sys
 import tempfile
 import unittest
@@ -33,7 +34,7 @@ def configuration(command=3, board=0x220410de):
 
 
 def synthetic_capture(*, bus=0x2b, igpu=False, no_edid=True, children=2, command=3, memory=0x6000, child_adr=0x20,
-                      board=0x220410de, chip=0xb72000a1):
+                      board=0x220410de, chip=0xb72000a1, aggregate=False):
     cfg = configuration(command, board)
     handles = {i: {} for i in (1, 2, 3, 4, 5, 6, 8, 10, 11)}
     if children == 2:
@@ -58,7 +59,7 @@ def synthetic_capture(*, bus=0x2b, igpu=False, no_edid=True, children=2, command
     protocol(2, mp.PATH, detail=path(RTX_PATH))
     protocol(2, mp.GOP, [(5, 2, 16, 1)],
              'gop framebuffer=0x000000fcc0000000 bytes=0x00000000007e9000 mode=0x0 max-mode=0x9\n'
-             'gop width=0x780 height=0x438 stride=0x780\n')
+             'gop width=0x780 height=0x438 stride=0x780\ngop pixel-format=0x0 info-bytes=0x24\n')
     protocol(2, mp.TEXT_OUT, [(4, 2, 16, 1), (4, 6, 8, 1)])
     protocol(2, mp.EDID_DISCOVERED, [(3, 2, 2, 1)] if no_edid else [(9, 2, 16, 1)])
     if children == 2:
@@ -76,6 +77,16 @@ def synthetic_capture(*, bus=0x2b, igpu=False, no_edid=True, children=2, command
         protocol(h, '5b1b31a1-9562-11d2-8e3f-00a0c969723b')
     if not no_edid:
         protocol(9, '18a031ab-b443-4d1a-a5c0-0c09261e9f71', detail='driver image=0x9 binding=0x9\n')
+    if aggregate:
+        handles[12]={};handles[13]={};handles[14]={}
+        del handles[2][mp.TEXT_OUT]
+        protocol(2,mp.GOP,[(13,2,16,1),(13,12,8,1)],
+                 'gop framebuffer=0x000000fcc0000000 bytes=0x00000000007e9000 mode=0x0 max-mode=0x9\n'
+                 'gop width=0x780 height=0x438 stride=0x780\ngop pixel-format=0x0 info-bytes=0x24\n')
+        protocol(12,mp.GOP,[(5,12,16,1)],'gop framebuffer=0x0 bytes=0x0 mode=0x0 max-mode=0x1\n')
+        protocol(12,mp.TEXT_OUT,[(4,12,16,1),(4,6,8,1)])
+        protocol(13,'18a031ab-b443-4d1a-a5c0-0c09261e9f71',detail='driver image=0xe binding=0xd\n')
+        protocol(14,'5b1b31a1-9562-11d2-8e3f-00a0c969723b')
     lines = [mp._graph.MARKER, 'console out=0x6 error=0x6 input=0x6',
              'variable name=ConOut initial-status=0x8000000000000005 bytes=0x24', path(RTX_PATH).rstrip(),
              'variable name=ConOutDev initial-status=0x800000000000000e bytes=0x0',
@@ -83,16 +94,26 @@ def synthetic_capture(*, bus=0x2b, igpu=False, no_edid=True, children=2, command
              'probe targets=0001 cfg-incomplete=0000', 'cfg dwords=' + ' '.join(f'{v:08x}' for v in cfg),
              f'pci-attributes status=0x0000000000000000 value=0x{0x200 | (0x100 if command & 1 else 0):016x}',
              'prom sha256=' + PROM_HASH]
+    if aggregate:
+        resource=struct.pack('<BHBBBQQQQQBB',0x8a,43,0,0,0,32,cfg[4],0xffffff,0,0x1000000,0x79,0)
+        lines.append('pci-bar0-resource raw='+resource.hex())
     cold = [chip, 0xffffff8f, 0x8b8f, 0x3ff, 0x10, 0, 0x03000062, 6, memory]
     lines += [f'mmio off=0x{at:08x} status=0x0000000000000000 value=0x{value:08x}' for at, value in zip(mp.COLD, cold)]
-    nv_size,nv_stop,nv_version=(0x26ae0,0x678,0x60010) if board in (0x248710de,0x250410de) else (0x2be40,0x698,0x60009)
-    bindings = [(4, 10, 0x400000, 0x60c0, 0x1290, 0x10, 3, mp.OUT_FILE),
-                (5, 11, 0x500000, 0x39e0, 0xa3c, 0x10, 3, mp.GFX_FILE),
+    nv_size,nv_stop,nv_version=(0x26ae0,0x678,0x60010) if board in (0x220310de,0x248710de,0x250410de) else (0x2be40,0x698,0x60009)
+    out_size,out_stop,gfx_size,gfx_stop=(0x6a40,0x104c,0x3bc0,0xb2c) if aggregate else (0x60c0,0x1290,0x39e0,0xa3c)
+    bindings = [(4, 10, 0x400000, out_size, out_stop, 0x10, 3, mp.OUT_FILE),
+                (5, 11, 0x500000, gfx_size, gfx_stop, 0x10, 3, mp.GFX_FILE),
                 (3, 3, 0x100000, nv_size, nv_stop, nv_version, 3, None)]
     if not no_edid:
-        bindings.append((9, 9, 0x600000, 0x9000, 0x157c, 1, 5, mp.MOUSE_FILE))
+        bindings.append((9, 9, 0x600000, 0x9000, 0x14d4 if aggregate else 0x157c, 1, 5, mp.MOUSE_FILE))
+    if aggregate:
+        bindings.append((13,14,0x700000,0x2160,0x88c,0x11,3,mp.COMBO_FILE))
     for agent, image, base, size, stop, version, code_type, guid in bindings:
         node = bytes.fromhex('04061400') + uuid.UUID(guid).bytes_le if guid else bytes.fromhex('04041c00') + 'nvgop-ga1xx\0'.encode('utf-16-le')
+        device=1 if agent==3 else 0
+        protocol(image,'5b1b31a1-9562-11d2-8e3f-00a0c969723b',detail=
+                 f'image parent=0x0 device=0x{device:x} base=0x{base:x} size=0x{size:x} code-type=0x{code_type:x}\n'
+                 'image-file-path-node raw='+node.hex()+'\nimage-file-path-node raw='+END.hex()+'\n')
         lines += [f'binding handle=0x{agent:x} image=0x{image:x} version=0x{version:x} stop=0x{base + stop:x}',
                   f'img base=0x{base:x}', f'img size=0x{size:x}', f'img code-type=0x{code_type:x}',
                   'img-path-node raw=' + node.hex(), 'img-path-node raw=' + END.hex()]
@@ -141,6 +162,10 @@ class LocalTopologyTests(unittest.TestCase):
                                     self.assertEqual(result['no_edid_driver'], no_edid)
                                     self.assertEqual(result['igpu_id'] is not None, igpu)
                                     self.assertEqual(dict(result['defines'])['GU_TARGET_BUS'], f'0x{bus:x}U')
+                                    self.assertEqual(dict(result['defines'])['GU_LOCAL_CHILD_COUNT'], str(children))
+                                    self.assertIs(result['aggregate'], False)
+                                    self.assertEqual(result['child_count'], children)
+                                    self.assertEqual(len(result['child_paths']), children)
 
     def test_graph_damage_is_not_absence(self):
         good = synthetic_capture()
@@ -214,6 +239,16 @@ class LocalTopologyTests(unittest.TestCase):
             self.assertNotEqual(bad, block)
             with self.assertRaisesRegex(mp.Refused, 'unique complete paths'):
                 analyze(text[:start] + bad + text[end:])
+
+    def test_edid_driver_children_also_require_complete_distinct_paths(self):
+        with self.assertRaisesRegex(mp.Refused, 'unique complete paths'):
+            analyze(synthetic_capture(no_edid=False, child_adr=RTX_PATH[28]))
+        for old, new in (('controller=0x7 attributes=0x8 count=0x1', 'controller=0x7 attributes=0x8 count=0x2'),
+                         ('controller=0x7 attributes=0x8 count=0x1', 'controller=0xff attributes=0x8 count=0x1')):
+            text = synthetic_capture(no_edid=False)
+            self.assertIn(old, text)
+            with self.assertRaises(mp.Refused):
+                analyze(text.replace(old, new))
 
     def test_fixture_conversion_matrix(self):
         script = HERE.parents[1] / 'internal-boot/boot/make-console-fixture.py'

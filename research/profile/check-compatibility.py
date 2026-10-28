@@ -297,7 +297,7 @@ def check(folder, envelope):
             return report
         latest = observations[-1]
         for earlier in observations[:-1]:
-            if any(earlier[key] != latest[key] for key in ('defines', 'config', 'igpu_id', 'no_edid_driver')):
+            if any(earlier[key] != latest[key] for key in ('defines', 'config', 'igpu_id', 'no_edid_driver', 'child_paths')):
                 add('invalid_data', 'captures_disagree')
                 return report
         try:

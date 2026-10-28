@@ -146,6 +146,8 @@ static VOID Details(CAPTURE *c,EFI_HANDLE h,EFI_GUID *g) {
       Field(c,"gop width=0x",gp->Mode->Info->HorizontalResolution);
       Field(c," height=0x",gp->Mode->Info->VerticalResolution);
       Field(c," stride=0x",gp->Mode->Info->PixelsPerScanLine);End(c);
+      Field(c,"gop pixel-format=0x",gp->Mode->Info->PixelFormat);
+      Field(c," info-bytes=0x",gp->Mode->SizeOfInfo);End(c);
     } else {
 #if GU_CONSOLE_AGGREGATE || defined(GU_PROBE_GENERIC)
       /* Aggregate/pathless GOPs legitimately lack Mode->Info on this firmware;

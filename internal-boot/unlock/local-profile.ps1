@@ -45,6 +45,22 @@ function Get-LocalProfile([string]$Repo) {
   throw 'profile-local.h requires one exact GU_NO_EDID_DRIVER 0/1; regenerate the local profile'
  }
  $noEdidDriver=$edidRows[0].Value.EndsWith(' 1')
+ $aggregateRows=@([regex]::Matches($text,'(?m)^[ \t]*#[ \t]*define[ \t]+GU_LOCAL_CONSOLE_AGGREGATE\b[^\r\n]*'))
+ $childRows=@([regex]::Matches($text,'(?m)^[ \t]*#[ \t]*define[ \t]+GU_LOCAL_CHILD_COUNT\b[^\r\n]*'))
+ if($text -match '(?m)^[ \t]*#[ \t]*undef[ \t]+GU_LOCAL_(CONSOLE_AGGREGATE|CHILD_COUNT)\b' -or
+    $text -match '(?m)^[ \t]*#[ \t]*(define|undef)[ \t]+GU_CONSOLE_(AGGREGATE|MULTI_CHILD|CHILD_COUNT)\b'){
+  throw 'Local console topology must use generated local metadata without overrides'
+ }
+ $legacyTopology=($aggregateRows.Count -eq 0 -and $childRows.Count -eq 0)
+ $consoleAggregate=$false;$childCount=0
+ if(!$legacyTopology) {
+  if($aggregateRows.Count -ne 1 -or $aggregateRows[0].Value -cnotmatch '^#define GU_LOCAL_CONSOLE_AGGREGATE [01]$' -or
+     $childRows.Count -ne 1 -or $childRows[0].Value -cnotmatch '^#define GU_LOCAL_CHILD_COUNT [12]$'){
+   throw 'Local topology requires one exact aggregate 0/1 and child count 1/2'
+  }
+  $consoleAggregate=$aggregateRows[0].Value.EndsWith(' 1');$childCount=[int]$childRows[0].Value.Substring($childRows[0].Value.Length-1)
+ }
+ if($consoleAggregate -and $noEdidDriver){throw 'Aggregate local profiles require an EDID driver'}
  return [ordered]@{
   Define='-DGU_PROFILE_LOCAL';Name=(Value 'GU_PROFILE_NAME' '"(LOCAL-[0-9a-f]{8}-[0-9a-f]{8}-[0-9a-f]{8})"')
   TargetPci=(Value 'GU_BOARD_ID' '0x([0-9a-f]{8})U');Subsystem=(Value 'GU_BOARD_SUBSYSTEM' '0x([0-9a-f]{8})U')
@@ -52,6 +68,7 @@ function Get-LocalProfile([string]$Repo) {
   Memory=('0x'+(Value 'GU_DEVICE_MEMORY_SIZE' '0x([0-9a-f]+)U'));HeadlessOnly=$true;UsbOnly=$true
   HeaderSha256=(Get-GuSha256 $header)
   NoEdidDriver=$noEdidDriver
+  ConsoleAggregate=$consoleAggregate;ChildCount=$childCount;LegacyTopology=$legacyTopology
  }
 }
 
@@ -63,6 +80,8 @@ function Get-LocalRequiredFiles {
    'internal-boot/unlock/build.ps1','internal-boot/boot/handoff.c',
    'research/headless/build-usb.ps1','research/headless/stage-usb.ps1',
    'research/profile/make-profile.py','research/profile/capture_graph.py','research/profile/test-profile.ps1',
+   'internal-boot/boot/make-console-fixture.py','internal-boot/boot/test_aggregate_full.c',
+   'internal-boot/boot/test_aggregate_prepare.c','internal-boot/boot/test_research_input.c',
    'research/profile/host.ps1','research/profile/proven.json')
 }
 function Get-LocalTreeInputs([string]$Repo) {
@@ -100,15 +119,17 @@ function Get-LocalInputDigest($Inputs) {
  try{return (($sha.ComputeHash($bytes) | ForEach-Object {$_.ToString('x2')}) -join '')}finally{$sha.Dispose()}
 }
 function Get-LocalTreeDigest([string]$Repo) {Get-LocalInputDigest @(Get-LocalTreeInputs $Repo)}
-function Get-LocalExpectedJobs([bool]$NoEdidDriver=$false) {
+function Get-LocalExpectedJobs([bool]$NoEdidDriver=$false,[bool]$ConsoleAggregate=$false) {
+ if($NoEdidDriver -and $ConsoleAggregate){throw 'Aggregate replay requires an EDID driver'}
  $jobs=[ordered]@{'generator refusals'=0;'stock-selection'=0;'checks (real config)'=0;
  'checks other profile (must reject)'=1;'port'=0;'write-lock'=0;'master-attributes'=0;'runtime'=0;
  'profile-lock-entryLatchedSs1Full'=0;'profile-lock-entryLatchedSs1Preserve'=0;
  'r2 console replay (real graph)'=0;'r2 replay other profile (must reject)'=1;
- 'cold pre-check (read-only)'=0;'full flow gates'=0;'core transaction (efi)'=0;
+ 'cold pre-check (read-only)'=0;'full flow gates'=0;'research input policy'=0;'core transaction (efi)'=0;
  'manual entry-latched'=0;'automatic internal'=0;'headless internal'=0;'headless USB (shipped child)'=0}
  # Every generated profile must replay the complete release on its own graph/images.
- if($NoEdidDriver){$jobs['release replay, no EDID driver (real graph)']=0}
+ if($ConsoleAggregate){$jobs['release replay, aggregate console (real graph)']=0}
+ elseif($NoEdidDriver){$jobs['release replay, no EDID driver (real graph)']=0}
  else {$jobs['release replay, EDID driver (real graph)']=0}
  return $jobs
 }
@@ -140,6 +161,13 @@ function Get-LocalProfileReport([string]$Repo,$Hardware) {
  if($null -eq $report.Replay -or $report.Replay.NoEdidDriver -isnot [bool] -or $report.Replay.NoEdidDriver -ne $Hardware.NoEdidDriver){
   throw 'Generated profile report NoEdidDriver must be boolean and match the header'
  }
+ $topologyKeys=@($report.Replay.PSObject.Properties.Name)
+ if(!$Hardware.LegacyTopology -or $topologyKeys -contains 'Aggregate' -or $topologyKeys -contains 'ChildCount') {
+  if($report.Replay.Aggregate -isnot [bool] -or $report.Replay.Aggregate -ne $Hardware.ConsoleAggregate -or
+     !(Test-GuExactInteger $report.Replay.ChildCount $Hardware.ChildCount)){
+   throw 'Generated profile report topology must match the header exactly'
+  }
+ }
  return $report
 }
 
@@ -164,7 +192,7 @@ function Assert-LocalProfileEvidence([string]$Repo) {
   if($e.Inputs[$i].Path -cne $inputs[$i].Path -or $e.Inputs[$i].Sha256 -cne $inputs[$i].Sha256){throw 'Build input path/hash changed after tests'}
  }
  if($e.TreeSha256 -cne (Get-LocalInputDigest $inputs)){throw 'Build input digest changed after tests'}
- $jobs=Get-LocalExpectedJobs $hw.NoEdidDriver
+ $jobs=Get-LocalExpectedJobs $hw.NoEdidDriver $hw.ConsoleAggregate
  Assert-LocalKeys $e.Results @($jobs.Keys) 'Host jobs'
  foreach($name in $jobs.Keys){
   $job=$e.Results.$name

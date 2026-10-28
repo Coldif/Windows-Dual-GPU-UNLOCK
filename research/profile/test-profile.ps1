@@ -81,14 +81,23 @@ try {
  if($r.IgpuId){$fixtureArgs+="--amd-id=$($r.IgpuId)"}else{$fixtureArgs+='--no-igpu'}
  # A firmware that binds no EDID driver (GU_NO_EDID_DRIVER) has no EDID consumer to replay.
  if($hw.NoEdidDriver){$fixtureArgs+='--no-edid-driver'}
+ if($hw.ConsoleAggregate){$fixtureArgs+='--aggregate'}
  & $Python -I make-console-fixture.py (Join-Path $fx 'console/DIAG.TXT') @fixtureArgs
  if($LASTEXITCODE -ne 0){throw 'Replay fixture failed'}
  $d=@('-std=c11','-O1','-Wall','-Wextra','-Werror','-D_CRT_SECURE_NO_WARNINGS','-DGU_SINGLE_RTX_CONSOLE','-DGU_DIAGNOSTIC_ONLY','-DGU_CONSOLE_PREPARE','-I','../../deps/edk2/MdePkg/Include','-I','../../deps/edk2/MdePkg/Include/X64')
- Run-Job 'r2 console replay (real graph)' ($d+$profile+@('test_r2.c','research-input.c','console-flow.c','-o','build/r2/test-r2-local.exe')) @('./build/r2/test-r2-local.exe')
+ if(!$hw.ConsoleAggregate) {
+  Run-Job 'r2 console replay (real graph)' ($d+$profile+@('test_r2.c','research-input.c','console-flow.c','-o','build/r2/test-r2-local.exe')) @('./build/r2/test-r2-local.exe')
+ }
  Run-Job 'r2 replay other profile (must reject)' ($d+@($foreign,'test_r2.c','research-input.c','console-flow.c','-o','build/r2/test-r2-other.exe')) @('./build/r2/test-r2-other.exe') 1
  [void][IO.Directory]::CreateDirectory((Join-Path $boot 'build/cold/include'))
  @('/* Host-test placeholder; never used for an EFI build. */','#define GU_INTERNAL_PARTITION_INITIALIZER {0,0,0,{0,0,0,0,0,0,0,0}}','#define GU_WINDOWS_PARTITION_INITIALIZER {0,0,0,{0,0,0,0,0,0,0,0}}') | Set-Content build/cold/include/platform-config.h -Encoding ascii
  $w=@('-std=c11','-O1','-Wall','-Wextra','-Werror','-D_CRT_SECURE_NO_WARNINGS','-I','build/cold/include','-I','../../deps/edk2/MdePkg/Include','-I','../../deps/edk2/MdePkg/Include/X64')
+ if($hw.ConsoleAggregate) {
+  [void][IO.Directory]::CreateDirectory((Join-Path $boot 'build/aggregate'))
+  Copy-Item -LiteralPath 'build/r2/replay-fixture.h' -Destination 'build/aggregate/replay-fixture.h'
+  Run-Job 'r2 console replay (real graph)' ($w+$profile+@('-DGU_HEADLESS_RESEARCH','-DGU_SINGLE_RTX_CONSOLE','-DGU_FULL_UNLOCK','-DGU_AUTOMATIC_BOOT','-DGU_AGGREGATE_CAPTURE_FIXTURE','test_aggregate_prepare.c','console-flow.c','../unlock/checks.c','../unlock/sha256.c','-o','build/aggregate/test-prepare-local.exe')) @('./build/aggregate/test-prepare-local.exe')
+ }
+ Run-Job 'research input policy' ($w+@('test_research_input.c','research-input.c','console-flow.c','-o','build/cold/test-input-local.exe')) @('./build/cold/test-input-local.exe')
  Run-Job 'cold pre-check (read-only)' ($w+$profile+@('-DGU_HEADLESS_RESEARCH','-DGU_SINGLE_RTX_CONSOLE','-DGU_FULL_UNLOCK','-DGU_AUTOMATIC_BOOT','test_cold_precheck.c','console-flow.c','../unlock/checks.c','../unlock/sha256.c','-o','build/cold/test-cold-local.exe')) @('./build/cold/test-cold-local.exe')
  Run-Job 'full flow gates' ($w+@('test_full_flow.c','full-flow.c','-o','build/cold/test-full-flow.exe')) @('./build/cold/test-full-flow.exe')
   # Every generated profile replays the complete driver release with its own captures.
@@ -108,7 +117,13 @@ try {
    $releaseName='release replay, EDID driver (real graph)'
    $releaseArgs=@('./build/release/test-release-local.exe',$edidImage,$driverImage,$prom,$configPath)
   }
-  Run-Job $releaseName ($w+$profile+@('-DGU_HEADLESS_RESEARCH','-DGU_SINGLE_RTX_CONSOLE','-DGU_FULL_UNLOCK','-DGU_AUTOMATIC_BOOT','test_headless_full.c','console-flow.c','../unlock/checks.c','../unlock/sha256.c','-o','build/release/test-release-local.exe')) $releaseArgs
+  $releaseSource='test_headless_full.c';$releaseExtra=@()
+  if($hw.ConsoleAggregate) {
+   $releaseName='release replay, aggregate console (real graph)'
+   $releaseSource='test_aggregate_full.c';$releaseExtra=@('-DGU_AGGREGATE_CAPTURE_FIXTURE')
+   $releaseArgs=@('./build/release/test-release-local.exe',$edidImage,$driverImage,$prom)
+  }
+  Run-Job $releaseName ($w+$profile+$releaseExtra+@('-DGU_HEADLESS_RESEARCH','-DGU_SINGLE_RTX_CONSOLE','-DGU_FULL_UNLOCK','-DGU_AUTOMATIC_BOOT',$releaseSource,'console-flow.c','../unlock/checks.c','../unlock/sha256.c','-o','build/release/test-release-local.exe')) $releaseArgs
 } finally {Pop-Location}
 
 # Transaction stage: production app + vendor unlock core against this card's real PROM and
@@ -131,7 +146,7 @@ try {
 if((Get-LocalTreeDigest $repo) -ne $tree -or (Get-LocalProfile $repo).HeaderSha256 -ne $hw.HeaderSha256){throw 'Sources or profile changed while the tests ran; rerun'}
 if((Get-GuSha256 (Join-Path $local 'profile.json')) -cne $reportSha){throw 'Profile report changed during tests'}
 Assert-LocalFixtures $repo $report.Fixtures
-$expectedJobs=Get-LocalExpectedJobs $hw.NoEdidDriver
+$expectedJobs=Get-LocalExpectedJobs $hw.NoEdidDriver $hw.ConsoleAggregate
 Assert-LocalKeys $results @($expectedJobs.Keys) 'Completed host jobs'
 foreach($jobName in $expectedJobs.Keys){if($results[$jobName].Exit -ne $expectedJobs[$jobName] -or $results[$jobName].Expected -ne $expectedJobs[$jobName]){throw 'Host result mismatch'}}
 [ordered]@{Format=2;AllPassed=$true;HardwareAccess=$false;ProfileName=$hw.Name;HeaderSha256=$hw.HeaderSha256;PromSha256=$hw.Prom;

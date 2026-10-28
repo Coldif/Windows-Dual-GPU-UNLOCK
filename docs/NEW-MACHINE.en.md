@@ -21,8 +21,8 @@ reviewed profiles have proven on hardware. There is no override flag. Today that
 | RTX 3090 / 3090 Ti `220410de` / `220310de`, or RTX 3060 12GB `248710de` / `250410de` | exact reviewed PCI-ID/chip/VRAM combinations are required |
 | GA102 `b72000a1` with `6000` / `5ff4` MiB; GA104 `b74000a1` with `248710de` + `3000` MiB; GA106 `b76000a1` with `250410de` + `3000` MiB | these are coupled tuples, not independent choices; class/revision remains `030000a1` |
 | exactly one NVIDIA display controller, at segment 0, device 0, function 0 on a nonzero PCI bus (reviewed profiles: bus `01`), behind one root port | `GuCheckConfig` / `GuDisplayPath`; the bus is the per-machine constant `GU_TARGET_BUS` |
-| at most one integrated (non-NVIDIA) display controller; with none, the RTX owns the only GOP in the whole graph | the single-RTX console path never uses a second adapter and refuses any AMD GOP |
-| `ConOut` is exactly the RTX GOP (non-aggregate console) | aggregate splitter consoles are not generated |
+| at most one integrated (non-NVIDIA) display controller; the RTX owns the only physical GOP | a recognized pathless, zero-framebuffer AMI aggregate GOP is allowed; a second physical GOP is refused |
+| non-aggregate `ConOut` is exactly the RTX GOP, or the complete reviewed AMI aggregate ownership graph is present | aggregate profiles require distinct NVIDIA/Combo/EDID/Gfx/Out roles and one or two unique NVIDIA display children |
 | AMI console text/GOP splitter drivers and `nvgop-ga1xx`; the AMI EDID driver is optional | the release path in `full-release.c` (see below) |
 | `nvgop-ga1xx` `.text` hash already released cleanly on hardware | another build has never been released |
 | GPU in its power-on state at every capture | the unlock never runs from anything else |
@@ -33,8 +33,8 @@ reviewed profiles have proven on hardware. There is no override flag. Today that
 A matching card on an AMI BIOS board, with or without an iGPU, is a candidate. Anything
 else is refused with the reason. The RTX 3060 tuples require nvgop `60010` with the exact
 reviewed `.text` hash in `proven.json`. The GA104 evidence is an aggregate B660-PLUS
-machine: this generator still refuses that aggregate topology, so its non-aggregate
-LOCAL route is a new combination, not another physical success report. The GA106
+machine. LOCAL aggregate and non-aggregate combinations still need their own replay
+and physical validation; generation is not another success report. The GA106
 evidence is one non-aggregate H610M success. Other boards and current builds still
 need their own host replay and physical validation. Widening the envelope needs a reviewed change that cites new
 hardware evidence, normally a new reviewed profile (PORTABILITY stage 4).
@@ -60,6 +60,18 @@ no-EDID path admits one or two unique NVIDIA-owned display children. The generat
 header explicitly records `GU_NO_EDID_DRIVER 0/1`; the report must contain the same
 boolean, and this header-bound value selects the required release replay. Regenerate
 older local profiles that lack this flag from their existing valid captures.
+
+**Aggregate console.** The generator records `GU_LOCAL_CONSOLE_AGGREGATE` and
+`GU_LOCAL_CHILD_COUNT` together, plus the observed Combo driver metadata. The report
+must match these values exactly. Aggregate preparation preserves the console and
+performs zero detach calls; the later release stops EDID and NVIDIA drivers. Its
+required host jobs use the actual captured ownership graph, loaded driver images,
+PCI configuration, BAR descriptor, cold observations, GOP mode and console handles.
+An ordinary non-aggregate release result cannot replace the aggregate replay.
+All display child paths must agree across cold captures. Aggregate profiles require
+an EDID driver. Capture with the current probe if older records lack pixel format,
+GOP info size or the raw BAR0 resource descriptor. Synthetic host integration covers
+generation and prepare/release but is not physical validation or a vendor transaction test.
 
 Maintainers can run capture-free regression checks with
 `python -I research/profile/test_local_topology.py` and
@@ -135,7 +147,7 @@ Run the same command repeatedly; each run does the next step.
 A write build of `-HardwareProfile local` (`internal-boot/unlock/build.ps1`, `build-usb.ps1`,
 and `stage-usb.ps1` again before copying) is refused unless `test-results.json`:
 
-- uses evidence format 2 with boolean pass/no-hardware flags and the exact 20
+- uses evidence format 2 with boolean pass/no-hardware flags and the exact 21
   host results (including exit 1 for the two required rejection jobs and the full
   driver-release replay selected by the profile's EDID state),
 - was made against exactly the current `profile-local.h` bytes and PROM hash,
@@ -159,8 +171,8 @@ section ranges and DIR64 relocations before hashing. Truncated ranges and any
 relocation touching hashed code are refused. Resuming the workflow archives earlier
 local captures instead of deleting them.
 
-`machine-profile.h` accepts `profile-local.h` only with the generator's marker and a
-non-aggregate topology. Never commit it, `research/profile/local/` or any capture: they
+`machine-profile.h` accepts `profile-local.h` only with the generator's marker and
+valid topology metadata. Never commit it, `research/profile/local/` or any capture: they
 identify your hardware and contain your PROM. Both paths are in `.gitignore`.
 
 ## When something changes

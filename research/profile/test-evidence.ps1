@@ -86,6 +86,8 @@ Check 'extra fixture' {param($e) $e.Fixtures|Add-Member NoteProperty extra ('0'*
 Check 'fixture hash' {param($e) $e.Fixtures.'PROM.BIN'='0'*64}
 Check 'report hash' {param($e) $e.ProfileReportSha256='0'*64}
 Check 'missing job' {param($e) $e.Results.PSObject.Properties.Remove('runtime')}
+Check 'missing actual input policy job' {param($e) $e.Results.PSObject.Properties.Remove('research input policy')}
+Check 'input policy expectation weakened' {param($e) $e.Results.'research input policy'.Exit=1;$e.Results.'research input policy'.Expected=1}
 Check 'extra job' {param($e) $e.Results|Add-Member NoteProperty extra @{Exit=0;Expected=0}}
 Check 'string exit' {param($e) $e.Results.runtime.Exit='0'}
 Check 'unexpected failure' {param($e) $e.Results.runtime.Exit=1}
@@ -147,6 +149,70 @@ foreach($invalid in @(
  if($accepted){throw 'Ambiguous/malformed local no-EDID define accepted'};$checks++
 }
 Put 'internal-boot/unlock/profile-local.h' $header
+foreach($aggregate in @(0,1)) {
+ foreach($children in @(1,2)) {
+  $topologyHeader=$header+"`n#define GU_LOCAL_CONSOLE_AGGREGATE $aggregate`n#define GU_LOCAL_CHILD_COUNT $children`n"
+  Put 'internal-boot/unlock/profile-local.h' $topologyHeader
+  $topologyHw=Get-LocalProfile $sandbox
+  if($topologyHw.LegacyTopology -or $topologyHw.ConsoleAggregate -ne [bool]$aggregate -or $topologyHw.ChildCount -ne $children){throw 'Local topology metadata changed during parsing'};$checks++
+  $topologyReport=[ordered]@{Format=1;ProfileName=$hw.Name;HeaderSha256=$topologyHw.HeaderSha256;PromSha256=$prom;HardwareTested=$false;Fixtures=$fixtures;Replay=[ordered]@{NoEdidDriver=$false;Aggregate=[bool]$aggregate;ChildCount=$children}}
+  Put 'research/profile/local/profile.json' ($topologyReport|ConvertTo-Json -Depth 8)
+  $null=Get-LocalProfileReport $sandbox $topologyHw;$checks++
+  $topologyExpected=Get-LocalExpectedJobs $false ([bool]$aggregate)
+  $topologyJobs=[ordered]@{}
+  foreach($name in $topologyExpected.Keys){$topologyJobs[$name]=[ordered]@{Exit=[int]$topologyExpected[$name];Expected=[int]$topologyExpected[$name]}}
+  $baseline=[ordered]@{Format=2;AllPassed=$true;HardwareAccess=$false;ProfileName=$hw.Name;
+   HeaderSha256=$topologyHw.HeaderSha256;PromSha256=$prom;ProfileReportSha256=(Get-GuSha256 (Join-Path $sandbox 'research/profile/local/profile.json'));
+   Fixtures=$fixtures;Inputs=$inputs;TreeSha256=(Get-LocalInputDigest $inputs);Results=$topologyJobs}|ConvertTo-Json -Depth 10
+  Check 'matching topology evidence' {} $true
+  if($aggregate) {
+   Check 'aggregate release replay missing' {param($e) $e.Results.PSObject.Properties.Remove('release replay, aggregate console (real graph)')}
+   Check 'aggregate replay replaced with nonaggregate replay' {param($e)
+    $e.Results.PSObject.Properties.Remove('release replay, aggregate console (real graph)')
+    $e.Results|Add-Member NoteProperty 'release replay, EDID driver (real graph)' @{Exit=0;Expected=0}
+   }
+   Check 'aggregate replay failure' {param($e) $e.Results.'release replay, aggregate console (real graph)'.Exit=1}
+   Check 'aggregate replay expectation weakened' {param($e) $e.Results.'release replay, aggregate console (real graph)'.Exit=1;$e.Results.'release replay, aggregate console (real graph)'.Expected=1}
+  }
+  foreach($token in @('null','true','false','"1"','"2"','1.0','2e0','0','3','2147483648')) {
+   $text=$topologyReport|ConvertTo-Json -Depth 8
+   Put 'research/profile/local/profile.json' ([regex]::Replace($text,'"ChildCount":\s*[12]\b',('"ChildCount": '+$token)))
+   $accepted=$true;try{$null=Get-LocalProfileReport $sandbox $topologyHw}catch{$accepted=$false}
+   if($accepted){throw "Invalid topology child count accepted: $token"};$checks++
+  }
+  foreach($value in @($null,'false',0,(-not [bool]$aggregate))) {
+   $topologyReport.Replay.Aggregate=$value
+   Put 'research/profile/local/profile.json' ($topologyReport|ConvertTo-Json -Depth 8)
+   $accepted=$true;try{$null=Get-LocalProfileReport $sandbox $topologyHw}catch{$accepted=$false}
+   if($accepted){throw 'Invalid topology aggregate flag accepted'};$checks++
+  }
+  $topologyReport.Replay.Remove('Aggregate');$topologyReport.Replay.Remove('ChildCount')
+  Put 'research/profile/local/profile.json' ($topologyReport|ConvertTo-Json -Depth 8)
+  $accepted=$true;try{$null=Get-LocalProfileReport $sandbox $topologyHw}catch{$accepted=$false}
+  if($accepted){throw 'New topology header accepted a legacy report'};$checks++
+ }
+}
+foreach($suffix in @(
+ '#define GU_LOCAL_CONSOLE_AGGREGATE 1',
+ '#define GU_LOCAL_CHILD_COUNT 2',
+ "#define GU_LOCAL_CONSOLE_AGGREGATE 2`n#define GU_LOCAL_CHILD_COUNT 1",
+ "#define GU_LOCAL_CONSOLE_AGGREGATE 1`n#define GU_LOCAL_CHILD_COUNT 0",
+ "#define GU_LOCAL_CONSOLE_AGGREGATE 1`n#define GU_LOCAL_CHILD_COUNT 3",
+ "#define GU_LOCAL_CONSOLE_AGGREGATE (1)`n#define GU_LOCAL_CHILD_COUNT 1",
+ "#define GU_LOCAL_CONSOLE_AGGREGATE 1`n#define GU_LOCAL_CHILD_COUNT 1`n#define GU_LOCAL_CHILD_COUNT 2",
+ '#undef GU_LOCAL_CONSOLE_AGGREGATE',
+ '#define GU_CONSOLE_AGGREGATE 1',
+ '#undef GU_CONSOLE_CHILD_COUNT')) {
+ Put 'internal-boot/unlock/profile-local.h' ($header+"`n"+$suffix+"`n")
+ $accepted=$true;try{$null=Get-LocalProfile $sandbox}catch{$accepted=$false}
+ if($accepted){throw 'Malformed topology header accepted'};$checks++
+}
+Put 'internal-boot/unlock/profile-local.h' ($noEdidHeader+"`n#define GU_LOCAL_CONSOLE_AGGREGATE 1`n#define GU_LOCAL_CHILD_COUNT 1`n")
+$accepted=$true;try{$null=Get-LocalProfile $sandbox}catch{$accepted=$false}
+if($accepted){throw 'Aggregate without EDID driver accepted'};$checks++
+$baseline=$normalBaseline
+Put 'internal-boot/unlock/profile-local.h' $header
+Put 'research/profile/local/profile.json' ($report|ConvertTo-Json -Depth 8)
 Check 'release replay job on a profile that has an EDID driver' {param($e) $e.Results|Add-Member NoteProperty 'release replay, no EDID driver (real graph)' @{Exit=0;Expected=0}}
 Put 'research/profile/local/test-results.json' $baseline
 $package=[ordered]@{HardwareProfile=$hw.Name;LocalProfileHeaderSha256=$hw.HeaderSha256;

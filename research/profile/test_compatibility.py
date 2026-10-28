@@ -58,7 +58,8 @@ class CompatibilityTests(unittest.TestCase):
     def populate(self, *, no_edid=True, count=2, **options):
         text = topology.synthetic_capture(no_edid=no_edid, **options)
         first_binding = text.index('binding handle=')
-        text = text[:first_binding] + f'driver-bindings={3 if no_edid else 4:08x}\n' + text[first_binding:]
+        binding_count = (3 if no_edid else 4) + int(options.get('aggregate', False))
+        text = text[:first_binding] + f'driver-bindings={binding_count:08x}\n' + text[first_binding:]
         for agent, index in ((3, 0), (9, 1)):
             if agent == 9 and no_edid:
                 continue
@@ -96,6 +97,30 @@ class CompatibilityTests(unittest.TestCase):
         self.assert_reason('needs_data', 'no_captures')
         self.populate(count=1)
         self.assert_reason('needs_data', 'capture_count')
+
+    def test_secondary_display_path_must_agree_across_cold_boots(self):
+        for no_edid in (False, True):
+            with self.subTest(no_edid=no_edid):
+                first = self.populate(no_edid=no_edid, children=2, child_adr=0x10)
+                self.populate(no_edid=no_edid, children=2, child_adr=0xa0)
+                (self.folder / 'DIAG00.TXT').write_text(first, encoding='ascii')
+                self.assert_reason('invalid_data', 'captures_disagree')
+                with self.assertRaisesRegex(checker.mp.Refused, 'disagree on the display child paths'), \
+                     patch.object(checker.mp, 'locate_fwsec', side_effect=AssertionError('must reject before PROM parsing')):
+                    checker.mp.generate(self.folder, Path('not-invoked'), self.envelope)
+
+    def test_generated_header_and_report_pin_nonaggregate_child_count(self):
+        for no_edid in (False, True):
+            for children in (1, 2):
+                with self.subTest(no_edid=no_edid, children=children):
+                    self.populate(no_edid=no_edid, children=children)
+                    # This test covers topology metadata, not the native PROM parser.
+                    with patch.object(checker.mp, 'locate_fwsec', return_value={'image_off': 0x100, 'image_size': 0x200}):
+                        header, report, _ = checker.mp.generate(self.folder, Path('not-invoked'), self.envelope)
+                    self.assertIn('#define GU_LOCAL_CONSOLE_AGGREGATE 0\n', header)
+                    self.assertIn(f'#define GU_LOCAL_CHILD_COUNT {children}\n', header)
+                    self.assertIs(report['Replay']['Aggregate'], False)
+                    self.assertEqual(report['Replay']['ChildCount'], children)
 
     def test_missing_assets_are_not_candidate(self):
         self.populate()
@@ -196,6 +221,16 @@ class CompatibilityTests(unittest.TestCase):
                 self.assertEqual(result['status'], 'error')
                 self.assertEqual(result['checks'][0]['code'], 'tool_error')
         self.assertEqual(checker.check(self.folder, {})['status'], 'error')
+
+    def test_recognized_aggregate_is_candidate_without_write_or_hardware_approval(self):
+        for children in (1,2):
+            self.populate(aggregate=True,no_edid=False,children=children)
+            self.assert_reason('candidate','images_pass')
+            with patch.object(checker.mp,'locate_fwsec',return_value={'image_off':0x100,'image_size':0x200}):
+                header,report,_=checker.mp.generate(self.folder,Path('not-invoked'),self.envelope)
+            self.assertIn('#define GU_LOCAL_CONSOLE_AGGREGATE 1\n',header)
+            self.assertIs(report['Replay']['Aggregate'],True)
+            self.assertEqual(report['Replay']['ChildCount'],children)
 
     def test_cli_candidate_and_installation_error_exit_codes(self):
         self.populate()

@@ -91,6 +91,47 @@ class FamilyTests(unittest.TestCase):
             with self.subTest(flag=flag):
                 self.assertNotEqual(compile_source(source, base + ['-D' + flag]).returncode, 0)
 
+    def test_local_topology_is_derived_without_changing_fixed_profiles(self):
+        for aggregate, children in itertools.product((0, 1), (1, 2)):
+            with self.subTest(aggregate=aggregate, children=children), tempfile.TemporaryDirectory() as directory:
+                folder = Path(directory)
+                local = folder / 'profile-local.h'
+                base = ('#define GU_LOCAL_PROFILE_GENERATOR 1\n#define GU_CHIP_ID 0xb72000a1U\n'
+                        '#define GU_BOARD_ID 0x220410deU\n#define GU_DEVICE_MEMORY_SIZE 0x6000U\n'
+                        '#define GU_NO_EDID_DRIVER 0\n')
+                local.write_text(base + f'#define GU_LOCAL_CONSOLE_AGGREGATE {aggregate}\n'
+                                 f'#define GU_LOCAL_CHILD_COUNT {children}\n')
+                overlay = folder / 'overlay.json'
+                overlay.write_text(json.dumps({'version': 0, 'roots': [{'type': 'file',
+                    'name': str(ROOT / 'profile-local.h'), 'external-contents': str(local), 'use-external-name': False}]}))
+                flags = ['-DGU_PROFILE_LOCAL', '-DGU_HEADLESS_RESEARCH', '-DGU_FULL_UNLOCK']
+                extra = ['-ivfsoverlay', str(overlay)]
+                source = ('#include "machine-profile.h"\n'
+                          f'_Static_assert(GU_CONSOLE_AGGREGATE == {aggregate}, "aggregate");\n'
+                          f'_Static_assert(GU_LOCAL_CHILD_COUNT == {children}, "children");\n')
+                if aggregate and children == 2:
+                    source += '_Static_assert(GU_CONSOLE_MULTI_CHILD == 1 && GU_CONSOLE_CHILD_COUNT == 2, "multi child");\n'
+                else:
+                    source += '#ifdef GU_CONSOLE_MULTI_CHILD\n#error Unexpected multi-child path\n#endif\n'
+                done = compile_source(source, flags, extra)
+                self.assertEqual(done.returncode, 0, done.stderr)
+                invalid = [base + '#define GU_LOCAL_CONSOLE_AGGREGATE 1\n',
+                           base + '#define GU_LOCAL_CHILD_COUNT 1\n',
+                           base + '#define GU_LOCAL_CONSOLE_AGGREGATE 2\n#define GU_LOCAL_CHILD_COUNT 1\n',
+                           base + '#define GU_LOCAL_CONSOLE_AGGREGATE 1\n#define GU_LOCAL_CHILD_COUNT 3\n',
+                           local.read_text().replace('GU_NO_EDID_DRIVER 0', 'GU_NO_EDID_DRIVER 1')]
+                for index, header in enumerate(invalid):
+                    if index == 4 and not aggregate:
+                        continue  # No-EDID remains supported on non-aggregate firmware.
+                    local.write_text(header)
+                    done = compile_source('#include "machine-profile.h"\n', flags, extra)
+                    self.assertNotEqual(done.returncode, 0, header)
+                local.write_text(base + f'#define GU_LOCAL_CONSOLE_AGGREGATE {aggregate}\n'
+                                 f'#define GU_LOCAL_CHILD_COUNT {children}\n')
+                for override in ('GU_CONSOLE_AGGREGATE=1', 'GU_CONSOLE_MULTI_CHILD=1', 'GU_CONSOLE_CHILD_COUNT=2'):
+                    done = compile_source('#include "machine-profile.h"\n', flags + ['-D' + override], extra)
+                    self.assertNotEqual(done.returncode, 0, override)
+
     def test_unknown_firmware_and_local_template_inheritance_are_refused(self):
         for defines in (['-DGU_FIRMWARE_PROFILE=99'],
                         ['-DGU_PROFILE_LOCAL', '-DGU_FIRMWARE_PROFILE=2'],
