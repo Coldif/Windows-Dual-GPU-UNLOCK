@@ -137,6 +137,16 @@ class CompatibilityTests(unittest.TestCase):
                      patch.object(checker.mp,'locate_fwsec',side_effect=AssertionError('ancestry drift must stop before PROM parsing')):
                     checker.mp.generate(self.folder,Path('not-invoked'),self.envelope)
 
+    def test_observed_nonzero_segment_does_not_enable_unlock_generation(self):
+        for segment in (1,0xffff):
+            text=self.populate()
+            text=text.replace('probe-target seg=0x0000 ',f'probe-target seg=0x{segment:04x} ')
+            text=text.replace('pci location-status=0x0 segment=0x0 ',f'pci location-status=0x0 segment=0x{segment:x} ')
+            for index in (0,1):(self.folder/f'DIAG{index:02d}.TXT').write_text(text,encoding='ascii')
+            self.assert_reason('outside_scope','topology_scope')
+            with self.assertRaisesRegex(checker.mp.Refused,'segment 0'):
+                checker.mp.generate(self.folder,Path('not-invoked'),self.envelope)
+
     def test_missing_assets_are_not_candidate(self):
         self.populate()
         (self.folder / 'IMG00.BIN').unlink()

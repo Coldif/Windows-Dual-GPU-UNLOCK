@@ -22,7 +22,6 @@ function Assert-GuProbeTargetBus([string[]]$Paths,[ValidateRange(1,255)][int]$Ta
   $rows=[regex]::Matches($text,'(?m)^probe-target[^\r\n]*\r?$')
   $target=if($rows.Count -eq 1){[regex]::Match($rows[0].Value.TrimEnd("`r"),'^probe-target seg=0x([0-9a-f]{1,4}) bus=0x([0-9a-f]{1,4}) dev=0x([0-9a-f]{1,4}) fun=0x([0-9a-f]{1,4})$')}else{$null}
   if(!$target -or !$target.Success -or
-     [Convert]::ToUInt32($target.Groups[1].Value,16) -ne 0 -or
      [Convert]::ToUInt32($target.Groups[2].Value,16) -ne $TargetBus -or
      [Convert]::ToUInt32($target.Groups[3].Value,16) -ne 0 -or
      [Convert]::ToUInt32($target.Groups[4].Value,16) -ne 0){throw 'Captured probe target does not match explicit -TargetBus; no profile or package was generated'}

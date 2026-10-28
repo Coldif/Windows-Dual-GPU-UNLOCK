@@ -17,7 +17,8 @@ enum {G_OK,G_UNKNOWN,G_BME,G_MEM_OFF,G_BAD_BAR,G_BAD_RESOURCE,G_CHANGED,G_MULTI,
       G_BUS_ZERO,G_BUS_OVERFLOW,G_SEGMENT,G_DEVICE,G_FUNCTION,G_LOCATION_FAIL,
       G_INVENTORY_READ_FAIL,G_INVENTORY_CLASS_FAIL,G_INITIAL_INTERFACE,G_INITIAL_ID,
       G_INITIAL_CLASS,G_INITIAL_BUS,G_MIXED_MULTI,G_NO_DISPLAY,
-      G_LOST_HANDLE,G_LOST_ID,G_LOST_VENDOR,G_LOST_CLASS,G_LOST_CLASS_READ};
+      G_LOST_HANDLE,G_LOST_ID,G_LOST_VENDOR,G_LOST_CLASS,G_LOST_CLASS_READ,
+      G_INITIAL_SEGMENT,G_ATTR_SEGMENT,G_MULTI_SEGMENT};
 static int Mode,RootCloses,RootOpens,ForeignOpens,SfsSearches,Dumps,ExistingWriteAttempts;
 static EFI_FILE_PROTOCOL DumpFile,ForeignRoot;
 static EFI_HANDLE BindingHandle=(VOID *)50,ImageHandle=(VOID *)51;
@@ -29,7 +30,7 @@ static int Drifted,ReadsAfterDrift;
 static BOOLEAN AttributeReturned;
 static int AttributeConfigReads;
 static EFI_PCI_IO_PROTOCOL ChangedPci;
-static UINTN TestBus;
+static UINTN TestSegment,TestBus;
 static UINT32 TestId;
 static int LocationCalls;
 
@@ -79,11 +80,14 @@ static EFI_STATUS EFIAPI GuardedMem(EFI_PCI_IO_PROTOCOL *io,EFI_PCI_IO_PROTOCOL_
 static EFI_STATUS EFIAPI GenericLocation(EFI_PCI_IO_PROTOCOL *io,UINTN *seg,UINTN *bus,UINTN *dev,UINTN *fun) {
   EFI_STATUS s=Location(io,seg,bus,dev,fun);
   LocationCalls++;
+  *seg=TestSegment;
+  if((Mode==G_INITIAL_SEGMENT && LocationCalls>1) || (Mode==G_ATTR_SEGMENT && AttributeReturned) ||
+     (Mode==G_MULTI_SEGMENT && io==&ChangedPci))*seg=TestSegment^1U;
   *bus=((Mode==G_OTHER_BDF && S.PromAllocs) || (Mode==G_ATTR_BDF && AttributeReturned) ||
         (Mode==G_INITIAL_BUS && LocationCalls>1))?TestBus+1U:TestBus;
   if(Mode==G_BUS_ZERO)*bus=0;
   if(Mode==G_BUS_OVERFLOW)*bus=256;
-  if(Mode==G_SEGMENT)*seg=1;
+  if(Mode==G_SEGMENT)*seg=0x10000U;
   if(Mode==G_DEVICE)*dev=1;
   if(Mode==G_FUNCTION)*fun=1;
   if(Mode==G_LOCATION_FAIL)return EFI_DEVICE_ERROR; /* Plausible partial BDF is not valid. */
@@ -114,7 +118,7 @@ static EFI_STATUS EFIAPI GenericLocate(EFI_LOCATE_SEARCH_TYPE search,EFI_GUID *g
     *out=malloc(sizeof(EFI_HANDLE));if(!*out)return EFI_OUT_OF_RESOURCES;
     (*out)[0]=BindingHandle;*n=1;return EFI_SUCCESS;
   }
-  if(g && !memcmp(g,&WantPci,sizeof(*g)) && (Mode==G_MULTI || Mode==G_MIXED_MULTI)) {
+  if(g && !memcmp(g,&WantPci,sizeof(*g)) && (Mode==G_MULTI || Mode==G_MIXED_MULTI || Mode==G_MULTI_SEGMENT)) {
     *out=malloc(2*sizeof(EFI_HANDLE));if(!*out)return EFI_OUT_OF_RESOURCES;
     (*out)[0]=PciHandle;(*out)[1]=(VOID *)4;*n=2;return EFI_SUCCESS;
   }
@@ -127,7 +131,7 @@ static EFI_STATUS EFIAPI GenericHandle(EFI_HANDLE h,EFI_GUID *g,VOID **out) {
   if(Mode==G_LOST_HANDLE && S.IdReads && h==PciHandle && !memcmp(g,&WantPci,sizeof(*g))) {
     *out=NULL;return EFI_NOT_FOUND;
   }
-  if(h==(VOID *)4 && !memcmp(g,&WantPci,sizeof(*g))){*out=&Pci;return EFI_SUCCESS;}
+  if(h==(VOID *)4 && !memcmp(g,&WantPci,sizeof(*g))){*out=Mode==G_MULTI_SEGMENT?&ChangedPci:&Pci;return EFI_SUCCESS;}
   if(Mode==G_PROTOCOL_CHANGED && h==PciHandle && S.PromAllocs){*out=NULL;return EFI_NOT_FOUND;}
   if(Mode==G_ATTR_INTERFACE && AttributeReturned && h==PciHandle && !memcmp(g,&WantPci,sizeof(*g))) {
     *out=&ChangedPci;return EFI_SUCCESS;
@@ -166,7 +170,7 @@ static void GenericSetup(int mode) {
   Pci.Pci.Read=GenericRead;Pci.GetBarAttributes=Bar;Pci.GetLocation=GenericLocation;
   Pci.Attributes=Attr;AttributeGets=AttributeOthers=0;
   AttributeReturned=FALSE;AttributeConfigReads=0;
-  TestBus=GU_TEST_PROBE_BUS;TestId=GU_BOARD_ID;LocationCalls=0;ChangedPci=Pci;
+  TestSegment=0;TestBus=GU_TEST_PROBE_BUS;TestId=GU_BOARD_ID;LocationCalls=0;ChangedPci=Pci;
   Bs.LocateHandleBuffer=GenericLocate;Bs.HandleProtocol=GenericHandle;
   memset(&Binding,0,sizeof(Binding));Binding.ImageHandle=ImageHandle;
   memset(&Image,0,sizeof(Image));Image.ImageBase=ImageBytes;Image.ImageSize=sizeof(ImageBytes);
@@ -199,7 +203,7 @@ int main(void) {
   Check(AttributeGets==1 && !AttributeOthers,"PciIo attributes are read once, Get only; never set, enabled or disabled");
   Check(Logged("pci-attributes status=0x0000000000000000 value=0x0000000000000300"),"PciIo attribute cache recorded for the generator");
   Check(S.CfgReads>AttributeConfigReads,"raw configuration is rechecked after Attributes returns");
-  const int attributeDrifts[]={G_ATTR_MEM,G_ATTR_BME,G_ATTR_CONFIG,G_ATTR_BDF,G_ATTR_INTERFACE};
+  const int attributeDrifts[]={G_ATTR_MEM,G_ATTR_BME,G_ATTR_CONFIG,G_ATTR_BDF,G_ATTR_INTERFACE,G_ATTR_SEGMENT};
   for(UINTN i=0;i<sizeof(attributeDrifts)/sizeof(attributeDrifts[0]);i++) {
     Check(GenericRun(attributeDrifts[i],TRUE)==EFI_NOT_READY,"Attributes callback drift fails closed");
     Check(AttributeGets==1 && !AttributeOthers,"drift follows exactly one Get and no attribute writes");
@@ -222,7 +226,8 @@ int main(void) {
 #ifdef GU_PROBE_GENERIC
   const int inventoryRefuse[]={G_BUS_ZERO,G_BUS_OVERFLOW,G_SEGMENT,G_DEVICE,G_FUNCTION,G_LOCATION_FAIL,
     G_INVENTORY_READ_FAIL,G_INVENTORY_CLASS_FAIL,G_INITIAL_INTERFACE,G_INITIAL_ID,G_INITIAL_CLASS,G_INITIAL_BUS,
-    G_MIXED_MULTI,G_NO_DISPLAY,G_LOST_HANDLE,G_LOST_ID,G_LOST_VENDOR,G_LOST_CLASS,G_LOST_CLASS_READ};
+    G_MIXED_MULTI,G_NO_DISPLAY,G_LOST_HANDLE,G_LOST_ID,G_LOST_VENDOR,G_LOST_CLASS,G_LOST_CLASS_READ,
+    G_INITIAL_SEGMENT,G_MULTI_SEGMENT};
   for(UINTN i=0;i<sizeof(inventoryRefuse)/sizeof(inventoryRefuse[0]);i++) {
     Check(GenericRun(inventoryRefuse[i],TRUE)==EFI_NOT_READY,"invalid or changed initial inventory fails closed");
     Check(!S.RegReads && !S.PromReads,"bad inventory permits no deep reads");
@@ -233,6 +238,17 @@ int main(void) {
     GenericSetup(G_OK);TestId=reviewedIds[i];
     Check(GuCaptureGraphOnVolume(&Table,&LogFile,&RootFile)==EFI_SUCCESS,"reviewed GA10x capture identity succeeds");
     Check(S.RegReads==16 && S.PromReads==PROM_DWORDS,"each reviewed identity retains bounded deep reads");
+  }
+  const UINTN segments[]={1,0xffffU};
+  for(UINTN i=0;i<sizeof(segments)/sizeof(segments[0]);i++) {
+    GenericSetup(G_OK);TestSegment=segments[i];
+    Check(GuCaptureGraphOnVolume(&Table,&LogFile,&RootFile)==EFI_SUCCESS,"generic discovery accepts a unique 16-bit segment target");
+    Check(S.RegReads==16 && S.PromReads==PROM_DWORDS && !AttributeOthers,"nonzero segment retains bounded observation-only access");
+    char observed[64];snprintf(observed,sizeof(observed),"probe-target seg=0x%04x",(unsigned)segments[i]);
+    Check(Logged(observed),"captured segment is recorded without truncation");
+    GenericSetup(G_ATTR_SEGMENT);TestSegment=segments[i];
+    Check(GuCaptureGraphOnVolume(&Table,&LogFile,&RootFile)==EFI_NOT_READY && !S.RegReads && !S.PromReads,
+          "nonzero segment drift after attribute callback permits no deep reads");
   }
 #ifdef GU_PROBE_AUTO_BUS
   const UINTN buses[]={1,0x2b,255};
@@ -246,6 +262,11 @@ int main(void) {
   Check(GuCaptureGraphOnVolume(&Table,&LogFile,&RootFile)==EFI_NOT_READY,"explicit bus mismatch has no auto fallback");
   Check(!S.RegReads && !S.PromReads,"explicit mismatch permits no deep reads");
 #endif
+#endif
+#ifndef GU_PROBE_GENERIC
+  GenericSetup(G_OK);TestSegment=1;
+  Check(GuCaptureGraphOnVolume(&Table,&LogFile,&RootFile)==EFI_NOT_READY && !S.RegReads && !S.PromReads,
+        "named profile observation remains pinned to segment zero");
 #endif
   for(int m=G_SHORT_WRITE;m<=G_CLOSE;m++) {
     Check(GenericRun(m,TRUE)==EFI_NOT_READY,"dump write/flush/close failure invalidates capture");

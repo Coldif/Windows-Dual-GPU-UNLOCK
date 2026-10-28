@@ -53,7 +53,13 @@ and PCI config. Every LOCAL profile now requires a full driver-release replay, w
 the EDID driver exists or not. Only the non-aggregate headless build supports the flag; other builds
 refuse it at compile time. The generic probe automatically selects the bus of the single
 eligible NVIDIA display controller; you do not need a motherboard-specific bus option.
-It still requires segment 0, device 0, function 0 and a nonzero bus.
+LOCAL profile generation still requires segment 0, device 0, function 0 and a nonzero bus.
+
+The generic read-only probe can also observe a unique reviewed NVIDIA target on
+segments `0001`–`ffff`. It pins both segment and bus through the final identity
+recheck; segment drift or multiple NVIDIA display controllers prevents deep reads.
+`-TargetBus` constrains the bus, regardless of the observed segment. This collects
+porting evidence only: LOCAL generation and unlock runtimes still require segment 0.
 
 Admission and replay share a strict parser: incomplete/ambiguous handle, protocol,
 open and PCI snapshots cannot establish absence of an adapter or EDID owner. The

@@ -201,6 +201,8 @@ machine. An optional `-TargetBus` constrains discovery and resumed captures.
 LOCAL discovery also accepts captured PNP0A03/PNP0A08 root identities and up to 16 PCI
 path nodes, pinning the complete ancestry and checking the exact PCI parent. This
 experimental bridge-chain support still requires per-machine validation.
+The read-only probe can collect a unique target on any 16-bit PCI segment;
+nonzero-segment unlock generation remains unsupported.
 Single-RTX systems may have no iGPU or separate EDID driver on the non-aggregate path.
 Recognized AMI aggregate consoles with one or
 two display children can generate an experimental local profile and require their own

@@ -198,17 +198,17 @@ static BOOLEAN ProbeEnvelope(CAPTURE *c,EFI_PCI_IO_PROTOCOL *io,const UINT32 *cf
   if(raw && c->Table->BootServices->FreePool(raw)!=EFI_SUCCESS)good=FALSE;
   return good;
 }
-static BOOLEAN ProbeUnchanged(CAPTURE *c,EFI_HANDLE handle,EFI_PCI_IO_PROTOCOL *io,const UINT32 *cfg,UINTN expectedBus) {
+static BOOLEAN ProbeUnchanged(CAPTURE *c,EFI_HANDLE handle,EFI_PCI_IO_PROTOCOL *io,const UINT32 *cfg,UINTN expectedSegment,UINTN expectedBus) {
   EFI_PCI_IO_PROTOCOL *current=NULL;UINTN seg=0,bus=0,dev=0,fun=0;UINT32 now[64];
   if(c->Table->BootServices->HandleProtocol(handle,&PciGuidL,(VOID **)&current)!=EFI_SUCCESS || current!=io ||
-     !io->GetLocation || io->GetLocation(io,&seg,&bus,&dev,&fun)!=EFI_SUCCESS || seg || bus!=expectedBus || dev || fun ||
+     !io->GetLocation || io->GetLocation(io,&seg,&bus,&dev,&fun)!=EFI_SUCCESS || seg!=expectedSegment || bus!=expectedBus || dev || fun ||
      io->Pci.Read(io,EfiPciIoWidthUint32,0,64,now)!=EFI_SUCCESS)return FALSE;
   for(UINTN j=0;j<64;j++)if(now[j]!=cfg[j])return FALSE;
   return TRUE;
 }
 #endif
 static VOID ProbeBar(CAPTURE *c,EFI_PCI_IO_PROTOCOL *io,UINT32 bar,EFI_FILE_PROTOCOL *root,
-                     EFI_HANDLE handle,const UINT32 *cfg,UINTN expectedBus) {
+                     EFI_HANDLE handle,const UINT32 *cfg,UINTN expectedSegment,UINTN expectedBus) {
   static const UINT32 offs[]={
     0x000000,0x108154,0x108170,0x108180,0x108354,
     0x118128,0x118234,0x110100,0x1183a4,0x1fa828,
@@ -224,11 +224,11 @@ static VOID ProbeBar(CAPTURE *c,EFI_PCI_IO_PROTOCOL *io,UINT32 bar,EFI_FILE_PROT
    * any release instead of stopping mid-release. A protocol call, so it precedes the recheck. */
   UINT64 pciAttributes=0;
   EFI_STATUS attributesStatus=io->Attributes?io->Attributes(io,EfiPciIoAttributeOperationGet,0,&pciAttributes):EFI_UNSUPPORTED;
-  if(!ProbeUnchanged(c,handle,io,cfg,expectedBus)) {
+  if(!ProbeUnchanged(c,handle,io,cfg,expectedSegment,expectedBus)) {
     c->Table->BootServices->FreePool(page);Problem(c,"probe-identity-changed",EFI_NOT_READY);return;
   }
 #else
-  (void)handle;(void)cfg;(void)expectedBus;
+  (void)handle;(void)cfg;(void)expectedSegment;(void)expectedBus;
 #endif
 #ifdef GU_CHECKED_PROBE
   UINT32 values[sizeof(offs)/sizeof(offs[0])];
@@ -330,7 +330,7 @@ EFI_STATUS GuProbeGpu(EFI_SYSTEM_TABLE *t,CAPTURE *c) {
   UINTN candidates=0;BOOLEAN inventoryOk=TRUE;
 #ifdef GU_PROBE_GENERIC
   EFI_HANDLE targetHandle=NULL;EFI_PCI_IO_PROTOCOL *targetIo=NULL;
-  UINT32 targetId=0,targetClass=0;UINTN targetBus=0;
+  UINT32 targetId=0,targetClass=0;UINTN targetSegment=0,targetBus=0;
   BOOLEAN targetValidated=FALSE;
 #endif
   /* Count all display targets before any MMIO/PROM access. Multiple devices
@@ -346,11 +346,11 @@ EFI_STATUS GuProbeGpu(EFI_SYSTEM_TABLE *t,CAPTURE *c) {
 #ifdef GU_PROBE_GENERIC
     UINTN seg=0,bus=0,dev=0,fun=0;
     if(!io->GetLocation || io->GetLocation(io,&seg,&bus,&dev,&fun)!=EFI_SUCCESS ||
-       seg || !bus || bus>255 || dev || fun){inventoryOk=FALSE;continue;}
+       seg>0xffffU || !bus || bus>255 || dev || fun){inventoryOk=FALSE;continue;}
 #ifndef GU_PROBE_AUTO_BUS
     if(bus!=GU_PROBE_BUS){inventoryOk=FALSE;continue;}
 #endif
-    targetHandle=hs[i];targetIo=io;targetId=id;targetClass=cls;targetBus=bus;
+    targetHandle=hs[i];targetIo=io;targetId=id;targetClass=cls;targetSegment=seg;targetBus=bus;
 #endif
   }
   if(!inventoryOk || candidates!=1)Problem(c,"probe-inventory",EFI_UNSUPPORTED);
@@ -388,18 +388,19 @@ EFI_STATUS GuProbeGpu(EFI_SYSTEM_TABLE *t,CAPTURE *c) {
 #ifdef GU_CHECKED_PROBE
     if(!inventoryOk || candidates!=1)continue;
 #endif
-    UINTN expectedBus=GU_PROBE_BUS;
+    UINTN expectedSegment=0,expectedBus=GU_PROBE_BUS;
 #ifdef GU_PROBE_GENERIC
     /* Bind this snapshot to the unique device inventoried before external log,
      * resource and allocation callbacks. No re-selection after a mismatch. */
     if(hs[i]!=targetHandle || io!=targetIo || id!=targetId || cfg[0]!=targetId || cfg[2]!=targetClass ||
-       locationStatus!=EFI_SUCCESS || seg || bus!=targetBus || dev || fun) {
+       locationStatus!=EFI_SUCCESS || seg!=targetSegment || bus!=targetBus || dev || fun) {
       Problem(c,"probe-inventory-changed",EFI_NOT_READY);continue;
     }
     expectedBus=targetBus;
+    expectedSegment=targetSegment;
     targetValidated=TRUE;
 #endif
-    if(bar)ProbeBar(c,io,bar,root,hs[i],cfg,expectedBus);else Problem(c,"bar0",EFI_UNSUPPORTED);
+    if(bar)ProbeBar(c,io,bar,root,hs[i],cfg,expectedSegment,expectedBus);else Problem(c,"bar0",EFI_UNSUPPORTED);
   }
 #ifdef GU_PROBE_GENERIC
   /* A selected target disappearing or turning non-display during the second

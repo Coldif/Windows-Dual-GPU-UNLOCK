@@ -97,7 +97,9 @@ foreach($case in @(
  @{Target=$valid;Bus=255;Accept=$false},
  @{Target=($valid+"`r`n"+$valid);Bus=43;Accept=$false},
  @{Target='probe-target seg=0x0000 bus=0x002b dev=0x0001 fun=0x0000';Bus=43;Accept=$false},
- @{Target='probe-target seg=0x0001 bus=0x002b dev=0x0000 fun=0x0000';Bus=43;Accept=$false},
+ @{Target='probe-target seg=0x0001 bus=0x002b dev=0x0000 fun=0x0000';Bus=43;Accept=$true},
+ @{Target='probe-target seg=0xffff bus=0x002b dev=0x0000 fun=0x0000';Bus=43;Accept=$true},
+ @{Target='probe-target seg=0x10000 bus=0x002b dev=0x0000 fun=0x0000';Bus=43;Accept=$false},
  @{Target='probe-target malformed';Bus=43;Accept=$false}
 )) {
  foreach($n in @(0,1)) {
