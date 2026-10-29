@@ -11,6 +11,8 @@ typedef struct {
 } GU_RELEASE_OWNER;
 EFI_STATUS GuClaimController(VOID);
 EFI_STATUS GuFindReleaseOwner(EFI_SYSTEM_TABLE *Table,GU_RELEASE_OWNER *Owner,BOOLEAN Log);
+/* After the release, before claiming: refuse if any driver still owns PciIo. */
+EFI_STATUS GuVerifyNoDriverOwns(VOID);
 BOOLEAN GuSameReleaseOwner(const GU_RELEASE_OWNER *A,const GU_RELEASE_OWNER *B);
 /* Caller holds TPL_NOTIFY through fresh resolution/validation and any BME clear. */
 EFI_STATUS GuRefreshTargetPci(VOID);

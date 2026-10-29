@@ -11,6 +11,12 @@ typedef struct {
 BOOLEAN GuCheckConfig(const UINT32 Config[64], UINTN Segment, UINTN Bus,
                       UINTN Device, UINTN Function, GU_CAPS *Out);
 
+/* Same admission rules, with the card identity and bus supplied by the caller
+   for a runtime-selected target. Out is cleared on failure. */
+BOOLEAN GuCheckConfigFor(const UINT32 Config[64], UINTN Segment, UINTN Bus,
+                         UINTN Device, UINTN Function, UINT32 Id, UINT32 Subsystem,
+                         GU_CAPS *Out);
+
 /* Path must point to readable memory through its terminator, up to MaxBytes.
    MaxBytes is a read bound, not necessarily the exact allocation length.
    Returns 1 for the exact captured AMD GOP route/ADR, 2 for RTX, 0 otherwise.

@@ -1,5 +1,44 @@
 # Changes
 
+## Unreleased — a stick setting can turn logging off
+
+- Read `\RTX3090-UNLOCK\CONFIG.TXT` (`log = 1` or `log = 0`; also
+  `on/off`, `true/false`, `yes/no`) in both the multi-target wrapper and the
+  child. With `log = 0` the boot writes no `MBnnn.TXT` breadcrumb and no `RUNnn`
+  directory; a missing or unreadable file keeps logging on, and an unknown value
+  warns and keeps the default.
+- The setting only gates file writes. Identity, decode, release and transaction
+  decisions are unchanged, so a boot with logging off runs the same hardware
+  sequence. The trade-off is explicit: a failed run then leaves no report.
+- Staging creates a documented `CONFIG.TXT` only when the stick has none and
+  never overwrites an existing one, so a rebuild cannot silently re-enable
+  logging.
+- Verified on the GA104/GA106 pair: both binaries are byte-identical to the
+  build that produced the RUN10 success (`b5603877` child, `20bc96b9` wrapper).
+
+## Unreleased — two-boot compute benchmark
+
+- Add `benchmark/gu-compute-benchmark.cu`: runs the established four GEMM modes
+  (`fp32_pedantic` on CUDA cores, `fp16`/`bf16`/`tf32` tensor paths), reports
+  every trial and the median of trial medians, checks each product against the
+  exact all-ones result, and adds device-to-device copy bandwidth plus the
+  largest buffer it can allocate and actually write. It selects cards by PCI
+  address or UUID and emits one JSON record per card.
+- Add `benchmark/gu_bench.py`: refuses to measure a busy or hot machine, builds
+  the harness, runs every enumerated card, pairs cards by NVIDIA UUID, stores
+  runs under `%USERPROFILE%\Windows-GPU-DIAG\BENCH` (override with `-OutDir`) and
+  compares two labelled
+  boots (`-Compare unlocked normal`). Every child process has a timeout, so a
+  stuck tool is killed instead of left running.
+- The first wrapper was PowerShell. `ConvertTo-Json` on the result object never
+  returned in Windows PowerShell 5.1 (one core busy, working set growing past
+  1 GB), while the same object shape serialized fine in isolation. The wrapper
+  is Python and the file is written by `json`, which removes that path entirely.
+- Measured run-to-run noise on the RTX 3060 pair is about 1%; the unlock is
+  volatile and does not change the silicon, so an unlocked boot and a normal
+  boot should measure the same. This tool measures the machine; it neither
+  unlocks nor changes firmware.
+
 ## Unreleased — connect reviewed RTX 3060 families to local capture and replay
 
 - Add bounded generic read-only capture for the exact `248710de` and `250410de`

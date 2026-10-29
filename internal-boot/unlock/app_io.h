@@ -6,3 +6,7 @@ EFI_STATUS GuLoadAssets(VOID);
 VOID GuReleaseAssets(VOID);
 BOOLEAN GuLogReady(VOID);
 VOID GuConsole(const char *Text);
+#ifdef GU_MULTI_GPU
+/* File-only logging from this point on (see app_io.c). */
+VOID GuConsoleOff(VOID);
+#endif

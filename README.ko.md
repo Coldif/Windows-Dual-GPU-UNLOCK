@@ -4,6 +4,10 @@
 
 커뮤니티 기여로 확장하는 실험용 UEFI GPU 언락과 Windows 직접 인계 구현입니다.
 
+> **Fork:** this fork is frozen and unsupported. The AI-generated changes
+> (DeepSeek V4.1 Flash), the tested hardware and the measured results are in
+> [README.md](README.md#fork-notice).
+
 [![Discord 커뮤니티 참여](https://img.shields.io/badge/Join%20Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/WjKsjEqxF)
 [![지원 구성과 호환성 확인](https://img.shields.io/badge/Compatibility-455A64?style=for-the-badge)](docs/COMPATIBILITY.ko.md)
 [![연구와 개선에 기여하기](https://img.shields.io/badge/Contribute-37474F?style=for-the-badge&logo=github&logoColor=white)](docs/CONTRIBUTING.ko.md)

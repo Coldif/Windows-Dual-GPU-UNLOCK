@@ -1,4 +1,5 @@
 /* Modified 2026-10-19/20 for Windows GPU UNLOCK; changes documented in CHANGES.md. */ #include "app_io.h"
+#include "../boot/log-config.h"
 #include "compat/compat.h"
 #include "format.h"
 #include "sha256.h"
@@ -13,6 +14,9 @@ static EFI_GUID LoadedGuid=EFI_LOADED_IMAGE_PROTOCOL_GUID,PathGuid=EFI_DEVICE_PA
 static EFI_SYSTEM_TABLE *Table;
 static EFI_FILE_PROTOCOL *Root,*Parent,*Run,*Report;
 static BOOLEAN LogFault;
+/* CONFIG.TXT said log=0: nothing is written, but every gate that exists only to
+   protect the evidence stays in the code and simply has nothing to protect. */
+static BOOLEAN LogOff;
 #ifdef GU_HEADLESS_RESEARCH
 /* Convert warnings at every file/protocol boundary, before consuming outputs. */
 static BOOLEAN GuIoError(EFI_STATUS s){return s!=EFI_SUCCESS;}
@@ -28,10 +32,20 @@ static const ASSET_SPEC Specs[]={
  {"gpu-unlock/610.43.03/gsp_boot_desc_ga102.bin",L"ASSETS\\gsp_boot_desc_ga102.bin",84,"cc5a3fc1f4c47f2fe107b1b68f0176d8a448e6dec84b575e5560ccef5262bf15"}
 };
 static VOID LogError(VOID){LogFault=TRUE;if(Gu.armed)Gu.fault=TRUE;}
+#ifdef GU_MULTI_GPU
+/* The multi-target child releases each card's firmware display driver. From
+   that point on ConOut may be backed by a stopped GOP: file logging continues,
+   console output must never touch it again. */
+static BOOLEAN ConsoleOff;
+VOID GuConsoleOff(VOID){ConsoleOff=TRUE;}
+#endif
 VOID GuConsole(const char *Text) {
 #ifdef GU_HEADLESS_RESEARCH
   (void)Text; /* No console calls, including failure and overflow paths. */
 #else
+#ifdef GU_MULTI_GPU
+  if(ConsoleOff)return;
+#endif
   if(!Table || !Table->ConOut || !Table->ConOut->OutputString){LogError();return;}
   while(*Text) {
     CHAR16 line[128];UINTN n=0;
@@ -44,6 +58,7 @@ VOID GuLogText(const char *Text) {
 #ifndef GU_HEADLESS_RESEARCH
   GuConsole(Text);
 #endif
+  if(LogOff)return;
   if(!Report || LogFault){LogError();return;}
   UINTN expected=strlen(Text),written=expected;
   EFI_STATUS status=Report->Write(Report,&written,(VOID *)Text);
@@ -55,7 +70,7 @@ VOID GuLog(const char *Format,...) {
   if(n>=sizeof(text)){LogError();GuConsole("Log format or length error.\n");return;}
   GuLogText(text);
 }
-BOOLEAN GuLogReady(VOID){return Report && !LogFault;}
+BOOLEAN GuLogReady(VOID){return LogOff?(!LogFault):(Report && !LogFault);}
 static BOOLEAN UsbPath(EFI_HANDLE Handle) {
   EFI_DEVICE_PATH_PROTOCOL *path=NULL;
   if(EFI_ERROR(Table->BootServices->HandleProtocol(Handle,&PathGuid,(VOID **)&path)) || !path)return FALSE;
@@ -85,7 +100,7 @@ static EFI_STATUS Metadata(EFI_FILE_PROTOCOL *File,BOOLEAN Directory,UINTN Expec
   return EFI_SUCCESS;
 }
 EFI_STATUS GuIoOpen(EFI_HANDLE Image,EFI_SYSTEM_TABLE *St) {
-  Table=St;Root=Parent=Run=Report=NULL;LogFault=FALSE;memset(GuAssets,0,sizeof(GuAssets));
+  Table=St;Root=Parent=Run=Report=NULL;LogFault=FALSE;LogOff=FALSE;memset(GuAssets,0,sizeof(GuAssets));
   EFI_LOADED_IMAGE_PROTOCOL *loaded=NULL;EFI_SIMPLE_FILE_SYSTEM_PROTOCOL *fs=NULL;
   EFI_STATUS status=Table->BootServices->HandleProtocol(Image,&LoadedGuid,(VOID **)&loaded);
   if(EFI_ERROR(status) || !loaded || !UsbPath(loaded->DeviceHandle))return EFI_UNSUPPORTED;
@@ -99,6 +114,15 @@ EFI_STATUS GuIoOpen(EFI_HANDLE Image,EFI_SYSTEM_TABLE *St) {
 #endif
   if(EFI_ERROR(status) || !Parent)return EFI_NOT_FOUND;
   status=Metadata(Parent,TRUE,0);if(EFI_ERROR(status))return status;
+  /* The stick decides whether this boot leaves any file behind. The wrapper
+     reads the same file, so the breadcrumb and the report agree. */
+  GU_LOG_CONFIG config=GuReadLogConfig(Root);
+  LogOff=!config.Enabled;
+  if(config.Invalid)GuConsole("CONFIG.TXT: log= value not understood; using the default.\n");
+  if(LogOff) {
+    GuConsole("CONFIG.TXT: logging off for this boot; no RUN directory and no report.\n");
+    return EFI_SUCCESS;
+  }
 #ifdef GU_AUTOMATIC_BOOT
   for(UINTN slot=0;slot<1000000;slot++) {
     CHAR16 name[]=L"AUTO000000";UINTN number=slot;

@@ -45,6 +45,8 @@ BOOLEAN GuSelectorPhase(UINT32 Phase) {
 #endif
 VOID GuInit(EFI_BOOT_SERVICES *Bs, EFI_PCI_IO_PROTOCOL *Pci) {
   memset(&Gu,0,sizeof(Gu)); Gu.bs=Bs; Gu.pci=Pci;
+  Gu.board_id=GU_BOARD_ID; Gu.board_subsystem=GU_BOARD_SUBSYSTEM;
+  Gu.target_bus=GU_TARGET_BUS;
 #ifdef GU_ENTRY_LATCHED
   EntryLatched=FALSE;EntrySs0=EntrySs1=0;
 #endif
@@ -52,10 +54,32 @@ VOID GuInit(EFI_BOOT_SERVICES *Bs, EFI_PCI_IO_PROTOCOL *Pci) {
   SelectorPhase=GU_SELECTOR_PHASE_ENTRY;Ss1WriteConsumed=FALSE;
 #endif
 }
-BOOLEAN GuTargetConfig(const UINT32 *C, UINTN S, UINTN B, UINTN D, UINTN F) {
-  return C && !S && B==GU_TARGET_BUS && !D && !F && C[0]==GU_BOARD_ID &&
-    C[11]==GU_BOARD_SUBSYSTEM && (C[2]>>24)==3 && !((C[3]>>16)&0x7f);
+BOOLEAN GuTargetConfigFor(const UINT32 *C, UINTN S, UINTN B, UINTN D, UINTN F,
+                          UINT32 Id, UINT32 Subsystem) {
+  return C && !S && B==Gu.target_bus && !D && !F && C[0]==Id &&
+    C[11]==Subsystem && (C[2]>>24)==3 && !((C[3]>>16)&0x7f);
 }
+BOOLEAN GuTargetConfig(const UINT32 *C, UINTN S, UINTN B, UINTN D, UINTN F) {
+  return GuTargetConfigFor(C,S,B,D,F,Gu.board_id,Gu.board_subsystem);
+}
+#ifdef GU_MULTI_GPU
+VOID GuMultiSelectTarget(UINT32 Id, UINT32 Subsystem, UINTN Bus) {
+  Gu.board_id=Id;Gu.board_subsystem=Subsystem;Gu.target_bus=Bus;
+}
+VOID GuMultiResetTransaction(VOID) {
+  /* Only per-target state: fault/retained stay fatal, so a clean card cannot
+   * authorize the next one after any I/O or containment failure. */
+  Gu.saved=FALSE;Gu.flrs=0;Gu.started=FALSE;Gu.quiesced=FALSE;
+  Gu.saved_devctl=0;Gu.saved_devctl2=0;
+  memset(Gu.saved_config,0,sizeof(Gu.saved_config));
+#ifdef GU_ENTRY_LATCHED
+  EntryLatched=FALSE;EntrySs0=EntrySs1=0;
+#endif
+#ifdef GU_ENTRY_LATCHED_SS1_FULL
+  SelectorPhase=GU_SELECTOR_PHASE_ENTRY;Ss1WriteConsumed=FALSE;
+#endif
+}
+#endif
 BOOLEAN GuSafeToReturn(VOID) {
   return !Gu.retained && !Gu.master_attributes_pending &&
     (!Gu.started || (Gu.quiesced && !Gu.fault));
@@ -171,7 +195,7 @@ EFI_STATUS GuEnableMaster(VOID) {
   if(GU_PREFLIGHT_ONLY || !Gu.profile_verified || Gu.fault || Gu.retained || Gu.started || Gu.master_attributes_pending ||
      !Gu.pci || !Gu.pci->Attributes || !Gu.owned || !Gu.armed || !Gu.display_ok)goto fail;
   Status=RawRead(EfiPciIoWidthUint32,0,&Id);
-  if(EFI_ERROR(Status) || Id!=GU_BOARD_ID)goto fail;
+  if(EFI_ERROR(Status) || Id!=Gu.board_id)goto fail;
   Status=RawRead(EfiPciIoWidthUint16,4,&Command);
   if(EFI_ERROR(Status) || Command==0xffff || (Command&4) || !(Command&2))goto fail;
   Status=Gu.pci->Attributes(Gu.pci,EfiPciIoAttributeOperationSupported,0,&Supported);
@@ -206,8 +230,9 @@ EFI_STATUS GuEnableMaster(VOID) {
 fail:
   Gu.fault=TRUE;
   if(!EFI_ERROR(Status))Status=EFI_DEVICE_ERROR;
-  GuLog("Bus Master enable failed: status=%#llx command=%#x readback=%#x managed=%u\n",
-    (unsigned long long)Status,Command,Now,Gu.master_attributes_pending);
+  GuLog("Bus Master enable failed: status=%#llx command=%#x readback=%#x managed=%u supported=%#llx before=%#llx\n",
+    (unsigned long long)Status,Command,Now,Gu.master_attributes_pending,
+    (unsigned long long)Supported,(unsigned long long)Before);
   return Status;
 }
 EFI_STATUS GuClearMaster(VOID) {
@@ -216,7 +241,7 @@ EFI_STATUS GuClearMaster(VOID) {
   if(GU_PREFLIGHT_ONLY)return EFI_ACCESS_DENIED;
   /* Containment remains permitted after a latched I/O failure. */
   Status=RawRead(EfiPciIoWidthUint32,0,&Id);
-  if(EFI_ERROR(Status) || Id!=GU_BOARD_ID)goto fail;
+  if(EFI_ERROR(Status) || Id!=Gu.board_id)goto fail;
   if(Gu.master_attributes_pending) {
     if(Gu.pci!=Gu.master_pci)AttributeStatus=EFI_COMPROMISED_DATA;
     else if(!Gu.pci->Attributes)AttributeStatus=EFI_UNSUPPORTED;
@@ -266,7 +291,7 @@ EFI_STATUS GuSavePci(VOID) {
      Gu.pcie_cap>(Gu.pcie_version==1?0xecU:0xc4U))return EFI_NOT_READY;
   for(I=0;I<64;I++)
     if(EFI_ERROR(GuConfigRead(EfiPciIoWidthUint32,(UINT32)I*4,&Gu.saved_config[I])))return EFI_DEVICE_ERROR;
-  if(Gu.saved_config[0]!=GU_BOARD_ID || Gu.saved_config[11]!=GU_BOARD_SUBSYSTEM ||
+  if(Gu.saved_config[0]!=Gu.board_id || Gu.saved_config[11]!=Gu.board_subsystem ||
      (Gu.saved_config[1]&4))return EFI_ACCESS_DENIED;
   if(EFI_ERROR(GuConfigRead(EfiPciIoWidthUint16,Gu.pcie_cap+8,&Gu.saved_devctl)))return EFI_DEVICE_ERROR;
   if(Gu.saved_devctl&0x8000)return EFI_NOT_READY;
@@ -278,7 +303,7 @@ EFI_STATUS GuFlr(VOID) {
   UINT32 Identity=0,Capability=0;UINT16 Command=0xffff,Pending=0xffff,Ctl=0;
   UINTN Wait;EFI_STATUS ResetStatus;
   if(GU_PREFLIGHT_ONLY || !Gu.profile_verified || !Gu.saved || Gu.flrs || Gu.fault || !Gu.owned || !Gu.armed || !Gu.display_ok)return EFI_NOT_READY;
-  if(EFI_ERROR(GuConfigRead(EfiPciIoWidthUint32,0,&Identity)) || Identity!=GU_BOARD_ID ||
+  if(EFI_ERROR(GuConfigRead(EfiPciIoWidthUint32,0,&Identity)) || Identity!=Gu.board_id ||
      EFI_ERROR(GuConfigRead(EfiPciIoWidthUint16,4,&Command)) || Command==0xffff ||
      (Command&4) || !(Command&2) ||
      EFI_ERROR(GuConfigRead(EfiPciIoWidthUint32,Gu.pcie_cap+4,&Capability)) ||
@@ -309,7 +334,7 @@ EFI_STATUS GuFlr(VOID) {
   if(EFI_ERROR(ResetStatus))return EFI_DEVICE_ERROR;
   for(Wait=0;Wait<=1000000;Wait+=1000) {
     EFI_STATUS Status=RawRead(EfiPciIoWidthUint32,0,&Identity);
-    if(!EFI_ERROR(Status) && Identity==GU_BOARD_ID)return EFI_SUCCESS;
+    if(!EFI_ERROR(Status) && Identity==Gu.board_id)return EFI_SUCCESS;
     if(!EFI_ERROR(Status) && Identity!=0xffffffffU && Identity!=0)break;
     if(Wait<1000000)GuStall(1000);
   }

@@ -5,6 +5,61 @@
 Experimental UEFI GPU unlock and direct Windows handoff, expanded through
 community contributions.
 
+---
+
+## Fork notice
+
+This is a personal fork of
+[impacifist/Windows-GPU-UNLOCK](https://github.com/impacifist/Windows-GPU-UNLOCK),
+based on upstream `main` at `64c2408`. It adds a runtime **dual-GPU** unlock
+for two RTX 3060 12 GB cards in the same power-on session, a `CONFIG.TXT`
+logging switch, and a two-boot compute benchmark.
+
+**The changes in this fork were written by AI (DeepSeek V4.1 Flash)** under
+human direction. They are published **as-is**: this fork is **frozen**, with
+**no maintenance, no support and no warranty**. Issues and pull requests may
+not be answered. Use the upstream project if you want the maintained version.
+
+**Tested hardware - the only configuration validated:**
+
+| | |
+|---|---|
+| Board / CPU | Intel X99, Xeon E5-2678 v3; no iGPU |
+| Console GPU | RTX 3060 12 GB, GA106, `10de:2504` / `10de:1536`, `0000:02:00.0` |
+| Second GPU | RTX 3060 12 GB, GA104, `10de:2487` / `1458:4074`, `0000:03:00.0` |
+| OS / driver | Windows 11 build 26200, NVIDIA 610.88, CUDA 12.8 / cuBLAS 12.8.3 |
+| Boot | FAT32 USB stick; upstream Secure Boot requirements apply |
+
+Other cards, boards, BIOS versions and driver versions are untested. The unlock
+is volatile: it lasts until power-off.
+
+**What this fork adds**
+
+- `internal-boot/build-multi.ps1`, `boot/multi-boot.c` and
+  `unlock/multi-app.c`: a `GU_PROFILE_MULTI_GPU` runtime build. It enumerates
+  the two cards, validates each identity, releases/claims/FLRs one card at a
+  time (console card first), never retries, and halts instead of starting
+  Windows after a hardware-touching failure.
+- `CONFIG.TXT` on the stick: `log = 1|0` controls `RUNnn\REPORT.TXT` and
+  `MBnnn.TXT`. A boot with logging off runs the same hardware sequence.
+- `benchmark/gu_bench.py` and `benchmark/gu-compute-benchmark.cu`: run the same
+  cards on an unlocked and a normal boot and compare them by NVIDIA UUID.
+
+On the pair above, the normal boot measured about 26 TFLOPS FP16/BF16 and
+13 TFLOPS TF32; the unlocked boot measured about 48/49 and 25 TFLOPS, with FP32
+(~8.2 TFLOPS) and memory bandwidth (~330 GB/s) unchanged. That is the
+documented tensor-core cap, not a measurement artifact. See `CHANGES.md` for
+the full change history.
+
+```text
+python benchmark\gu_bench.py -Label unlocked
+# normal boot, stick removed
+python benchmark\gu_bench.py -Label normal
+python benchmark\gu_bench.py -Compare unlocked normal
+```
+
+---
+
 [![Join our Discord community](https://img.shields.io/badge/Join%20Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/WjKsjEqxF)
 [![View compatibility and supported configurations](https://img.shields.io/badge/Compatibility-455A64?style=for-the-badge)](docs/COMPATIBILITY.en.md)
 [![Contribute research and improvements](https://img.shields.io/badge/Contribute-37474F?style=for-the-badge&logo=github&logoColor=white)](docs/CONTRIBUTING.en.md)

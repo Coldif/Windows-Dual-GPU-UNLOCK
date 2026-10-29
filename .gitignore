@@ -7,6 +7,8 @@ benchmark/build-manifest.json
 benchmark/runtime-verification.json
 benchmark/packages-manifest.json
 assets/
+assets.src/
+inputs/
 usb-package/
 *.bin
 *.BIN

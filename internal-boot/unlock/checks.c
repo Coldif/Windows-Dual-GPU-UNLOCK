@@ -16,8 +16,9 @@ static UINT16 ConfigWord(const UINT32 Config[64], UINTN Offset) {
                   ((UINT16)ConfigByte(Config, Offset + 1U) << 8U));
 }
 
-BOOLEAN GuCheckConfig(const UINT32 Config[64], UINTN Segment, UINTN Bus,
-                      UINTN Device, UINTN Function, GU_CAPS *Out) {
+BOOLEAN GuCheckConfigFor(const UINT32 Config[64], UINTN Segment, UINTN Bus,
+                         UINTN Device, UINTN Function, UINT32 Id, UINT32 Subsystem,
+                         GU_CAPS *Out) {
   GU_CAPS Caps = {0, 0, 0, 0, 0};
   UINT8 Occupied[GU_CONFIG_BYTES - GU_CAP_START] = {0};
   UINT64 Seen = 0;
@@ -26,9 +27,9 @@ BOOLEAN GuCheckConfig(const UINT32 Config[64], UINTN Segment, UINTN Bus,
 
   if (Out == NULL) return FALSE;
   *Out = Caps;
-  if (Config == NULL || Segment != 0 || Bus != GU_TARGET_BUS || Device != 0 || Function != 0)
+  if (Config == NULL || Segment != 0 || Bus < 1 || Device != 0 || Function != 0)
     return FALSE;
-  if (Config[0] != GU_BOARD_ID || Config[0x2c / 4] != GU_BOARD_SUBSYSTEM ||
+  if (Config[0] != Id || Config[0x2c / 4] != Subsystem ||
       ConfigByte(Config, 0x0b) != PCI_CLASS_DISPLAY ||
       (ConfigByte(Config, PCI_HEADER_TYPE_OFFSET) & 0x7fU) != HEADER_TYPE_DEVICE)
     return FALSE;
@@ -121,6 +122,18 @@ BOOLEAN GuCheckConfig(const UINT32 Config[64], UINTN Segment, UINTN Bus,
   if (Caps.pm == 0 || Caps.pcie == 0) return FALSE;
   *Out = Caps;
   return TRUE;
+}
+
+BOOLEAN GuCheckConfig(const UINT32 Config[64], UINTN Segment, UINTN Bus,
+                      UINTN Device, UINTN Function, GU_CAPS *Out) {
+  if (Out == NULL) return FALSE;
+  if (Bus != GU_TARGET_BUS) {
+    GU_CAPS Empty = {0, 0, 0, 0, 0};
+    *Out = Empty;
+    return FALSE;
+  }
+  return GuCheckConfigFor(Config, Segment, Bus, Device, Function, GU_BOARD_ID,
+                          GU_BOARD_SUBSYSTEM, Out);
 }
 
 #ifndef GU_PROFILE_LOCAL

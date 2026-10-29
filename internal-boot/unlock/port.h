@@ -78,6 +78,12 @@ typedef struct {
   UINT32 flrs, mmio_writes, dma_count;
   GU_DMA *allocations;
   BOOLEAN (*display_check)(VOID);
+  /* Runtime target context. GuInit copies the compile-time profile into these,
+     so single-target builds keep their exact behaviour. The multi-target build
+     rewrites them per card before that card's checks and transaction; the
+     identity comparisons below then read the runtime copy. */
+  UINT32 board_id, board_subsystem;
+  UINTN target_bus;
 } GU_PLATFORM;
 extern GU_PLATFORM Gu;
 
@@ -94,6 +100,15 @@ BOOLEAN GuEntrySelectorsMatch(UINT32 Ss0, UINT32 Ss1);
 BOOLEAN GuSelectorPhase(UINT32 Phase);
 #endif
 BOOLEAN GuTargetConfig(const UINT32 *Config, UINTN Segment, UINTN Bus, UINTN Device, UINTN Function);
+/* Same check with explicit identity, for a runtime-selected target. */
+BOOLEAN GuTargetConfigFor(const UINT32 *Config, UINTN Segment, UINTN Bus, UINTN Device,
+                          UINTN Function, UINT32 Id, UINT32 Subsystem);
+#ifdef GU_MULTI_GPU
+/* Install one enumerated card as the active target context. */
+VOID GuMultiSelectTarget(UINT32 Id, UINT32 Subsystem, UINTN Bus);
+/* Clear only per-target transaction state after a card finished cleanly. */
+VOID GuMultiResetTransaction(VOID);
+#endif
 BOOLEAN GuSafeToReturn(VOID);
 EFI_STATUS GuDmaAllocate(UINTN Bytes, VOID **Cpu, UINT64 *Dma);
 EFI_STATUS GuDmaFree(VOID *Cpu, UINT64 Dma);

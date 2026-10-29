@@ -3,6 +3,12 @@
  * console firmware. LOCAL always keeps its own captured values, never defaults.
  */
 #pragma once
+#if defined(GU_PROFILE_MULTI_GPU)
+/* The multi-target runtime build releases and unlocks GPUs without ever
+ * fingerprinting the firmware console chain: its policy is one transaction per
+ * card and then Windows, so no console/driver image template exists here and
+ * none may be invented for a machine that was not captured. */
+#else
 #if defined(GU_PROFILE_LOCAL) || defined(GU_PROFILE_PROBE_H610M_3060)
 #error Captured local and identity-only probe profiles must not inherit firmware templates
 #endif
@@ -86,3 +92,4 @@
 #define GU_NVGOP_TEXT_BYTES 0x20d33U
 #define GU_NVGOP_TEXT_SHA256 "615b37a708b1894e18d7fa60cfcdacaa4d8b598863a10b8103d231a595847b2b"
 #endif
+#endif /* GU_PROFILE_MULTI_GPU */

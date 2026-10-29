@@ -14,10 +14,10 @@
 #error GPU family and firmware must be derived from the selected machine profile
 #endif
 
-#if (defined(GU_PROFILE_B650M_3090FE) + defined(GU_PROFILE_B660M_3070TI) + defined(GU_PROFILE_B660M_3090TI) + defined(GU_PROFILE_X870_3090TI) + defined(GU_PROFILE_B660PLUS_3060) + defined(GU_PROFILE_LOCAL) + defined(GU_PROFILE_H610M_3060) + defined(GU_PROFILE_PROBE_H610M_3060)) > 1
+#if (defined(GU_PROFILE_B650M_3090FE) + defined(GU_PROFILE_B660M_3070TI) + defined(GU_PROFILE_B660M_3090TI) + defined(GU_PROFILE_X870_3090TI) + defined(GU_PROFILE_B660PLUS_3060) + defined(GU_PROFILE_LOCAL) + defined(GU_PROFILE_H610M_3060) + defined(GU_PROFILE_PROBE_H610M_3060) + defined(GU_PROFILE_MULTI_GPU)) > 1
 #error Select exactly one machine profile
 #endif
-#if !defined(GU_PROFILE_B650M_3090FE) && !defined(GU_PROFILE_B660M_3070TI) && !defined(GU_PROFILE_B660M_3090TI) && !defined(GU_PROFILE_X870_3090TI) && !defined(GU_PROFILE_B660PLUS_3060) && !defined(GU_PROFILE_LOCAL) && !defined(GU_PROFILE_H610M_3060) && !defined(GU_PROFILE_PROBE_H610M_3060)
+#if !defined(GU_PROFILE_B650M_3090FE) && !defined(GU_PROFILE_B660M_3070TI) && !defined(GU_PROFILE_B660M_3090TI) && !defined(GU_PROFILE_X870_3090TI) && !defined(GU_PROFILE_B660PLUS_3060) && !defined(GU_PROFILE_LOCAL) && !defined(GU_PROFILE_H610M_3060) && !defined(GU_PROFILE_PROBE_H610M_3060) && !defined(GU_PROFILE_MULTI_GPU)
 #define GU_PROFILE_B650M_3090FE 1
 #endif
 
@@ -39,7 +39,7 @@
  * (original verified B650M headless topology). */
 #if defined(GU_PROFILE_B660M_3070TI) || defined(GU_PROFILE_B660M_3090TI) || defined(GU_PROFILE_B660PLUS_3060)
 #define GU_CONSOLE_AGGREGATE 1
-#elif !defined(GU_PROFILE_LOCAL)
+#elif !defined(GU_PROFILE_LOCAL) && !defined(GU_PROFILE_MULTI_GPU)
 #define GU_CONSOLE_AGGREGATE 0
 #endif
 
@@ -96,6 +96,30 @@
 #define GU_PROFILE_NAME "PROBE-ONLY-GIGABYTE-H610M-H-FC-RTX3060-12GB"
 #define GU_BOARD_ID 0x250410deU
 #define GU_BOARD_SUBSYSTEM 0x40961458U
+
+#elif defined(GU_PROFILE_MULTI_GPU)
+
+/* Multi-target runtime build. The cards present in this machine are enumerated
+ * at boot and validated one at a time against multi-app.c's per-card table
+ * (device ID, subsystem, bus, chip revision, VRAM size, live BAR0, live PROM
+ * hash). The constants below are only link-time placeholders for shared code
+ * that keeps its compile-time profile for single-target builds; the
+ * multi-target child never uses them as an identity check. Cold-state,
+ * exclusivity, one-transaction-per-card and no-retry gates stay mandatory.
+ * This profile is not a reviewed machine and claims no console firmware. */
+#define GU_PROFILE_NAME "MULTI-TARGET-RUNTIME"
+#define GU_BOARD_ID 0x248710deU
+#define GU_BOARD_SUBSYSTEM 0x40741458U
+#define GU_BAR0_BASE 0x00000000ULL
+#define GU_BAR0_END 0x00ffffffULL
+#define GU_DEVICE_MEMORY_SIZE 0x3000U
+#define GU_CHIP_ID 0xb74000a1U
+#define GU_GPU_FAMILY GU_GPU_FAMILY_GA104
+#define GU_PROM_SHA256 ""
+#define GU_ROOT_PORT_DEVICE 1U
+#define GU_ROOT_PORT_FUNCTION 0U
+#define GU_RTX_PATH_BYTES 2,1,1
+#define GU_MULTI_GPU 1
 
 #elif defined(GU_PROFILE_H610M_3060)
 
